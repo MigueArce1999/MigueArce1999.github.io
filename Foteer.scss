@@ -1,0 +1,25 @@
+footer{
+    display: flex;
+    flex-direction: column;
+    padding-top: 1rem;
+    padding-bottom: 3rem;
+    margin-left: 10%;
+    margin-right: 10%;
+    p{
+        font-size: 14px;
+        font-family:'IBMPlexMono' ;
+        text-align: center;
+        color: #060A24;
+        font-weight: 500;
+        padding-bottom: 1rem;
+    }
+    ul{
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+        text-align: center;
+        list-style: none;
+    }
+    a{
+        color:#060A24;
+    }
+}

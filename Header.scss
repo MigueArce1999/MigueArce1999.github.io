@@ -1,0 +1,62 @@
+header{
+    margin: 10px 1em 10px;
+    height: 3rem;
+
+.respmenu{
+    a{
+        color: #fff;
+        text-decoration: none;
+        display: block;
+        padding: 16px 20px;
+        max-width: 100%;
+        background: #0000FF;
+        font-variant: small-caps;
+        text-shadow: 1px 1px #fff;
+    }
+    input[type="checkbox"], .fa-bars, .fa-times{
+        position: absolute;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 5px;
+        right: 0;
+        top: 0;
+        width: 20px;
+        height: 24px;
+        cursor: pointer;
+    }
+    .fa-bars, .fa-times{
+        font-size: 20px;
+        pointer-events: none;
+    }
+
+    input[type="checkbox"]{
+        opacity: 0;
+    }
+    color: #000;;
+    position: relative;
+    background: #fff;
+    nav {
+        display: none;
+    }
+    li{
+        list-style: none;
+        }
+    
+    input {
+        &:checked ~{
+            nav{
+                display: block;
+                }
+            .fa-bars{
+                display: none;
+            }
+            
+        }
+        &:not(:checked) ~ .fa-times{
+            display: none;
+            }
+        }
+    }
+}
+    
+

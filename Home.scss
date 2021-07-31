@@ -1,0 +1,60 @@
+.home{
+    margin: auto;
+    display: flex;
+    flex-flow: column;
+    padding: 18px 16px 26px;
+    h1 {
+        font-size: 36px;
+        color: #060A24;
+        font-family: 'IBMplexSans', sans-serif;
+        font-weight: 500;
+        padding-right: 20%;
+        
+        .world{
+            text-decoration: line-through;
+        }
+
+    }
+    p{
+        
+        text-align: justify;
+        margin-top: 16px;
+        font-family: 'IBMPlexMono', sans-serif;
+        color: #060A24;
+        height: 66px;
+        line-height: 130%;
+
+    }
+    .caja{
+        margin-top: 15px;
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 48px;
+        .btn{
+            text-align: center;
+            padding: 13px;
+            position: absolute;
+            text-decoration: none;
+            font-family: 'IBMPlexMono-Medium', sans-serif;
+            font-weight: 500;
+            width: 100%;
+            font-size: 16px;
+            color: #060A24;
+            background-color: #00F3BB;
+            &:hover {
+                //cursor: pointer;
+                background: linear-gradient(to right,#00F0B8,#0000FE);
+                transition: all 500ms ease;
+                color: #fff ;
+            }
+        
+        }
+           
+
+    }
+    
+}
+
+

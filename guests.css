@@ -1,0 +1,16 @@
+.guests {
+  display: -ms-grid;
+  display: grid;
+  -ms-grid-columns: auto;
+      grid-template-columns: auto;
+  grid-gap: 0px;
+  padding: 10px 1px;
+}
+
+.guests h3 {
+  font-size: 2 rem;
+  font-family: 'IBMPlexSans', sans-serif;
+  margin-bottom: 20px;
+  margin-left: 20px;
+}
+/*# sourceMappingURL=guests.css.map */

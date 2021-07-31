@@ -1,0 +1,147 @@
+@media screen and (min-width: 800px) {
+  header {
+    height: 100px;
+  }
+  header .respmenu nav li a:hover {
+    color: #00f3bb;
+    text-decoration: line-through;
+  }
+  header .respmenu nav li a:active {
+    color: #060a24;
+    text-decoration: line-through;
+  }
+
+  .home h1 {
+    font-size: 3rem;
+  }
+  .home p {
+    visibility: hidden;
+    max-width: 70%;
+    padding-top: -60px;
+    margin-top: 0;
+  }
+  .home p::after {
+    content: 'El portal de podcast que explora el mundo de la programaciòn y la tecnologia Nuevos episodios, todos los jueves cada 15 dias.';
+    visibility: visible;
+    float: left;
+  }
+  .home h1 .point {
+    color: blue;
+    border-radius: 50%;
+  }
+
+  .home {
+    justify-content: left;
+    padding-left: 200px;
+  }
+  .home .caja {
+    justify-content: left;
+  }
+  .home .caja .btn {
+    width: 226px;
+    margin-top: 2rem;
+  }
+  header .respmenu {
+    display: flex;
+    justify-content: space-between;
+  }
+  header .respmenu i {
+    display: none;
+  }
+  header .respmenu nav {
+    display: block;
+  }
+  header .respmenu nav ul {
+    display: flex;
+    float: right;
+  }
+  header .respmenu nav ul li a {
+    background: white;
+    color: black;
+  }
+  header .respmenu .logo {
+    padding: 10px 0 0 60px;
+  }
+  header .respmenu .logo img {
+    width: 36px;
+    height: 36px;
+  }
+  .audios {
+    display: grid;
+    grid-column-gap: 60px;
+    grid-row-gap: 50px;
+    grid-template-columns: auto auto;
+    padding: 0 100px 0 100px;
+    margin-bottom: 0;
+  }
+  .audios iframe {
+    margin-bottom: 40px;
+  }
+  .episodes {
+    background: linear-gradient(to right, #0000a3, #0000ff);
+    clip-path: polygon(0 4.1%, 100% 4%, 100% 100%, 0 100%);
+    background-size: 100% 58%;
+    background-repeat: no-repeat;
+    padding-top: 35px;
+  }
+  .episodes h2 {
+    padding-left: 200px;
+    padding-top: 80px;
+    margin-bottom: 20px;
+  }
+  .episodes .info {
+    display: flex;
+    justify-content: space-around;
+  }
+  .episodes .img1 {
+    padding-left: 10%;
+    width: 90%;
+  }
+  .episodes .img1 img {
+    width: 460px;
+  }
+  .episodes .info {
+    align-items: center;
+  }
+  .episodes .info .text p {
+    font-size: 18px;
+    font-family: 'IBMPlexMono', sans-serif;
+    max-width: 80%;
+  }
+
+  .guests .imginvited {
+    display: grid;
+    grid-template-columns: auto auto auto;
+  }
+  .topics h3 {
+    text-align: left;
+    padding: 40px 0 30px 190px;
+    font-size: 40px;
+  }
+  .topics .imgtopics {
+    display: grid;
+    grid-template-columns: auto auto auto auto;
+    padding: 30px 10rem 30px 10rem;
+  }
+  .news {
+    padding-bottom: 150px;
+    background: linear-gradient(to left, #0000ff, #0000a3);
+    clip-path: polygon(0 25%, 100% 0, 100% 100%, 0 100%);
+  }
+  .news .caja .btn {
+    margin-top: 40px;
+    width: 25%;
+    text-align: center;
+  }
+  footer {
+    padding: 2rem 10px 1rem 10px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin: auto 1rem auto 3rem;
+  }
+  footer ul li {
+    display: grid;
+    grid-template-columns: 12px 12px 12px 12px 12px;
+  }
+}
