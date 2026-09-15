@@ -1,0 +1,53 @@
+// Formato regional del negocio: pesos colombianos, zona horaria America/Bogota.
+// Ver docs/04-modelo-de-datos.md §4.10 — las fechas se guardan en UTC (timestamptz)
+// y solo se convierten a hora de Bogotá en esta capa de presentación.
+
+const ZONA_HORARIA = 'America/Bogota'
+
+export function formatoMoneda(valor: number | null | undefined): string {
+  if (valor === null || valor === undefined) return '—'
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0,
+  }).format(valor)
+}
+
+export function formatoFecha(iso: string, opciones: Intl.DateTimeFormatOptions = {}): string {
+  return new Intl.DateTimeFormat('es-CO', {
+    timeZone: ZONA_HORARIA,
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    ...opciones,
+  }).format(new Date(iso))
+}
+
+export function formatoHora(iso: string): string {
+  return new Intl.DateTimeFormat('es-CO', {
+    timeZone: ZONA_HORARIA,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(iso))
+}
+
+export function formatoFechaHora(iso: string): string {
+  return `${formatoFecha(iso)} · ${formatoHora(iso)}`
+}
+
+export function fechaBogotaISO(fecha: Date = new Date()): string {
+  // yyyy-mm-dd tal como se ve en Bogotá, para usar como parámetro de fecha en RPCs.
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: ZONA_HORARIA,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(fecha)
+  const obtener = (tipo: string) => partes.find((p) => p.type === tipo)?.value
+  return `${obtener('year')}-${obtener('month')}-${obtener('day')}`
+}
+
+export function diaSemanaBogota(fecha: Date = new Date()): string {
+  return new Intl.DateTimeFormat('es-CO', { timeZone: ZONA_HORARIA, weekday: 'long' }).format(fecha)
+}
