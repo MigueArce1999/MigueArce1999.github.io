@@ -4,9 +4,9 @@ import { Input, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { Drawer, Modal } from '../../components/ui/Modal'
 import { isDemoMode, supabase, supabaseRequerido } from '../../lib/supabase'
-import { listarEquipoConRendimiento } from '../../lib/api/admin'
+import { invitarEmpleada, listarEquipoConRendimiento } from '../../lib/api/admin'
 import { listarServicios } from '../../lib/api/catalogo'
-import type { Perfil, Profesional, Servicio } from '../../lib/types'
+import type { Profesional, Servicio } from '../../lib/types'
 
 export function AdminEquipo() {
   const [equipo, setEquipo] = useState<Profesional[] | null>(null)
@@ -26,7 +26,7 @@ export function AdminEquipo() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-marca text-2xl font-semibold text-carbon">Equipo</h1>
-        <Button tamano="sm" onClick={() => setModalNueva(true)}>+ Añadir profesional</Button>
+        <Button tamano="sm" onClick={() => setModalNueva(true)}>+ Invitar empleada</Button>
       </div>
       <p className="text-sm text-carbon/60">
         Horarios y reglas de comisión se configuran por separado (comisiones en /admin/comisiones). Ninguno
@@ -71,10 +71,9 @@ export function AdminEquipo() {
         )}
       </Drawer>
 
-      <Modal abierto={modalNueva} onCerrar={() => setModalNueva(false)} titulo="Añadir profesional">
-        <AgregarProfesional
+      <Modal abierto={modalNueva} onCerrar={() => setModalNueva(false)} titulo="Invitar empleada">
+        <InvitarEmpleada
           onCreada={() => {
-            setModalNueva(false)
             recargar()
           }}
         />
@@ -186,70 +185,64 @@ function FormularioProfesional({
   )
 }
 
-function AgregarProfesional({ onCreada }: { onCreada: () => void }) {
-  const [busqueda, setBusqueda] = useState('')
-  const [candidatos, setCandidatos] = useState<Perfil[]>([])
-  const [seleccionado, setSeleccionado] = useState<Perfil | null>(null)
+function generarSlug(nombre: string) {
+  return nombre
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function InvitarEmpleada({ onCreada }: { onCreada: () => void }) {
+  const [nombre, setNombre] = useState('')
+  const [email, setEmail] = useState('')
   const [slug, setSlug] = useState('')
-  const [guardando, setGuardando] = useState(false)
+  const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [exito, setExito] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (isDemoMode || !busqueda) { setCandidatos([]); return }
-    const t = setTimeout(() => {
-      supabase!
-        .from('perfil')
-        .select('*')
-        .eq('rol', 'cliente')
-        .ilike('nombre', `%${busqueda}%`)
-        .limit(5)
-        .then(({ data }) => setCandidatos(data ?? []))
-    }, 300)
-    return () => clearTimeout(t)
-  }, [busqueda])
+  function alCambiarNombre(v: string) {
+    setNombre(v)
+    setSlug(generarSlug(v))
+  }
 
-  async function crear() {
-    if (!seleccionado || !slug) return
-    setGuardando(true)
+  async function enviar(e: React.FormEvent) {
+    e.preventDefault()
+    setEnviando(true)
     setError(null)
+    setExito(null)
     try {
-      const client = supabaseRequerido()
-      const { error: err1 } = await client.from('perfil').update({ rol: 'empleada' }).eq('id', seleccionado.id)
-      if (err1) throw err1
-      const { error: err2 } = await client.from('profesional').insert({ id: seleccionado.id, slug })
-      if (err2) throw err2
+      const resultado = await invitarEmpleada({ nombre, email, slug })
+      setExito(
+        resultado === 'ya_era_empleada'
+          ? `${nombre} ya forma parte del equipo.`
+          : `Invitación enviada a ${email}. En cuanto abra el enlace del correo, su cuenta quedará activa como empleada.`,
+      )
+      setNombre('')
+      setEmail('')
+      setSlug('')
       onCreada()
     } catch (e: any) {
       setError(e.message)
     } finally {
-      setGuardando(false)
+      setEnviando(false)
     }
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <form onSubmit={enviar} className="flex flex-col gap-4">
       {error && <ErrorState mensaje={error} />}
+      {exito && <p className="rounded-lg bg-exito/10 px-3 py-2 text-sm font-medium text-exito">{exito}</p>}
       <p className="text-sm text-carbon/60">
-        Primero la persona debe crear su cuenta en <code>/registro</code> (con el rol de cliente por defecto).
-        Búscala aquí por nombre para convertirla en profesional.
+        Se le envía un correo con un enlace de acceso (sin necesidad de que cree una contraseña). Si el
+        correo ya pertenece a una cuenta de clienta, se usa esa misma cuenta; si no existe, se crea
+        automáticamente al abrir el enlace.
       </p>
-      <Input id="buscarPersona" etiqueta="Buscar por nombre" value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setSeleccionado(null) }} />
-      {!seleccionado && candidatos.map((c) => (
-        <button
-          key={c.id}
-          onClick={() => { setSeleccionado(c); setSlug(c.nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-')) }}
-          className="rounded-lg border border-piedra p-2 text-left text-sm hover:border-oliva"
-        >
-          {c.nombre}
-        </button>
-      ))}
-      {seleccionado && (
-        <>
-          <p className="text-sm text-carbon">Seleccionada: <strong>{seleccionado.nombre}</strong></p>
-          <Input id="slugProfesional" etiqueta="Identificador para su perfil público (slug)" value={slug} onChange={(e) => setSlug(e.target.value)} />
-          <Button onClick={crear} cargando={guardando}>Convertir en profesional</Button>
-        </>
-      )}
-    </div>
+      <Input id="nombreInvitar" etiqueta="Nombre completo" required value={nombre} onChange={(e) => alCambiarNombre(e.target.value)} />
+      <Input id="emailInvitar" etiqueta="Correo electrónico" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Input id="slugInvitar" etiqueta="Identificador para su perfil público (slug)" required value={slug} onChange={(e) => setSlug(e.target.value)} />
+      <Button type="submit" cargando={enviando}>Enviar invitación</Button>
+    </form>
   )
 }

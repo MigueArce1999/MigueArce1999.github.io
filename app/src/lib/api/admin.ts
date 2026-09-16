@@ -1,5 +1,12 @@
 import { isDemoMode, supabaseRequerido } from '../supabase'
-import { demoClientesAdmin, demoEquipoResumen, demoHistorialAtenciones, demoResumenNegocio } from '../demoData'
+import {
+  demoClientesAdmin,
+  demoColaboradoresVenta,
+  demoEquipoResumen,
+  demoHistorialAtenciones,
+  demoProductosVenta,
+  demoResumenNegocio,
+} from '../demoData'
 import type { Cliente, VentaLinea } from '../types'
 
 // Fórmulas del resumen (ver docs/01-arquitectura-informacion.md y docs/03-flujos.md):
@@ -112,4 +119,110 @@ export async function listarEquipoConRendimiento() {
   const { data, error } = await client.from('vista_profesional').select('*').order('orden_visualizacion')
   if (error) throw error
   return data
+}
+
+export interface ColaboradorVenta {
+  id: string
+  atencionServicioId: string
+  colaboradorNombre: string
+  participacion: string | null
+  valor: number
+  creadoPorNombre: string | null
+}
+
+// Colaboradores de las líneas de servicio ya cargadas en el detalle de ventas, con quién los
+// agregó (ver vista_atencion_servicio_colaborador en 0019_admin_colaboradores_productos.sql).
+export async function listarColaboradoresDeLineas(atencionServicioIds: string[]): Promise<ColaboradorVenta[]> {
+  if (isDemoMode) return demoColaboradoresVenta.filter((c) => atencionServicioIds.includes(c.atencionServicioId))
+  if (atencionServicioIds.length === 0) return []
+  const client = supabaseRequerido()
+  const { data, error } = await client
+    .from('vista_atencion_servicio_colaborador')
+    .select('*')
+    .in('atencion_servicio_id', atencionServicioIds)
+  if (error) throw error
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    atencionServicioId: r.atencion_servicio_id,
+    colaboradorNombre: r.colaborador_nombre,
+    participacion: r.participacion,
+    valor: Number(r.valor),
+    creadoPorNombre: r.creado_por_nombre,
+  }))
+}
+
+export interface ProductoVenta {
+  id: string
+  fecha: string
+  clienteNombre: string
+  categoria: string
+  nombre: string
+  cantidad: number
+  precioUnitario: number
+  subtotal: number
+}
+
+export async function listarProductosVendidos(limite = 50): Promise<ProductoVenta[]> {
+  if (isDemoMode) return demoProductosVenta.slice(0, limite)
+  const client = supabaseRequerido()
+  const { data, error } = await client
+    .from('vista_atencion_producto')
+    .select('*')
+    .order('atencion_creado_en', { ascending: false })
+    .limit(limite)
+  if (error) throw error
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    fecha: r.atencion_completado_en ?? r.atencion_creado_en,
+    clienteNombre: r.cliente_nombre,
+    categoria: r.categoria,
+    nombre: r.nombre,
+    cantidad: r.cantidad,
+    precioUnitario: Number(r.precio_unitario),
+    subtotal: Number(r.subtotal),
+  }))
+}
+
+// Invita a una persona a unirse como empleada por correo, sin depender de la clave
+// service_role (nunca debe exponerse en el navegador): signInWithOtp es una llamada segura
+// con la clave pública (anon) que crea la cuenta si no existe y envía un correo con un
+// enlace de acceso. Si el correo ya pertenece a una clienta, se reutiliza esa misma cuenta.
+// El trigger on_auth_user_created (0002_identidad.sql) ya crea perfil+cliente en la misma
+// transacción, así que justo después se puede buscar el usuario por email y ascenderlo.
+export async function invitarEmpleada(params: { nombre: string; email: string; slug: string }): Promise<'invitada' | 'ya_era_empleada'> {
+  if (isDemoMode) return 'invitada'
+  const client = supabaseRequerido()
+  const origen = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
+
+  const { error: errInvitar } = await client.auth.signInWithOtp({
+    email: params.email,
+    options: {
+      data: { nombre: params.nombre },
+      emailRedirectTo: origen ? `${origen}#/ingresar` : undefined,
+    },
+  })
+  if (errInvitar) throw errInvitar
+
+  const { data: candidatos, error: errBuscar } = await client
+    .from('cliente')
+    .select('usuario_id')
+    .ilike('email', params.email)
+    .not('usuario_id', 'is', null)
+    .order('creado_en', { ascending: false })
+    .limit(1)
+  if (errBuscar) throw errBuscar
+  const usuarioId = candidatos?.[0]?.usuario_id
+  if (!usuarioId) {
+    throw new Error('La invitación se envió, pero el perfil todavía no aparece. Espera unos segundos y vuelve a intentarlo.')
+  }
+
+  const { data: yaProfesional, error: errRevisar } = await client.from('profesional').select('id').eq('id', usuarioId).maybeSingle()
+  if (errRevisar) throw errRevisar
+  if (yaProfesional) return 'ya_era_empleada'
+
+  const { error: errRol } = await client.from('perfil').update({ rol: 'empleada' }).eq('id', usuarioId)
+  if (errRol) throw errRol
+  const { error: errProf } = await client.from('profesional').insert({ id: usuarioId, slug: params.slug })
+  if (errProf) throw errProf
+  return 'invitada'
 }
