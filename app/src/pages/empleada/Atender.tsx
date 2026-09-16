@@ -48,8 +48,9 @@ function lineaIncompleta(l: LineaServicioBorrador) {
   return !l.servicioId || !l.profesionalId || l.precio == null || l.precio < 0
 }
 
+// La marca es opcional: la categoría (tinte, champú…) ya identifica el producto igual.
 function productoIncompleto(p: LineaProductoBorrador) {
-  return !p.categoria.trim() || !p.nombre.trim() || p.cantidad <= 0 || p.precioUnitario == null || p.precioUnitario < 0
+  return !p.categoria.trim() || p.cantidad <= 0 || p.precioUnitario == null || p.precioUnitario < 0
 }
 
 // Navegación con teclado compartida por los dos buscadores (cliente y servicio).
@@ -869,7 +870,13 @@ function ProductoFila({
             {CATEGORIAS_PRODUCTO_SUGERIDAS.map((c) => <option key={c} value={c} />)}
           </datalist>
         </div>
-        <Input id={`prod-nombre-${producto.tempId}`} etiqueta="Nombre del producto" value={producto.nombre} onChange={(e) => onCambiar({ nombre: e.target.value })} />
+        <Input
+          id={`prod-nombre-${producto.tempId}`}
+          etiqueta="Marca (opcional)"
+          placeholder="Ej. L'Oréal"
+          value={producto.nombre}
+          onChange={(e) => onCambiar({ nombre: e.target.value })}
+        />
       </div>
       {/* Precio unitario recibe más ancho que Cantidad/Subtotal: el prefijo "$" y el sufijo
           "COP" fijos le restan espacio útil al número frente a un input normal. */}
