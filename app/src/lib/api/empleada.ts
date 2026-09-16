@@ -144,6 +144,22 @@ export async function listarAtencionesDelDia(profesionalId: string, fechaISO: st
   return data
 }
 
+// Autogestión de servicios: antes solo admin podía tocar servicio_profesional
+// (0014_rls.sql). 0022 agrega una policy que permite a cada profesional escribir sus PROPIAS
+// filas (profesional_id = auth.uid()); esta función reemplaza el conjunto completo por el que
+// se le pasa, igual que el mismo patrón ya usado en el formulario de admin (Equipo.tsx).
+export async function guardarServiciosPropios(profesionalId: string, servicioIds: string[]): Promise<void> {
+  if (isDemoMode) return
+  const client = supabaseRequerido()
+  const { error: errDel } = await client.from('servicio_profesional').delete().eq('profesional_id', profesionalId)
+  if (errDel) throw errDel
+  if (servicioIds.length > 0) {
+    const filas = servicioIds.map((servicio_id) => ({ servicio_id, profesional_id: profesionalId }))
+    const { error: errIns } = await client.from('servicio_profesional').insert(filas)
+    if (errIns) throw errIns
+  }
+}
+
 export async function crearLiquidacion(profesionalId: string, periodoInicio: string, periodoFin: string) {
   const client = supabaseRequerido()
   const { data, error } = await client.rpc('fn_crear_liquidacion', {
