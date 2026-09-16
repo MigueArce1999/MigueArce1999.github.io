@@ -675,8 +675,11 @@ function ServicioTarjeta({
   onQuitar?: () => void
   onAgregarColaboracion: (nueva: LineaServicioBorrador) => void
 }) {
-  const servicioSeleccionado = servicios.find((s) => s.id === linea.servicioId)
-  const opcionesProfesional = servicioSeleccionado?.profesionales?.length ? servicioSeleccionado.profesionales : equipo
+  // Siempre el equipo completo: restringir a quienes tiene asignado el servicio en el
+  // catálogo (servicio_profesional) bloqueaba elegir a alguien que sí lo hizo en la práctica
+  // pero no estaba configurada para ese servicio — el mismo problema de fondo que se corrigió
+  // en fn_registrar_atencion (0021) para el lado del servidor.
+  const opcionesProfesional = equipo
 
   function elegirServicio(s: Servicio) {
     onCambiar({
