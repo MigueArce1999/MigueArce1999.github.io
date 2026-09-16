@@ -306,6 +306,30 @@ export const demoResumenNegocio = {
   comisionesPendientes: 450000,
 }
 
+export const demoClientesAdmin: Cliente[] = [
+  demoClienteActual,
+  {
+    id: 'demo-cliente-2',
+    usuario_id: null,
+    nombre: 'Valentina Gómez',
+    telefono: '3001112233',
+    email: null,
+    consentimiento_marketing: false,
+    visitas_completadas: 5,
+    gasto_acumulado: 380000,
+  },
+  {
+    id: 'demo-cliente-3',
+    usuario_id: null,
+    nombre: 'Daniela Restrepo',
+    telefono: '3004445566',
+    email: null,
+    consentimiento_marketing: true,
+    visitas_completadas: 2,
+    gasto_acumulado: 95000,
+  },
+]
+
 export const demoEquipoResumen = demoProfesionales.map((p, i) => ({
   ...p,
   ventasDelMes: [1450000, 980000, 620000, 540000][i],

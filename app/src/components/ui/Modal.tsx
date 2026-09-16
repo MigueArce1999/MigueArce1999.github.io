@@ -1,4 +1,15 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
+
+function useCerrarConEscape(abierto: boolean, onCerrar: () => void) {
+  useEffect(() => {
+    if (!abierto) return
+    function manejar(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCerrar()
+    }
+    window.addEventListener('keydown', manejar)
+    return () => window.removeEventListener('keydown', manejar)
+  }, [abierto, onCerrar])
+}
 
 export function Modal({
   abierto,
@@ -11,6 +22,7 @@ export function Modal({
   titulo: string
   children: ReactNode
 }) {
+  useCerrarConEscape(abierto, onCerrar)
   if (!abierto) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-carbon/40 p-4" onClick={onCerrar}>
@@ -44,6 +56,7 @@ export function Drawer({
   titulo: string
   children: ReactNode
 }) {
+  useCerrarConEscape(abierto, onCerrar)
   if (!abierto) return null
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-carbon/40" onClick={onCerrar}>
