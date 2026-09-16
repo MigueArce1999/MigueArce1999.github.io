@@ -1,5 +1,5 @@
 import { isDemoMode, supabaseRequerido } from '../supabase'
-import { demoEquipoResumen, demoResumenNegocio } from '../demoData'
+import { demoClientesAdmin, demoEquipoResumen, demoResumenNegocio } from '../demoData'
 import type { Cliente } from '../types'
 
 // Fórmulas del resumen (ver docs/01-arquitectura-informacion.md y docs/03-flujos.md):
@@ -57,6 +57,10 @@ export async function resumenNegocio(desdeISO: string, hastaISO: string) {
 }
 
 export async function listarClientes(busqueda?: string): Promise<Cliente[]> {
+  if (isDemoMode) {
+    const q = busqueda?.toLowerCase()
+    return q ? demoClientesAdmin.filter((c) => c.nombre.toLowerCase().includes(q)) : demoClientesAdmin
+  }
   const client = supabaseRequerido()
   let query = client.from('cliente').select('*').order('nombre')
   if (busqueda) query = query.or(`nombre.ilike.%${busqueda}%,telefono.ilike.%${busqueda}%,email.ilike.%${busqueda}%`)

@@ -1,21 +1,36 @@
 import { useEffect, useState } from 'react'
+import { Button } from '../../components/ui/Button'
+import { Input, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
+import { Drawer, Modal } from '../../components/ui/Modal'
+import { isDemoMode, supabase, supabaseRequerido } from '../../lib/supabase'
 import { listarEquipoConRendimiento } from '../../lib/api/admin'
+import { listarServicios } from '../../lib/api/catalogo'
+import type { Perfil, Profesional, Servicio } from '../../lib/types'
 
 export function AdminEquipo() {
-  const [equipo, setEquipo] = useState<any[] | null>(null)
+  const [equipo, setEquipo] = useState<Profesional[] | null>(null)
+  const [servicios, setServicios] = useState<Servicio[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [panelAbierto, setPanelAbierto] = useState<Profesional | null>(null)
+  const [modalNueva, setModalNueva] = useState(false)
 
-  useEffect(() => {
-    listarEquipoConRendimiento().then(setEquipo).catch((e) => setError(e.message))
-  }, [])
+  function recargar() {
+    listarEquipoConRendimiento().then(setEquipo as any).catch((e) => setError(e.message))
+    listarServicios().then(setServicios)
+  }
+
+  useEffect(recargar, [])
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-marca text-2xl font-semibold text-carbon">Equipo</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="font-marca text-2xl font-semibold text-carbon">Equipo</h1>
+        <Button tamano="sm" onClick={() => setModalNueva(true)}>+ Añadir profesional</Button>
+      </div>
       <p className="text-sm text-carbon/60">
-        Horarios, comisiones y permisos de cada profesional se configuran individualmente. Ninguno de estos
-        datos se asume: Claudia, Naldi, Ana y Valery aparecen aquí solo cuando su cuenta y perfil existan.
+        Horarios y reglas de comisión se configuran por separado (comisiones en /admin/comisiones). Ninguno
+        de estos datos se asume: Claudia, Naldi, Ana y Valery aparecen aquí solo cuando su cuenta y perfil existan.
       </p>
 
       {error && <ErrorState mensaje={error} />}
@@ -35,19 +50,205 @@ export function AdminEquipo() {
                   {p.activo ? 'Activa' : 'Inactiva'}
                 </span>
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <p className="text-carbon/50">Horarios</p>
-                  <p className="text-carbon/70">Configurar en /admin/equipo/{p.slug} (pendiente de UI detallada)</p>
-                </div>
-                <div>
-                  <p className="text-carbon/50">Regla de comisión</p>
-                  <p className="text-carbon/70">Configurar en /admin/comisiones</p>
-                </div>
-              </div>
+              <button onClick={() => setPanelAbierto(p)} className="mt-1 self-start text-xs font-semibold text-oliva underline underline-offset-2">
+                Editar perfil y servicios
+              </button>
             </Card>
           ))}
         </div>
+      )}
+
+      <Drawer abierto={panelAbierto !== null} onCerrar={() => setPanelAbierto(null)} titulo="Editar profesional">
+        {panelAbierto && (
+          <FormularioProfesional
+            profesional={panelAbierto}
+            servicios={servicios}
+            onGuardado={() => {
+              setPanelAbierto(null)
+              recargar()
+            }}
+          />
+        )}
+      </Drawer>
+
+      <Modal abierto={modalNueva} onCerrar={() => setModalNueva(false)} titulo="Añadir profesional">
+        <AgregarProfesional
+          onCreada={() => {
+            setModalNueva(false)
+            recargar()
+          }}
+        />
+      </Modal>
+    </div>
+  )
+}
+
+function FormularioProfesional({
+  profesional,
+  servicios,
+  onGuardado,
+}: {
+  profesional: Profesional
+  servicios: Servicio[]
+  onGuardado: () => void
+}) {
+  const [bio, setBio] = useState(profesional.bio ?? '')
+  const [especialidades, setEspecialidades] = useState((profesional.especialidades ?? []).join(', '))
+  const [fotoUrl, setFotoUrl] = useState(profesional.foto_url ?? '')
+  const [activo, setActivo] = useState(profesional.activo)
+  const [serviciosAsignados, setServiciosAsignados] = useState<Set<string>>(new Set())
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isDemoMode) return
+    supabase!
+      .from('servicio_profesional')
+      .select('servicio_id')
+      .eq('profesional_id', profesional.id)
+      .then(({ data }) => setServiciosAsignados(new Set((data ?? []).map((r: any) => r.servicio_id))))
+  }, [profesional.id])
+
+  function alternarServicio(id: string) {
+    setServiciosAsignados((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault()
+    if (isDemoMode) { onGuardado(); return }
+    setGuardando(true)
+    setError(null)
+    try {
+      const client = supabaseRequerido()
+      const { error: err1 } = await client
+        .from('profesional')
+        .update({
+          bio: bio || null,
+          foto_url: fotoUrl || null,
+          activo,
+          especialidades: especialidades.split(',').map((s) => s.trim()).filter(Boolean),
+        })
+        .eq('id', profesional.id)
+      if (err1) throw err1
+
+      // Reemplaza el conjunto de servicios asignados: borra y vuelve a insertar la selección actual.
+      const { error: errDel } = await client.from('servicio_profesional').delete().eq('profesional_id', profesional.id)
+      if (errDel) throw errDel
+      if (serviciosAsignados.size > 0) {
+        const filas = Array.from(serviciosAsignados).map((servicio_id) => ({ servicio_id, profesional_id: profesional.id }))
+        const { error: errIns } = await client.from('servicio_profesional').insert(filas)
+        if (errIns) throw errIns
+      }
+      onGuardado()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <form onSubmit={guardar} className="flex flex-col gap-4">
+      {error && <ErrorState mensaje={error} />}
+      <Textarea id="bio" etiqueta="Presentación" value={bio} onChange={(e) => setBio(e.target.value)} />
+      <Input
+        id="especialidades"
+        etiqueta="Especialidades (separadas por coma)"
+        value={especialidades}
+        onChange={(e) => setEspecialidades(e.target.value)}
+        placeholder="Color, Cortes"
+      />
+      <Input id="fotoUrl" etiqueta="URL de foto (opcional)" value={fotoUrl} onChange={(e) => setFotoUrl(e.target.value)} />
+      <label className="flex items-center gap-2 text-sm text-carbon">
+        <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
+        Visible en el sitio público y disponible para nuevas reservas
+      </label>
+
+      <div>
+        <p className="mb-2 text-sm font-semibold text-carbon">Servicios que realiza</p>
+        <div className="flex flex-col gap-1.5 rounded-lg border border-piedra p-3">
+          {servicios.map((s) => (
+            <label key={s.id} className="flex items-center gap-2 text-sm text-carbon">
+              <input type="checkbox" checked={serviciosAsignados.has(s.id)} onChange={() => alternarServicio(s.id)} />
+              {s.nombre}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <Button type="submit" cargando={guardando}>Guardar cambios</Button>
+    </form>
+  )
+}
+
+function AgregarProfesional({ onCreada }: { onCreada: () => void }) {
+  const [busqueda, setBusqueda] = useState('')
+  const [candidatos, setCandidatos] = useState<Perfil[]>([])
+  const [seleccionado, setSeleccionado] = useState<Perfil | null>(null)
+  const [slug, setSlug] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isDemoMode || !busqueda) { setCandidatos([]); return }
+    const t = setTimeout(() => {
+      supabase!
+        .from('perfil')
+        .select('*')
+        .eq('rol', 'cliente')
+        .ilike('nombre', `%${busqueda}%`)
+        .limit(5)
+        .then(({ data }) => setCandidatos(data ?? []))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [busqueda])
+
+  async function crear() {
+    if (!seleccionado || !slug) return
+    setGuardando(true)
+    setError(null)
+    try {
+      const client = supabaseRequerido()
+      const { error: err1 } = await client.from('perfil').update({ rol: 'empleada' }).eq('id', seleccionado.id)
+      if (err1) throw err1
+      const { error: err2 } = await client.from('profesional').insert({ id: seleccionado.id, slug })
+      if (err2) throw err2
+      onCreada()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {error && <ErrorState mensaje={error} />}
+      <p className="text-sm text-carbon/60">
+        Primero la persona debe crear su cuenta en <code>/registro</code> (con el rol de cliente por defecto).
+        Búscala aquí por nombre para convertirla en profesional.
+      </p>
+      <Input id="buscarPersona" etiqueta="Buscar por nombre" value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setSeleccionado(null) }} />
+      {!seleccionado && candidatos.map((c) => (
+        <button
+          key={c.id}
+          onClick={() => { setSeleccionado(c); setSlug(c.nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-')) }}
+          className="rounded-lg border border-piedra p-2 text-left text-sm hover:border-oliva"
+        >
+          {c.nombre}
+        </button>
+      ))}
+      {seleccionado && (
+        <>
+          <p className="text-sm text-carbon">Seleccionada: <strong>{seleccionado.nombre}</strong></p>
+          <Input id="slugProfesional" etiqueta="Identificador para su perfil público (slug)" value={slug} onChange={(e) => setSlug(e.target.value)} />
+          <Button onClick={crear} cargando={guardando}>Convertir en profesional</Button>
+        </>
       )}
     </div>
   )
