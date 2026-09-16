@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { listarProfesionales, listarPromocionesVigentes, listarServicios } from '../../lib/api/catalogo'
 import { formatoFecha, formatoMoneda } from '../../lib/format'
-import type { Profesional, Promocion, Servicio } from '../../lib/types'
+import { isDemoMode } from '../../lib/supabase'
+import { useAuth } from '../../state/AuthContext'
+import type { Profesional, Promocion, Rol, Servicio } from '../../lib/types'
+
+const rutaPorRol: Record<Rol, string> = { cliente: '/cliente', empleada: '/equipo-app', admin: '/admin' }
 
 export function Home() {
+  const navigate = useNavigate()
+  const { perfil } = useAuth()
   const [servicios, setServicios] = useState<Servicio[] | null>(null)
   const [promos, setPromos] = useState<Promocion[] | null>(null)
   const [equipo, setEquipo] = useState<Profesional[] | null>(null)
@@ -21,6 +27,14 @@ export function Home() {
       })
       .catch((err) => setError(err.message))
   }, [])
+
+  // Aterrizaje del enlace de invitación/magic-link: supabase-js consume el token del hash y
+  // deja al navegador en "/" (ver lib/api/admin.ts → invitarEmpleada). Sin esto, quien entra
+  // por primera vez se quedaría viendo la página pública en vez de su portal.
+  useEffect(() => {
+    if (isDemoMode || !perfil) return
+    navigate(rutaPorRol[perfil.rol], { replace: true })
+  }, [perfil, navigate])
 
   return (
     <div>

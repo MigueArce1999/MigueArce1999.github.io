@@ -162,13 +162,20 @@ export async function listarProductosVendidos(limite = 50): Promise<ProductoVent
 export async function invitarEmpleada(params: { nombre: string; email: string; slug: string }): Promise<'invitada' | 'ya_era_empleada'> {
   if (isDemoMode) return 'invitada'
   const client = supabaseRequerido()
+  // Sin sufijo de ruta (#/ingresar): la app usa HashRouter, y Supabase añade su propio
+  // fragmento "#access_token=...&type=magiclink" al final de emailRedirectTo. Si ya trae un
+  // "#" (p. ej. "...#/ingresar"), el resultado queda con DOS "#" en la misma URL
+  // ("...#/ingresar#access_token=..."), y supabase-js ya no logra leer access_token del hash
+  // (window.location.hash.substring(1) deja de ser un query string válido). Dejando el
+  // origen "limpio", el enlace del correo llega como ".../#access_token=...", supabase-js
+  // detecta la sesión, y luego limpia el hash — Home.tsx se encarga de redirigir a su portal.
   const origen = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
 
   const { error: errInvitar } = await client.auth.signInWithOtp({
     email: params.email,
     options: {
       data: { nombre: params.nombre },
-      emailRedirectTo: origen ? `${origen}#/ingresar` : undefined,
+      emailRedirectTo: origen,
     },
   })
   if (errInvitar) throw errInvitar
