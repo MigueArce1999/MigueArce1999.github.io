@@ -37,8 +37,12 @@ export function AdminComisiones() {
   }, [equipo])
 
   async function liquidar(profesionalId: string) {
-    setLiquidando(profesionalId)
     setError(null)
+    if (new Date(fin) < new Date(inicio)) {
+      setError('El fin del periodo debe ser igual o posterior al inicio.')
+      return
+    }
+    setLiquidando(profesionalId)
     try {
       await crearLiquidacion(profesionalId, inicio, fin)
       setPendientes((p) => ({ ...p, [profesionalId]: 0 }))

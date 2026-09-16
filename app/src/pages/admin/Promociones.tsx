@@ -26,8 +26,12 @@ export function AdminPromociones() {
   async function crear(e: React.FormEvent) {
     e.preventDefault()
     if (isDemoMode) return
-    setGuardando(true)
     setError(null)
+    if (new Date(hasta) <= new Date(desde)) {
+      setError('La fecha "Vigente hasta" debe ser posterior a "Vigente desde".')
+      return
+    }
+    setGuardando(true)
     try {
       const { error: err } = await supabase!.from('promocion').insert({
         nombre,
