@@ -6,7 +6,7 @@ import {
   demoProductosVenta,
   demoResumenNegocio,
 } from '../demoData'
-import type { Cliente, VentaLinea } from '../types'
+import type { Cliente, ReglaComision, VentaLinea } from '../types'
 
 // Fórmulas del resumen (ver docs/01-arquitectura-informacion.md y docs/03-flujos.md):
 // - ventas netas = suma de atencion_servicio (precio_snapshot - descuento) * cantidad de
@@ -136,6 +136,70 @@ export async function eliminarEmpleada(profesionalId: string): Promise<void> {
   if (errRol) throw errRol
   const { error: errProf } = await client.from('profesional').update({ activo: false }).eq('id', profesionalId)
   if (errProf) throw errProf
+}
+
+// --- Comisión base y excepciones por servicio (Equipo → Editar perfil y servicios → Comisiones) ---
+//
+// Misma lógica de prioridad que ya usa fn_completar_y_cobrar_atencion al cobrar (servicio_id
+// específico gana sobre servicio_id null): esto es solo la capa de administración de esas
+// mismas filas de regla_comision, no una regla nueva. Sigue el patrón ya establecido en
+// AdminComisiones.tsx: nunca se hace UPDATE de una regla vigente, se cierra (vigente_hasta)
+// y se crea una nueva, para que las comisiones ya generadas conserven intacto el snapshot de
+// la regla con la que se calcularon (ver regla_aplicada en la tabla comision).
+export async function listarReglasComision(profesionalId: string): Promise<ReglaComision[]> {
+  if (isDemoMode) return []
+  const client = supabaseRequerido()
+  const { data, error } = await client
+    .from('regla_comision')
+    .select('id, profesional_id, servicio_id, tipo, valor, servicio:servicio_id(nombre)')
+    .eq('profesional_id', profesionalId)
+    .is('vigente_hasta', null)
+  if (error) throw error
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    profesionalId: r.profesional_id,
+    servicioId: r.servicio_id,
+    servicioNombre: r.servicio?.nombre ?? null,
+    tipo: r.tipo,
+    valor: Number(r.valor),
+  }))
+}
+
+async function cerrarReglaVigente(profesionalId: string, servicioId: string | null): Promise<void> {
+  const client = supabaseRequerido()
+  let query = client.from('regla_comision').update({ vigente_hasta: new Date().toISOString() }).eq('profesional_id', profesionalId).is('vigente_hasta', null)
+  query = servicioId ? query.eq('servicio_id', servicioId) : query.is('servicio_id', null)
+  const { error } = await query
+  if (error) throw error
+}
+
+// valorPct: 0-100 inclusive, hasta 2 decimales (validado también en el formulario). Reemplaza
+// la comisión base vigente de la profesional; no afecta ninguna excepción por servicio.
+export async function guardarComisionBase(profesionalId: string, valorPct: number): Promise<void> {
+  if (isDemoMode) return
+  await cerrarReglaVigente(profesionalId, null)
+  const client = supabaseRequerido()
+  const { error } = await client.from('regla_comision').insert({ profesional_id: profesionalId, servicio_id: null, tipo: 'porcentaje', valor: valorPct })
+  if (error) throw error
+}
+
+// Crea o reemplaza la excepción vigente para esa combinación profesional+servicio (el índice
+// único regla_comision_vigente_unica_idx impide dos excepciones vigentes para la misma
+// combinación, aunque esta función ya cierra la anterior antes de insertar la nueva).
+export async function guardarExcepcionComision(profesionalId: string, servicioId: string, valorPct: number): Promise<void> {
+  if (isDemoMode) return
+  await cerrarReglaVigente(profesionalId, servicioId)
+  const client = supabaseRequerido()
+  const { error } = await client.from('regla_comision').insert({ profesional_id: profesionalId, servicio_id: servicioId, tipo: 'porcentaje', valor: valorPct })
+  if (error) throw error
+}
+
+// "Eliminar" una excepción cierra su vigencia (nunca se borra la fila, igual que el resto del
+// historial de reglas): las próximas atenciones de ese servicio vuelven a usar la comisión
+// base de la profesional; las comisiones ya generadas con esta excepción no cambian.
+export async function eliminarExcepcionComision(profesionalId: string, servicioId: string): Promise<void> {
+  if (isDemoMode) return
+  await cerrarReglaVigente(profesionalId, servicioId)
 }
 
 export interface ProductoVenta {
