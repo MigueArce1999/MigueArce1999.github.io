@@ -360,7 +360,7 @@ export function EmpleadaAtender() {
                   equipo={equipo}
                   mostrarErrorPrecio={intentoContinuar && (l.precio == null || l.precio < 0)}
                   onCambiar={(cambios) => actualizarLinea(l.tempId, cambios)}
-                  onQuitar={lineas.length > 1 ? () => quitarLinea(l.tempId) : undefined}
+                  onQuitar={() => quitarLinea(l.tempId)}
                   onAgregarColaboracion={agregarLinea}
                 />
               ))
