@@ -16,7 +16,7 @@ Los permisos finos (p. ej. "puede aplicar descuentos", "puede ver agenda de todo
 | Recurso / acción | cliente | empleada | recepcion | admin |
 |---|---|---|---|---|
 | Ver/editar su propio perfil | ✅🔒 | ✅🔒 | ✅🔒 | ✅🔒 |
-| Ver perfil de otro cliente | ❌🔒 | solo si tiene reserva/atención con ella 🔒 | ✅🔒 | ✅🔒 |
+| Ver perfil de otro cliente | ❌🔒 | ✅🔒 (cualquier empleada puede buscar/registrar clientes en recepción y caja) | ✅🔒 | ✅🔒 |
 | Crear reserva propia | ✅🔒 | ✅ (para clientes, como recepción) | ✅ | ✅ |
 | Cancelar/reprogramar reserva propia | ✅🔒 (según política) | — | — | ✅ |
 | Cancelar/reprogramar cualquier reserva | ❌ | ❌🔒 | ✅🔒 | ✅🔒 |
