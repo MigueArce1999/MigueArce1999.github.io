@@ -1,6 +1,6 @@
 import { isDemoMode, supabaseRequerido } from '../supabase'
-import { demoClientesAdmin, demoEquipoResumen, demoResumenNegocio } from '../demoData'
-import type { Cliente } from '../types'
+import { demoClientesAdmin, demoEquipoResumen, demoHistorialAtenciones, demoResumenNegocio } from '../demoData'
+import type { Cliente, VentaLinea } from '../types'
 
 // Fórmulas del resumen (ver docs/01-arquitectura-informacion.md y docs/03-flujos.md):
 // - ventas netas = suma de atencion_servicio (precio_snapshot - descuento) * cantidad de
@@ -65,6 +65,43 @@ export async function listarClientes(busqueda?: string): Promise<Cliente[]> {
   let query = client.from('cliente').select('*').order('nombre')
   if (busqueda) query = query.or(`nombre.ilike.%${busqueda}%,telefono.ilike.%${busqueda}%,email.ilike.%${busqueda}%`)
   const { data, error } = await query
+  if (error) throw error
+  return data
+}
+
+// Detalle de ventas por línea de servicio (no por atención completa), para mostrar en el
+// panel admin cuánto se cobró por cada servicio y cuánto quedó para el negocio después de
+// pagar la comisión (precio - descuento - comisión_total). Ver vista_atencion_servicio en
+// supabase/migrations/0017_vista_atencion_servicio_detalle.sql.
+export async function listarVentasDetalle(limite = 50): Promise<VentaLinea[]> {
+  if (isDemoMode) {
+    return demoHistorialAtenciones.flatMap((a) =>
+      a.lineas.map((l) => ({
+        id: l.id,
+        atencion_id: a.id,
+        servicio_id: l.servicio_id,
+        nombre_snapshot: l.nombre_snapshot,
+        precio_snapshot: l.precio_snapshot,
+        descuento: l.descuento,
+        cantidad: l.cantidad,
+        profesional_id: l.profesional_id,
+        profesional_nombre: l.profesional_nombre,
+        reserva_id: a.reserva_id,
+        atencion_estado: a.estado,
+        atencion_creado_en: a.creado_en,
+        atencion_completado_en: a.completado_en,
+        cliente_id: a.cliente_id,
+        cliente_nombre: a.cliente_nombre ?? '',
+        comision_total: Math.round(l.precio_snapshot * 0.4),
+      })),
+    )
+  }
+  const client = supabaseRequerido()
+  const { data, error } = await client
+    .from('vista_atencion_servicio')
+    .select('*')
+    .order('atencion_creado_en', { ascending: false })
+    .limit(limite)
   if (error) throw error
   return data
 }

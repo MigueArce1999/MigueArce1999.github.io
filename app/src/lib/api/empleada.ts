@@ -1,6 +1,6 @@
 import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
 import { demoComisionesEmpleada, demoReservasAgendaEmpleada } from '../demoData'
-import type { Atencion, ComisionResumen } from '../types'
+import type { Atencion, ComisionResumen, VentaLinea } from '../types'
 
 export async function registrarAtencion(params: {
   clienteId: string
@@ -68,6 +68,26 @@ export async function listarReservasDelDia(profesionalId: string, fechaISO: stri
     .gte('inicio', desde)
     .lte('inicio', hasta)
     .order('inicio')
+  if (error) throw error
+  return data
+}
+
+// Servicios que la profesional registró y cobró hoy directamente desde "Atender", sin pasar
+// por una cita (reserva_id null). "Mi día" solo miraba vista_reserva, así que una venta de
+// mostrador nunca aparecía ahí ni sumaba a "Servicios realizados"/"Vendido hoy" — ver
+// supabase/migrations/0017_vista_atencion_servicio_detalle.sql.
+export async function listarAtencionesDelDia(profesionalId: string, fechaISO: string): Promise<VentaLinea[]> {
+  if (isDemoMode) return []
+  const desde = `${fechaISO}T00:00:00`
+  const hasta = `${fechaISO}T23:59:59`
+  const { data, error } = await supabase!
+    .from('vista_atencion_servicio')
+    .select('*')
+    .eq('profesional_id', profesionalId)
+    .is('reserva_id', null)
+    .gte('atencion_creado_en', desde)
+    .lte('atencion_creado_en', hasta)
+    .order('atencion_creado_en', { ascending: false })
   if (error) throw error
   return data
 }

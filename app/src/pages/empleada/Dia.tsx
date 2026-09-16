@@ -1,23 +1,32 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Cargando, EmptyState } from '../../components/ui/Estados'
-import { EstadoReservaBadge } from '../../components/ui/StatusBadge'
+import { EstadoAtencionBadge, EstadoReservaBadge } from '../../components/ui/StatusBadge'
 import { useAuth } from '../../state/AuthContext'
-import { listarReservasDelDia } from '../../lib/api/empleada'
+import { listarAtencionesDelDia, listarReservasDelDia } from '../../lib/api/empleada'
 import { fechaBogotaISO, formatoHora, formatoMoneda } from '../../lib/format'
-import type { Reserva } from '../../lib/types'
+import type { Reserva, VentaLinea } from '../../lib/types'
 
 export function EmpleadaDia() {
   const { profesional } = useAuth()
   const [reservas, setReservas] = useState<Reserva[] | null>(null)
+  // Ventas de mostrador (sin cita previa) registradas hoy desde "Atender" — no vienen en
+  // vista_reserva, así que se consultan aparte (ver lib/api/empleada.listarAtencionesDelDia).
+  const [ventasMostrador, setVentasMostrador] = useState<VentaLinea[] | null>(null)
 
   useEffect(() => {
     if (!profesional) return
-    listarReservasDelDia(profesional.id, fechaBogotaISO()).then(setReservas as any)
+    const hoy = fechaBogotaISO()
+    listarReservasDelDia(profesional.id, hoy).then(setReservas as any)
+    listarAtencionesDelDia(profesional.id, hoy).then(setVentasMostrador)
   }, [profesional])
 
   const hoyCompletadas = reservas?.filter((r) => r.estado === 'completada') ?? []
-  const vendidoHoy = hoyCompletadas.reduce((acc, r) => acc + (r.precio_estimado ?? 0), 0)
+  const mostradorCompletadas = ventasMostrador?.filter((v) => v.atencion_estado === 'completada') ?? []
+  const vendidoHoy =
+    hoyCompletadas.reduce((acc, r) => acc + (r.precio_estimado ?? 0), 0) +
+    mostradorCompletadas.reduce((acc, v) => acc + (v.precio_snapshot - v.descuento) * v.cantidad, 0)
+  const serviciosRealizados = hoyCompletadas.length + mostradorCompletadas.length
   // Nota: en la vista de agenda no viene el detalle de pago/comisión por línea; para el
   // desglose exacto (cobrado vs comisión vs propinas) se consulta lib/api/empleada.listarComisiones,
   // usado en la pantalla "Mis ventas". Aquí se muestra un resumen rápido del día.
@@ -32,7 +41,7 @@ export function EmpleadaDia() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Resumen etiqueta="Citas hoy" valor={String(reservas?.length ?? '—')} />
-        <Resumen etiqueta="Servicios realizados" valor={String(hoyCompletadas.length)} />
+        <Resumen etiqueta="Servicios realizados" valor={String(serviciosRealizados)} />
         <Resumen etiqueta="Vendido hoy" valor={formatoMoneda(vendidoHoy)} />
         <Resumen etiqueta="Próxima cita" valor={proxima ? formatoHora(proxima.rango_inicio) : '—'} />
       </div>
@@ -56,6 +65,27 @@ export function EmpleadaDia() {
                   <p className="text-xs text-carbon/60">{r.cliente_nombre}</p>
                 </div>
                 <EstadoReservaBadge estado={r.estado} />
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="mb-3 font-semibold text-carbon">Ventas de mostrador de hoy (sin cita)</p>
+        {!ventasMostrador ? (
+          <Cargando />
+        ) : ventasMostrador.length === 0 ? (
+          <EmptyState titulo="Aún no has registrado ninguna venta de mostrador hoy" />
+        ) : (
+          <div className="flex flex-col gap-2">
+            {ventasMostrador.map((v) => (
+              <Card key={v.id} className="flex items-center justify-between py-3">
+                <div>
+                  <p className="font-medium text-carbon">{v.nombre_snapshot}</p>
+                  <p className="text-xs text-carbon/60">{v.cliente_nombre} · {formatoMoneda((v.precio_snapshot - v.descuento) * v.cantidad)}</p>
+                </div>
+                <EstadoAtencionBadge estado={v.atencion_estado} />
               </Card>
             ))}
           </div>
