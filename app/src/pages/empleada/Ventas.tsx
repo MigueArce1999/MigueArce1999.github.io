@@ -104,7 +104,7 @@ export function EmpleadaVentas() {
         </div>
       )}
 
-      <LiquidacionDelDia
+      <ModalLiquidar
         abierto={liquidacionAbierta}
         onCerrar={() => setLiquidacionAbierta(false)}
         profesionalId={profesional?.id}
@@ -122,11 +122,13 @@ function Resumen({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   )
 }
 
-// "Liquidar" aquí es un resumen informativo de lo que se ganó HOY (siempre hoy, sin importar
-// el filtro elegido arriba) — no cambia el estado de ninguna comisión. La liquidación oficial
-// que sí marca comisiones como pagadas sigue siendo una acción de administración
-// (/admin/comisiones → "Liquidar periodo"), para no dejar que alguien se autoapruebe un pago.
-function LiquidacionDelDia({
+// "Liquidar" es un resumen informativo de cuánto se le debe: todas las comisiones generadas
+// que todavía no pasaron por una liquidación oficial (estado != 'liquidada'), sin importar de
+// qué fecha sean ni el filtro elegido arriba. No cambia el estado de ninguna comisión — la
+// liquidación oficial que sí las marca como pagadas sigue siendo una acción exclusiva de
+// administración (/admin/comisiones → "Liquidar periodo"), para no dejar que alguien se
+// autoapruebe un pago.
+function ModalLiquidar({
   abierto,
   onCerrar,
   profesionalId,
@@ -142,44 +144,44 @@ function LiquidacionDelDia({
     if (!abierto || !profesionalId) return
     setComisiones(null)
     setError(null)
-    const hoy = fechaBogotaISO()
-    listarComisiones(profesionalId, `${hoy}T00:00:00`, `${hoy}T23:59:59`)
+    // Rango amplio ("desde siempre" hasta ahora): lo que se debe puede venir de cualquier
+    // fecha, no solo de hoy o del filtro que esté elegido arriba en la pantalla.
+    listarComisiones(profesionalId, '2000-01-01T00:00:00', new Date().toISOString())
       .then(setComisiones)
       .catch((e) => setError(e.message))
   }, [abierto, profesionalId])
 
-  const generadas = comisiones?.filter((c) => c.valor > 0) ?? []
-  const devoluciones = comisiones?.filter((c) => c.valor < 0) ?? []
-  const total = comisiones?.reduce((acc, c) => acc + Number(c.valor), 0) ?? 0
+  const pendientes = (comisiones ?? []).filter((c) => c.estado !== 'liquidada')
+  const totalPendiente = pendientes.reduce((acc, c) => acc + Number(c.valor), 0)
 
   return (
-    <Modal abierto={abierto} onCerrar={onCerrar} titulo="Liquidación del día">
+    <Modal abierto={abierto} onCerrar={onCerrar} titulo="Cuánto se te debe">
       <p className="mb-3 text-sm text-carbon/60">
-        {formatoFecha(new Date().toISOString())} · resumen de lo que ganaste hoy en comisiones. Es
-        informativo: no marca nada como pagado, eso lo hace administración.
+        Comisiones generadas que todavía no han sido liquidadas. Es informativo: no marca nada
+        como pagado, eso lo hace administración.
       </p>
       {error && <ErrorState mensaje={error} />}
+      <div className="mb-4 rounded-lg bg-marfil px-4 py-3">
+        <p className="text-xs text-carbon/50">Total que se te debe</p>
+        <p className="font-marca text-3xl font-semibold text-oliva">{formatoMoneda(totalPendiente)}</p>
+      </div>
       {!comisiones ? (
         <Cargando />
-      ) : comisiones.length === 0 ? (
-        <EmptyState titulo="No has generado comisiones hoy todavía" />
+      ) : pendientes.length === 0 ? (
+        <EmptyState titulo="No tienes comisiones pendientes de liquidar" />
       ) : (
         <div className="flex flex-col gap-1">
-          {[...generadas, ...devoluciones].map((c) => (
+          {pendientes.map((c) => (
             <div key={c.id} className="flex items-center justify-between border-b border-piedra/60 py-2 text-sm last:border-0">
               <div>
-                <p className="font-medium text-carbon">{c.servicio_nombre}</p>
-                <p className="text-xs text-carbon/50">{c.cliente_nombre}</p>
+                <p className="font-medium text-carbon">{c.servicio_nombre} · {c.cliente_nombre}</p>
+                <p className="text-xs text-carbon/50">{formatoFecha(c.creado_en)}</p>
               </div>
               <span className={`font-semibold ${c.valor >= 0 ? 'text-exito' : 'text-error'}`}>{formatoMoneda(c.valor)}</span>
             </div>
           ))}
         </div>
       )}
-      <div className="mt-4 rounded-lg bg-marfil px-4 py-3">
-        <p className="text-xs text-carbon/50">Total ganado hoy</p>
-        <p className="font-marca text-2xl font-semibold text-oliva">{formatoMoneda(total)}</p>
-      </div>
     </Modal>
   )
 }
