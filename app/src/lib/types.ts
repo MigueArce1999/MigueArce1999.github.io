@@ -125,6 +125,27 @@ export interface Atencion {
   total_vendido?: number
 }
 
+// Fila plana de vista_atencion_servicio: una línea de venta con su contexto de atención,
+// cliente y comisión ya generada (ver supabase/migrations/0017_vista_atencion_servicio_detalle.sql).
+export interface VentaLinea {
+  id: string
+  atencion_id: string
+  servicio_id: string
+  nombre_snapshot: string
+  precio_snapshot: number
+  descuento: number
+  cantidad: number
+  profesional_id: string
+  profesional_nombre?: string
+  reserva_id: string | null
+  atencion_estado: EstadoAtencion
+  atencion_creado_en: string
+  atencion_completado_en: string | null
+  cliente_id: string
+  cliente_nombre: string
+  comision_total: number
+}
+
 export interface MovimientoPuntos {
   id: string
   cliente_id: string
