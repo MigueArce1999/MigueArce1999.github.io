@@ -13,6 +13,13 @@ export function formatoMoneda(valor: number | null | undefined): string {
   }).format(valor)
 }
 
+// Solo el número con separador de miles colombiano ("45000" -> "45.000"), sin símbolo de
+// moneda: para el texto editable de un campo de dinero, donde el "$"/"COP" van fuera del
+// valor (ver components/ui/Campos.tsx → CampoMoneda).
+export function formatoEnteroCOP(valor: number): string {
+  return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(valor)
+}
+
 export function formatoFecha(iso: string, opciones: Intl.DateTimeFormatOptions = {}): string {
   return new Intl.DateTimeFormat('es-CO', {
     timeZone: ZONA_HORARIA,

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
-import { Input, Select, Textarea } from '../../components/ui/Campos'
+import { CampoBase, CampoMoneda, Input, Select, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { useAuth } from '../../state/AuthContext'
 import { isDemoMode, supabase } from '../../lib/supabase'
@@ -27,7 +27,9 @@ interface LineaServicioBorrador {
   servicioId: string
   nombre: string
   profesionalId: string
-  precio: number
+  // null = campo vacío (nunca "0" forzado); distinto de un 0 explícito para un servicio
+  // cortesía. Ver docs/03-flujos.md y components/ui/Campos.tsx → CampoMoneda.
+  precio: number | null
   colaboradores: ColaboradorBorrador[]
   colaboradorFormAbierto: boolean
 }
@@ -37,7 +39,7 @@ interface LineaProductoBorrador {
   categoria: string
   nombre: string
   cantidad: number
-  precioUnitario: number
+  precioUnitario: number | null
 }
 
 function idTemporal() {
@@ -45,15 +47,15 @@ function idTemporal() {
 }
 
 function lineaVacia(profesionalPorDefecto: string): LineaServicioBorrador {
-  return { tempId: idTemporal(), servicioId: '', nombre: '', profesionalId: profesionalPorDefecto, precio: 0, colaboradores: [], colaboradorFormAbierto: false }
+  return { tempId: idTemporal(), servicioId: '', nombre: '', profesionalId: profesionalPorDefecto, precio: null, colaboradores: [], colaboradorFormAbierto: false }
 }
 
 function lineaIncompleta(l: LineaServicioBorrador) {
-  return !l.servicioId || !l.profesionalId || l.precio < 0 || Number.isNaN(l.precio)
+  return !l.servicioId || !l.profesionalId || l.precio == null || l.precio < 0
 }
 
 function productoIncompleto(p: LineaProductoBorrador) {
-  return !p.categoria.trim() || !p.nombre.trim() || p.cantidad <= 0 || Number.isNaN(p.precioUnitario) || p.precioUnitario < 0
+  return !p.categoria.trim() || !p.nombre.trim() || p.cantidad <= 0 || p.precioUnitario == null || p.precioUnitario < 0
 }
 
 // Navegación con teclado compartida por los dos buscadores (cliente y servicio).
@@ -86,6 +88,10 @@ export function EmpleadaAtender() {
 
   const [paso, setPaso] = useState<'registrar' | 'cobrar' | 'listo'>('registrar')
   const [errores, setErrores] = useState<string[]>([])
+  // Se activa la primera vez que se intenta continuar; a partir de ahí, los campos
+  // pendientes muestran su propio mensaje debajo (p. ej. "Ingresa el precio cobrado") en vez
+  // de solo aparecer en la lista general de arriba.
+  const [intentoContinuar, setIntentoContinuar] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
@@ -112,8 +118,8 @@ export function EmpleadaAtender() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profesional])
 
-  const subtotalServicios = lineas.reduce((acc, l) => acc + (Number.isFinite(l.precio) ? l.precio : 0), 0)
-  const subtotalProductos = productos.reduce((acc, p) => acc + p.cantidad * p.precioUnitario, 0)
+  const subtotalServicios = lineas.reduce((acc, l) => acc + (l.precio ?? 0), 0)
+  const subtotalProductos = productos.reduce((acc, p) => acc + p.cantidad * (p.precioUnitario ?? 0), 0)
   const total = subtotalServicios + subtotalProductos
 
   function actualizarLinea(tempId: string, cambios: Partial<LineaServicioBorrador>) {
@@ -130,6 +136,7 @@ export function EmpleadaAtender() {
   }
 
   function irACobrar() {
+    setIntentoContinuar(true)
     const nuevosErrores: string[] = []
     if (!cliente) nuevosErrores.push('Selecciona un cliente para continuar.')
     const completas = lineas.filter((l) => !lineaIncompleta(l))
@@ -172,10 +179,10 @@ export function EmpleadaAtender() {
             .map((l) => ({
               servicioId: l.servicioId,
               profesionalId: l.profesionalId,
-              precioSnapshot: l.precio,
+              precioSnapshot: l.precio ?? 0,
               colaboradores: l.colaboradores.map((c) => ({ colaboradorId: c.colaboradorId, participacion: c.participacion, valor: c.valor })),
             })),
-          productos: productos.map((p) => ({ categoria: p.categoria, nombre: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioUnitario })),
+          productos: productos.map((p) => ({ categoria: p.categoria, nombre: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioUnitario ?? 0 })),
           notas: notas.trim() || null,
           borradorKey,
         })
@@ -255,7 +262,7 @@ export function EmpleadaAtender() {
             {productos.map((p) => (
               <div key={p.tempId} className="flex items-center justify-between text-sm">
                 <span className="text-carbon">{p.nombre} <span className="text-carbon/50">· {p.categoria} · x{p.cantidad}</span></span>
-                <span className="font-medium text-carbon">{formatoMoneda(p.cantidad * p.precioUnitario)}</span>
+                <span className="font-medium text-carbon">{formatoMoneda(p.cantidad * (p.precioUnitario ?? 0))}</span>
               </div>
             ))}
           </Card>
@@ -327,6 +334,7 @@ export function EmpleadaAtender() {
                   linea={l}
                   servicios={servicios}
                   equipo={equipo}
+                  mostrarErrorPrecio={intentoContinuar && (l.precio == null || l.precio < 0)}
                   onCambiar={(cambios) => actualizarLinea(l.tempId, cambios)}
                   onQuitar={lineas.length > 1 ? () => quitarLinea(l.tempId) : undefined}
                 />
@@ -346,7 +354,7 @@ export function EmpleadaAtender() {
               <ProductoFila key={p.tempId} producto={p} onCambiar={(c) => actualizarProducto(p.tempId, c)} onQuitar={() => quitarProducto(p.tempId)} />
             ))}
             <button
-              onClick={() => setProductos((prev) => [...prev, { tempId: idTemporal(), categoria: '', nombre: '', cantidad: 1, precioUnitario: 0 }])}
+              onClick={() => setProductos((prev) => [...prev, { tempId: idTemporal(), categoria: '', nombre: '', cantidad: 1, precioUnitario: null }])}
               className="self-start text-sm font-semibold text-oliva hover:underline"
             >
               + Añadir producto
@@ -587,6 +595,7 @@ function ServicioTarjeta({
   linea,
   servicios,
   equipo,
+  mostrarErrorPrecio,
   onCambiar,
   onQuitar,
 }: {
@@ -594,6 +603,7 @@ function ServicioTarjeta({
   linea: LineaServicioBorrador
   servicios: Servicio[]
   equipo: Profesional[]
+  mostrarErrorPrecio: boolean
   onCambiar: (cambios: Partial<LineaServicioBorrador>) => void
   onQuitar?: () => void
 }) {
@@ -604,7 +614,9 @@ function ServicioTarjeta({
     onCambiar({
       servicioId: s.id,
       nombre: s.nombre,
-      precio: s.precio ?? linea.precio,
+      // Si el servicio no tiene precio configurado (a_valorar), el campo queda vacío en vez
+      // de forzar un 0 o conservar lo que hubiera antes.
+      precio: s.precio ?? null,
       profesionalId: linea.profesionalId || opcionesProfesional[0]?.id || '',
     })
   }
@@ -613,17 +625,17 @@ function ServicioTarjeta({
   const [errorColaborador, setErrorColaborador] = useState<string | null>(null)
   const [colaboradorId, setColaboradorId] = useState('')
   const [participacion, setParticipacion] = useState('')
-  const [valorColaborador, setValorColaborador] = useState(0)
+  const [valorColaborador, setValorColaborador] = useState<number | null>(null)
 
   function agregarColaborador() {
     if (!colaboradorId) { setErrorColaborador('Selecciona un colaborador.'); return }
     if (colaboradorId === linea.profesionalId) { setErrorColaborador('El profesional responsable no puede ser su propio colaborador.'); return }
     if (linea.colaboradores.some((c) => c.colaboradorId === colaboradorId)) { setErrorColaborador('Ese colaborador ya está agregado en este servicio.'); return }
-    if (valorColaborador <= 0) { setErrorColaborador('Ingresa un valor mayor a cero.'); return }
-    if (sumaColaboradores + valorColaborador > linea.precio) { setErrorColaborador('La suma de los colaboradores no puede superar el precio del servicio.'); return }
+    if (valorColaborador == null || valorColaborador <= 0) { setErrorColaborador('Ingresa un valor mayor a cero.'); return }
+    if (sumaColaboradores + valorColaborador > (linea.precio ?? 0)) { setErrorColaborador('La suma de los colaboradores no puede superar el precio del servicio.'); return }
     const nombre = equipo.find((p) => p.id === colaboradorId)?.nombre ?? '—'
     onCambiar({ colaboradores: [...linea.colaboradores, { tempId: idTemporal(), colaboradorId, colaboradorNombre: nombre, participacion, valor: valorColaborador }], colaboradorFormAbierto: false })
-    setColaboradorId(''); setParticipacion(''); setValorColaborador(0); setErrorColaborador(null)
+    setColaboradorId(''); setParticipacion(''); setValorColaborador(null); setErrorColaborador(null)
   }
 
   return (
@@ -632,19 +644,30 @@ function ServicioTarjeta({
         <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40">Servicio {numero}</p>
         {onQuitar && <button onClick={onQuitar} aria-label="Quitar servicio" className="text-sm text-error hover:underline">Quitar</button>}
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <ServicioBuscador servicios={servicios} valor={linea.nombre} onSeleccionar={elegirServicio} />
-        <Select id={`prof-${linea.tempId}`} etiqueta="Profesional responsable" value={linea.profesionalId} onChange={(e) => onCambiar({ profesionalId: e.target.value })}>
+      {/* alinearAltura en los tres campos: reserva la misma altura de etiqueta (hasta 2
+          líneas) para que "Profesional responsable" (la más larga, la única que a veces se
+          parte en dos líneas) no desplace su control hacia abajo respecto a Servicio/Precio. */}
+      {/* Precio cobrado recibe algo más de ancho que sus dos vecinos: el prefijo "$" y el
+          sufijo "COP" fijos le restan espacio útil al número frente a un input normal. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1.05fr_1.3fr]">
+        <ServicioBuscador id={`servicio-${linea.tempId}`} servicios={servicios} valor={linea.nombre} onSeleccionar={elegirServicio} />
+        <Select
+          id={`prof-${linea.tempId}`}
+          etiqueta="Profesional responsable"
+          alinearAltura
+          value={linea.profesionalId}
+          onChange={(e) => onCambiar({ profesionalId: e.target.value })}
+        >
           <option value="">Elegir…</option>
           {opcionesProfesional.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
         </Select>
-        <Input
+        <CampoMoneda
           id={`precio-${linea.tempId}`}
-          etiqueta="Precio cobrado (COP)"
-          type="number"
-          min={0}
+          etiqueta="Precio cobrado"
+          alinearAltura
           value={linea.precio}
-          onChange={(e) => onCambiar({ precio: Number(e.target.value) })}
+          onChange={(v) => onCambiar({ precio: v })}
+          error={mostrarErrorPrecio ? 'Ingresa el precio cobrado' : undefined}
         />
       </div>
 
@@ -672,7 +695,7 @@ function ServicioTarjeta({
               ))}
             </Select>
             <Input id={`part-${linea.tempId}`} etiqueta="Participación" placeholder="Apoyo en peinado" value={participacion} onChange={(e) => setParticipacion(e.target.value)} />
-            <Input id={`valorcolab-${linea.tempId}`} etiqueta="Valor asignado" type="number" min={0} value={valorColaborador} onChange={(e) => setValorColaborador(Number(e.target.value))} />
+            <CampoMoneda id={`valorcolab-${linea.tempId}`} etiqueta="Valor asignado" value={valorColaborador} onChange={setValorColaborador} />
           </div>
           <p className="text-xs text-carbon/50">Este valor se distribuye dentro del precio del servicio.</p>
           <div className="flex gap-2">
@@ -689,7 +712,7 @@ function ServicioTarjeta({
   )
 }
 
-function ServicioBuscador({ servicios, valor, onSeleccionar }: { servicios: Servicio[]; valor: string; onSeleccionar: (s: Servicio) => void }) {
+function ServicioBuscador({ id, servicios, valor, onSeleccionar }: { id: string; servicios: Servicio[]; valor: string; onSeleccionar: (s: Servicio) => void }) {
   const [query, setQuery] = useState(valor)
   const [abierto, setAbierto] = useState(false)
   useEffect(() => setQuery(valor), [valor])
@@ -706,36 +729,38 @@ function ServicioBuscador({ servicios, valor, onSeleccionar }: { servicios: Serv
   }
 
   return (
-    <div className="relative">
-      <label className="mb-1.5 block text-sm font-semibold text-carbon">Servicio</label>
-      <input
-        value={query}
-        onChange={(e) => { setQuery(e.target.value); setAbierto(true) }}
-        onFocus={() => setAbierto(true)}
-        onBlur={() => setTimeout(() => setAbierto(false), 150)}
-        onKeyDown={(e) => onKeyDown(e, (i) => elegir(filtrados[i]), () => setAbierto(false))}
-        placeholder="Buscar servicio…"
-        role="combobox"
-        aria-expanded={abierto}
-        className="w-full rounded-lg border border-piedra bg-blanco px-3 py-2.5 text-sm text-carbon outline-none transition-colors focus:border-oliva"
-      />
-      {abierto && (
-        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-piedra bg-blanco shadow-lg">
-          {filtrados.length === 0 && <p className="px-3 py-3 text-sm text-carbon/60">Sin resultados.</p>}
-          {filtrados.map((s, i) => (
-            <button
-              key={s.id}
-              onMouseDown={() => elegir(s)}
-              onMouseEnter={() => setIndice(i)}
-              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${i === indice ? 'bg-piedra/40' : ''}`}
-            >
-              <span className="text-carbon">{s.nombre}</span>
-              {s.precio != null && <span className="text-xs text-carbon/50">{formatoMoneda(s.precio)}</span>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <CampoBase etiqueta="Servicio" id={id} alinearAltura>
+      <div className="relative">
+        <input
+          id={id}
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setAbierto(true) }}
+          onFocus={() => setAbierto(true)}
+          onBlur={() => setTimeout(() => setAbierto(false), 150)}
+          onKeyDown={(e) => onKeyDown(e, (i) => elegir(filtrados[i]), () => setAbierto(false))}
+          placeholder="Buscar servicio…"
+          role="combobox"
+          aria-expanded={abierto}
+          className="w-full rounded-lg border border-piedra bg-blanco px-3 py-2.5 text-sm text-carbon outline-none transition-colors focus:border-oliva"
+        />
+        {abierto && (
+          <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-piedra bg-blanco shadow-lg">
+            {filtrados.length === 0 && <p className="px-3 py-3 text-sm text-carbon/60">Sin resultados.</p>}
+            {filtrados.map((s, i) => (
+              <button
+                key={s.id}
+                onMouseDown={() => elegir(s)}
+                onMouseEnter={() => setIndice(i)}
+                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${i === indice ? 'bg-piedra/40' : ''}`}
+              >
+                <span className="text-carbon">{s.nombre}</span>
+                {s.precio != null && <span className="text-xs text-carbon/50">{formatoMoneda(s.precio)}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </CampoBase>
   )
 }
 
@@ -750,7 +775,7 @@ function ProductoFila({
   onCambiar: (cambios: Partial<LineaProductoBorrador>) => void
   onQuitar: () => void
 }) {
-  const subtotal = producto.cantidad * producto.precioUnitario
+  const subtotal = producto.cantidad * (producto.precioUnitario ?? 0)
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-piedra p-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -769,9 +794,11 @@ function ProductoFila({
         </div>
         <Input id={`prod-nombre-${producto.tempId}`} etiqueta="Nombre del producto" value={producto.nombre} onChange={(e) => onCambiar({ nombre: e.target.value })} />
       </div>
-      <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-4">
+      {/* Precio unitario recibe más ancho que Cantidad/Subtotal: el prefijo "$" y el sufijo
+          "COP" fijos le restan espacio útil al número frente a un input normal. */}
+      <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[0.7fr_1.3fr_1fr_auto]">
         <Input id={`prod-cant-${producto.tempId}`} etiqueta="Cantidad" type="number" min={1} value={producto.cantidad} onChange={(e) => onCambiar({ cantidad: Number(e.target.value) })} />
-        <Input id={`prod-precio-${producto.tempId}`} etiqueta="Precio unitario" type="number" min={0} value={producto.precioUnitario} onChange={(e) => onCambiar({ precioUnitario: Number(e.target.value) })} />
+        <CampoMoneda id={`prod-precio-${producto.tempId}`} etiqueta="Precio unitario" value={producto.precioUnitario} onChange={(v) => onCambiar({ precioUnitario: v })} />
         <div className="text-right">
           <p className="text-xs text-carbon/50">Subtotal</p>
           <p className="font-semibold text-carbon">{formatoMoneda(subtotal)}</p>

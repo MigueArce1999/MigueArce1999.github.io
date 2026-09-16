@@ -230,6 +230,32 @@ export const demoHistorialAtenciones: Atencion[] = [
   },
 ]
 
+// Colaborador y producto de ejemplo para la línea 'demo-linea-1' de arriba, así el panel
+// admin de Ventas (modo demostración) también muestra cómo se ven esos dos bloques.
+export const demoColaboradoresVenta = [
+  {
+    id: 'demo-colab-1',
+    atencionServicioId: 'demo-linea-1',
+    colaboradorNombre: 'Ana',
+    participacion: 'Apoyo en esmaltado',
+    valor: 10000,
+    creadoPorNombre: 'Valery (demo)',
+  },
+]
+
+export const demoProductosVenta = [
+  {
+    id: 'demo-prod-1',
+    fecha: enHoras(-47),
+    clienteNombre: 'Cliente Demo',
+    categoria: 'Tratamiento',
+    nombre: 'Aceite de cutícula',
+    cantidad: 1,
+    precioUnitario: 12000,
+    subtotal: 12000,
+  },
+]
+
 export const demoMovimientosPuntos: MovimientoPuntos[] = [
   {
     id: 'demo-mov-1',
