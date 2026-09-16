@@ -17,6 +17,10 @@ import type { Cliente, MetodoPago, Profesional, Servicio } from '../../lib/types
 // de servicio (esColaboracion = true), sumada al total, cuyo valor asignado es su ganancia
 // completa (100%) — decisión explícita del negocio. ---
 
+// Máximo de colaboradores por servicio (decisión de negocio, sin caso de uso real por encima
+// de esto todavía; evita que un servicio termine con una lista interminable de líneas).
+const MAX_COLABORADORES_POR_SERVICIO = 5
+
 interface LineaServicioBorrador {
   tempId: string
   servicioId: string
@@ -26,6 +30,9 @@ interface LineaServicioBorrador {
   // cortesía. Ver docs/03-flujos.md y components/ui/Campos.tsx → CampoMoneda.
   precio: number | null
   esColaboracion: boolean
+  // Solo presente en una línea de colaboración: tempId de su línea de servicio principal, para
+  // agruparla visualmente bajo esa tarjeta en el paso de registrar (hasta MAX_COLABORADORES_POR_SERVICIO).
+  colaboracionDe?: string
 }
 
 interface LineaProductoBorrador {
@@ -309,7 +316,7 @@ export function EmpleadaAtender() {
     )
   }
 
-  const serviciosContados = lineas.filter((l) => l.servicioId).length
+  const serviciosContados = lineas.filter((l) => l.servicioId && !l.colaboracionDe).length
 
   return (
     <div className="mx-auto max-w-5xl pb-40 md:pb-24 lg:pb-6">
@@ -351,19 +358,23 @@ export function EmpleadaAtender() {
             {cargandoCatalogo ? (
               <Cargando filas={1} />
             ) : (
-              lineas.map((l, i) => (
-                <ServicioTarjeta
-                  key={l.tempId}
-                  numero={i + 1}
-                  linea={l}
-                  servicios={servicios}
-                  equipo={equipo}
-                  mostrarErrorPrecio={intentoContinuar && (l.precio == null || l.precio < 0)}
-                  onCambiar={(cambios) => actualizarLinea(l.tempId, cambios)}
-                  onQuitar={() => quitarLinea(l.tempId)}
-                  onAgregarColaboracion={agregarLinea}
-                />
-              ))
+              lineas
+                .filter((l) => !l.colaboracionDe)
+                .map((l, i) => (
+                  <ServicioTarjeta
+                    key={l.tempId}
+                    numero={i + 1}
+                    linea={l}
+                    colaboradores={lineas.filter((c) => c.colaboracionDe === l.tempId)}
+                    servicios={servicios}
+                    equipo={equipo}
+                    mostrarErrorPrecio={intentoContinuar && (l.precio == null || l.precio < 0)}
+                    onCambiar={(cambios) => actualizarLinea(l.tempId, cambios)}
+                    onQuitar={() => quitarLinea(l.tempId)}
+                    onAgregarColaboracion={agregarLinea}
+                    onQuitarColaboracion={quitarLinea}
+                  />
+                ))
             )}
             <button
               onClick={() => agregarLinea(lineaVacia(profesional?.id ?? ''))}
@@ -659,21 +670,25 @@ function ClienteSeccion({
 function ServicioTarjeta({
   numero,
   linea,
+  colaboradores,
   servicios,
   equipo,
   mostrarErrorPrecio,
   onCambiar,
   onQuitar,
   onAgregarColaboracion,
+  onQuitarColaboracion,
 }: {
   numero: number
   linea: LineaServicioBorrador
+  colaboradores: LineaServicioBorrador[]
   servicios: Servicio[]
   equipo: Profesional[]
   mostrarErrorPrecio: boolean
   onCambiar: (cambios: Partial<LineaServicioBorrador>) => void
   onQuitar?: () => void
   onAgregarColaboracion: (nueva: LineaServicioBorrador) => void
+  onQuitarColaboracion: (tempId: string) => void
 }) {
   // Siempre el equipo completo: restringir a quienes tiene asignado el servicio en el
   // catálogo (servicio_profesional) bloqueaba elegir a alguien que sí lo hizo en la práctica
@@ -699,8 +714,13 @@ function ServicioTarjeta({
   const [valorColaboracion, setValorColaboracion] = useState<number | null>(null)
 
   function agregarColaboracion() {
+    if (colaboradores.length >= MAX_COLABORADORES_POR_SERVICIO) {
+      setErrorColaboracion(`Ya tiene el máximo de ${MAX_COLABORADORES_POR_SERVICIO} colaboradores.`)
+      return
+    }
     if (!colaboradorId) { setErrorColaboracion('Selecciona un colaborador.'); return }
     if (colaboradorId === linea.profesionalId) { setErrorColaboracion('El profesional responsable no puede ser su propio colaborador.'); return }
+    if (colaboradores.some((c) => c.profesionalId === colaboradorId)) { setErrorColaboracion('Ese colaborador ya está agregado en este servicio.'); return }
     if (valorColaboracion == null || valorColaboracion <= 0) { setErrorColaboracion('Ingresa un valor mayor a cero.'); return }
     const nombreColaborador = equipo.find((p) => p.id === colaboradorId)?.nombre ?? '—'
     const nombreBase = linea.nombre || 'Servicio'
@@ -711,6 +731,7 @@ function ServicioTarjeta({
       profesionalId: colaboradorId,
       precio: valorColaboracion,
       esColaboracion: true,
+      colaboracionDe: linea.tempId,
     })
     setColaboradorId(''); setParticipacion(''); setValorColaboracion(null); setErrorColaboracion(null); setFormAbierto(false)
   }
@@ -721,9 +742,7 @@ function ServicioTarjeta({
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-piedra/40 text-lg" aria-hidden>✂️</div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40">
-              {linea.esColaboracion ? 'Colaboración' : `Servicio ${numero}`}
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40">Servicio {numero}</p>
             <p className="text-sm text-carbon/60">{linea.nombre ? 'Servicio seleccionado' : 'Elige un servicio'}</p>
           </div>
         </div>
@@ -760,34 +779,59 @@ function ServicioTarjeta({
         />
       </div>
 
-      {!linea.esColaboracion && (
-        formAbierto ? (
-          <div className="mt-3 flex flex-col gap-2 rounded-lg border border-piedra bg-marfil p-3">
-            {errorColaboracion && <p className="text-xs font-medium text-error">{errorColaboracion}</p>}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <Select id={`colab-${linea.tempId}`} etiqueta="Colaborador" value={colaboradorId} onChange={(e) => setColaboradorId(e.target.value)}>
-                <option value="">Elegir…</option>
-                {equipo.filter((p) => p.id !== linea.profesionalId).map((p) => (
+      {colaboradores.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1.5">
+          {colaboradores.map((c) => {
+            const nombreColaborador = equipo.find((p) => p.id === c.profesionalId)?.nombre ?? '—'
+            return (
+              <div key={c.tempId} className="flex items-center justify-between gap-2 rounded-lg bg-marfil px-3 py-2 text-sm">
+                <span className="text-carbon">{nombreColaborador}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-carbon">{formatoMoneda(c.precio ?? 0)}</span>
+                  <button
+                    onClick={() => onQuitarColaboracion(c.tempId)}
+                    aria-label={`Quitar a ${nombreColaborador} de este servicio`}
+                    className="rounded p-1 text-carbon/40 hover:bg-error/10 hover:text-error"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {colaboradores.length >= MAX_COLABORADORES_POR_SERVICIO ? (
+        <p className="mt-3 text-xs text-carbon/50">Máximo de {MAX_COLABORADORES_POR_SERVICIO} colaboradores por servicio.</p>
+      ) : formAbierto ? (
+        <div className="mt-3 flex flex-col gap-2 rounded-lg border border-piedra bg-marfil p-3">
+          {errorColaboracion && <p className="text-xs font-medium text-error">{errorColaboracion}</p>}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <Select id={`colab-${linea.tempId}-${colaboradores.length}`} etiqueta="Colaborador" value={colaboradorId} onChange={(e) => setColaboradorId(e.target.value)}>
+              <option value="">Elegir…</option>
+              {equipo
+                .filter((p) => p.id !== linea.profesionalId && !colaboradores.some((c) => c.profesionalId === p.id))
+                .map((p) => (
                   <option key={p.id} value={p.id}>{p.nombre}</option>
                 ))}
-              </Select>
-              <Input id={`part-${linea.tempId}`} etiqueta="Participación" placeholder="Apoyo en peinado" value={participacion} onChange={(e) => setParticipacion(e.target.value)} />
-              <CampoMoneda id={`valorcolab-${linea.tempId}`} etiqueta="Valor asignado" value={valorColaboracion} onChange={setValorColaboracion} />
-            </div>
-            <p className="text-xs text-carbon/50">
-              Se suma al total a cobrar y se registra como una línea de servicio nueva: ese valor queda como el 100%
-              de la ganancia del colaborador, sin aplicarle ninguna comisión adicional.
-            </p>
-            <div className="flex gap-2">
-              <Button tamano="sm" onClick={agregarColaboracion}>Añadir colaborador</Button>
-              <Button tamano="sm" variante="ghost" onClick={() => { setFormAbierto(false); setErrorColaboracion(null) }}>Cancelar</Button>
-            </div>
+            </Select>
+            <Input id={`part-${linea.tempId}-${colaboradores.length}`} etiqueta="Participación" placeholder="Apoyo en peinado" value={participacion} onChange={(e) => setParticipacion(e.target.value)} />
+            <CampoMoneda id={`valorcolab-${linea.tempId}-${colaboradores.length}`} etiqueta="Valor asignado" value={valorColaboracion} onChange={setValorColaboracion} />
           </div>
-        ) : (
-          <button onClick={() => setFormAbierto(true)} className="mt-3 text-sm font-semibold text-oliva hover:underline">
-            + Añadir colaborador
-          </button>
-        )
+          <p className="text-xs text-carbon/50">
+            Se suma al total a cobrar y se registra como una línea de servicio nueva: ese valor queda como el 100%
+            de la ganancia del colaborador, sin aplicarle ninguna comisión adicional.
+          </p>
+          <div className="flex gap-2">
+            <Button tamano="sm" onClick={agregarColaboracion}>Añadir colaborador</Button>
+            <Button tamano="sm" variante="ghost" onClick={() => { setFormAbierto(false); setErrorColaboracion(null) }}>Cancelar</Button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setFormAbierto(true)} className="mt-3 text-sm font-semibold text-oliva hover:underline">
+          {colaboradores.length > 0 ? '+ Añadir otro colaborador' : '+ Añadir colaborador'}
+        </button>
       )}
     </div>
   )
