@@ -1,3 +1,4 @@
+import type { ComponentType, SVGProps } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { isDemoMode } from '../../lib/supabase'
 import { DemoBanner } from '../ui/Estados'
@@ -7,7 +8,7 @@ import { cerrarSesion } from '../../lib/api/auth'
 export interface ItemNav {
   to: string
   label: string
-  icono: string
+  icono: ComponentType<SVGProps<SVGSVGElement>>
 }
 
 export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: string }) {
@@ -23,26 +24,30 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
       {isDemoMode && <DemoBanner />}
       <div className="mx-auto flex max-w-6xl">
         {/* Sidebar (tablet/escritorio) */}
-        <aside className="hidden w-60 shrink-0 flex-col gap-1 border-r border-piedra px-4 py-6 md:flex">
-          <Link to="/" className="mb-6 font-marca text-xl font-semibold text-carbon">
+        <aside className="hidden w-60 shrink-0 flex-col gap-7 border-r border-piedra px-4 py-8 md:flex">
+          <Link to="/" className="px-2 font-marca text-xl font-semibold text-carbon">
             Claudia Patricia
+            <span className="mt-1 block font-sans text-[10px] font-semibold uppercase tracking-[0.15em] text-carbon/40">
+              {titulo}
+            </span>
           </Link>
-          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-carbon/40">{titulo}</p>
-          {items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end
-              className={({ isActive }) =>
-                `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive ? 'bg-oliva text-blanco' : 'text-carbon/80 hover:bg-piedra/40'
-                }`
-              }
-            >
-              <span aria-hidden>{item.icono}</span>
-              {item.label}
-            </NavLink>
-          ))}
+          <nav className="flex flex-col gap-1.5">
+            {items.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    isActive ? 'bg-oliva text-blanco' : 'text-carbon/70 hover:bg-piedra/40'
+                  }`
+                }
+              >
+                <item.icono className="h-[18px] w-[18px] shrink-0" />
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
           <div className="mt-auto flex flex-col gap-1 border-t border-piedra pt-3">
             <p className="px-3 text-xs text-carbon/50">{perfil?.nombre}</p>
             <button onClick={salir} className="rounded-lg px-3 py-2 text-left text-sm font-medium text-carbon/70 hover:bg-piedra/40">
@@ -65,22 +70,21 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
         </div>
       </div>
 
-      {/* Navegación inferior (móvil) */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-around border-t border-piedra bg-blanco py-1.5 md:hidden">
+      {/* Navegación inferior (móvil): la pestaña activa recibe un fondo suave en vez de solo
+          cambiar el color del texto, para que se note de un vistazo cuál sección está abierta. */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 border-t border-piedra bg-blanco px-2 py-2 md:hidden">
         {items.slice(0, 5).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end
             className={({ isActive }) =>
-              `flex flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-[11px] font-medium ${
-                isActive ? 'text-oliva' : 'text-carbon/60'
+              `flex flex-1 flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition-colors ${
+                isActive ? 'bg-piedra/60 text-oliva' : 'text-carbon/50'
               }`
             }
           >
-            <span aria-hidden className="text-lg leading-none">
-              {item.icono}
-            </span>
+            <item.icono className="h-[22px] w-[22px]" />
             {item.label}
           </NavLink>
         ))}

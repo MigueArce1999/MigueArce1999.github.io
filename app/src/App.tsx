@@ -41,37 +41,56 @@ import { AdminPromociones } from './pages/admin/Promociones'
 import { AdminContenido } from './pages/admin/Contenido'
 import { AdminReportes } from './pages/admin/Reportes'
 import { AdminConfiguracion } from './pages/admin/Configuracion'
+import {
+  IconoAgenda,
+  IconoAtender,
+  IconoClientes,
+  IconoComisiones,
+  IconoConfiguracion,
+  IconoContenido,
+  IconoEquipo,
+  IconoGastos,
+  IconoHistorial,
+  IconoInicio,
+  IconoPerfil,
+  IconoPromociones,
+  IconoPuntos,
+  IconoReportes,
+  IconoResumen,
+  IconoVentas,
+} from './components/ui/Icons'
+import type { ItemNav } from './components/layout/PortalLayout'
 
-const navCliente = [
-  { to: '/cliente', label: 'Inicio', icono: '🏠' },
-  { to: '/cliente/reservas', label: 'Reservas', icono: '📅' },
-  { to: '/cliente/historial', label: 'Historial', icono: '🧾' },
-  { to: '/cliente/puntos', label: 'Puntos', icono: '⭐' },
-  { to: '/cliente/perfil', label: 'Perfil', icono: '👤' },
+const navCliente: ItemNav[] = [
+  { to: '/cliente', label: 'Inicio', icono: IconoInicio },
+  { to: '/cliente/reservas', label: 'Reservas', icono: IconoAgenda },
+  { to: '/cliente/historial', label: 'Historial', icono: IconoHistorial },
+  { to: '/cliente/puntos', label: 'Puntos', icono: IconoPuntos },
+  { to: '/cliente/perfil', label: 'Perfil', icono: IconoPerfil },
 ]
 
-const navEmpleada = [
-  { to: '/equipo-app', label: 'Mi día', icono: '🏠' },
-  { to: '/equipo-app/agenda', label: 'Agenda', icono: '📅' },
-  { to: '/equipo-app/atender', label: 'Atender', icono: '✂️' },
-  { to: '/equipo-app/ventas', label: 'Ventas', icono: '💰' },
-  { to: '/equipo-app/perfil', label: 'Perfil', icono: '👤' },
+const navEmpleada: ItemNav[] = [
+  { to: '/equipo-app', label: 'Mi día', icono: IconoInicio },
+  { to: '/equipo-app/agenda', label: 'Agenda', icono: IconoAgenda },
+  { to: '/equipo-app/atender', label: 'Atender', icono: IconoAtender },
+  { to: '/equipo-app/ventas', label: 'Ventas', icono: IconoVentas },
+  { to: '/equipo-app/perfil', label: 'Perfil', icono: IconoPerfil },
 ]
 
-const navAdmin = [
-  { to: '/admin', label: 'Resumen', icono: '📊' },
-  { to: '/admin/agenda', label: 'Agenda', icono: '📅' },
-  { to: '/admin/clientes', label: 'Clientes', icono: '👥' },
-  { to: '/admin/equipo', label: 'Equipo', icono: '💼' },
-  { to: '/admin/servicios', label: 'Servicios', icono: '✂️' },
-  { to: '/admin/ventas', label: 'Ventas', icono: '💰' },
-  { to: '/admin/comisiones', label: 'Comisiones', icono: '🧮' },
-  { to: '/admin/gastos', label: 'Gastos', icono: '📉' },
-  { to: '/admin/fidelizacion', label: 'Fidelización', icono: '⭐' },
-  { to: '/admin/promociones', label: 'Promociones', icono: '🏷️' },
-  { to: '/admin/contenido', label: 'Contenido', icono: '🖼️' },
-  { to: '/admin/reportes', label: 'Reportes', icono: '📈' },
-  { to: '/admin/configuracion', label: 'Configuración', icono: '⚙️' },
+const navAdmin: ItemNav[] = [
+  { to: '/admin', label: 'Resumen', icono: IconoResumen },
+  { to: '/admin/agenda', label: 'Agenda', icono: IconoAgenda },
+  { to: '/admin/clientes', label: 'Clientes', icono: IconoClientes },
+  { to: '/admin/equipo', label: 'Equipo', icono: IconoEquipo },
+  { to: '/admin/servicios', label: 'Servicios', icono: IconoAtender },
+  { to: '/admin/ventas', label: 'Ventas', icono: IconoVentas },
+  { to: '/admin/comisiones', label: 'Comisiones', icono: IconoComisiones },
+  { to: '/admin/gastos', label: 'Gastos', icono: IconoGastos },
+  { to: '/admin/fidelizacion', label: 'Fidelización', icono: IconoPuntos },
+  { to: '/admin/promociones', label: 'Promociones', icono: IconoPromociones },
+  { to: '/admin/contenido', label: 'Contenido', icono: IconoContenido },
+  { to: '/admin/reportes', label: 'Reportes', icono: IconoReportes },
+  { to: '/admin/configuracion', label: 'Configuración', icono: IconoConfiguracion },
 ]
 
 function App() {
