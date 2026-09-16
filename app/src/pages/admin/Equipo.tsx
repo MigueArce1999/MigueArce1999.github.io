@@ -1,12 +1,30 @@
 import { useEffect, useState } from 'react'
 import { Button } from '../../components/ui/Button'
-import { Input, Textarea } from '../../components/ui/Campos'
+import { Input, Select, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { Drawer, Modal } from '../../components/ui/Modal'
 import { isDemoMode, supabase, supabaseRequerido } from '../../lib/supabase'
-import { eliminarEmpleada, invitarEmpleada, listarEquipoConRendimiento } from '../../lib/api/admin'
+import {
+  eliminarEmpleada,
+  eliminarExcepcionComision,
+  guardarComisionBase,
+  guardarExcepcionComision,
+  invitarEmpleada,
+  listarEquipoConRendimiento,
+  listarReglasComision,
+} from '../../lib/api/admin'
 import { listarServicios } from '../../lib/api/catalogo'
-import type { Profesional, Servicio } from '../../lib/types'
+import { formatoMoneda } from '../../lib/format'
+import type { Profesional, ReglaComision, Servicio } from '../../lib/types'
+
+// Acepta 0-100, hasta dos decimales ("50", "50.5", "50.55"); rechaza vacío, negativos, >100,
+// más de dos decimales o cualquier otro texto que no sea un número.
+function validarPorcentaje(texto: string): number | null {
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(texto.trim())) return null
+  const n = Number(texto)
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null
+  return Math.round(n * 100) / 100
+}
 
 export function AdminEquipo() {
   const [equipo, setEquipo] = useState<Profesional[] | null>(null)
@@ -197,6 +215,8 @@ function FormularioProfesional({
 
       <Button type="submit" cargando={guardando}>Guardar cambios</Button>
 
+      <SeccionComisiones profesionalId={profesional.id} servicios={servicios} />
+
       <div className="mt-2 rounded-lg border border-error/30 bg-error/5 p-3">
         <p className="mb-1 text-sm font-semibold text-error">Eliminar empleada</p>
         <p className="mb-3 text-xs text-carbon/60">
@@ -222,6 +242,325 @@ function FormularioProfesional({
         )}
       </div>
     </form>
+  )
+}
+
+// Equipo → Editar perfil y servicios → Comisiones: comisión base de la profesional más sus
+// excepciones por servicio (regla_comision.servicio_id null vs. específico — ver
+// supabase/migrations/0006_comisiones_liquidaciones.sql y 0023). La misma prioridad
+// (excepción > base) ya la resuelve fn_completar_y_cobrar_atencion al cobrar; esta sección
+// solo administra esas filas.
+function SeccionComisiones({ profesionalId, servicios }: { profesionalId: string; servicios: Servicio[] }) {
+  const [reglas, setReglas] = useState<ReglaComision[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  function recargar() {
+    if (isDemoMode) { setReglas([]); return }
+    listarReglasComision(profesionalId).then(setReglas).catch((e) => setError(e.message))
+  }
+
+  useEffect(recargar, [profesionalId])
+
+  const base = reglas?.find((r) => r.servicioId === null) ?? null
+  const excepciones = reglas?.filter((r) => r.servicioId !== null) ?? []
+
+  return (
+    <div className="flex flex-col gap-4 rounded-lg border border-piedra p-3">
+      <p className="text-sm font-semibold text-carbon">Comisiones</p>
+      {error && <ErrorState mensaje={error} />}
+      {!reglas ? (
+        <Cargando filas={2} />
+      ) : (
+        <>
+          <ComisionBase profesionalId={profesionalId} regla={base} onGuardado={recargar} />
+          <div className="border-t border-piedra/60 pt-3">
+            <ComisionesEspeciales profesionalId={profesionalId} servicios={servicios} excepciones={excepciones} onCambio={recargar} />
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function ComisionBase({
+  profesionalId,
+  regla,
+  onGuardado,
+}: {
+  profesionalId: string
+  regla: ReglaComision | null
+  onGuardado: () => void
+}) {
+  const [valor, setValor] = useState(regla ? String(regla.valor) : '')
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  const [exito, setExito] = useState(false)
+
+  useEffect(() => {
+    setValor(regla ? String(regla.valor) : '')
+  }, [regla?.id])
+
+  async function guardar() {
+    setError(null)
+    setExito(false)
+    const n = validarPorcentaje(valor)
+    if (n === null) { setError('Ingresa un porcentaje entre 0 y 100, con hasta dos decimales.'); return }
+    setGuardando(true)
+    try {
+      await guardarComisionBase(profesionalId, n)
+      setExito(true)
+      onGuardado()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-sm font-semibold text-carbon">Comisión base</p>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className={`flex items-center rounded-lg border bg-blanco px-2.5 ${error ? 'border-error' : 'border-piedra'}`}>
+          <input
+            value={valor}
+            onChange={(e) => { setValor(e.target.value); setExito(false) }}
+            placeholder="50"
+            inputMode="decimal"
+            aria-label="Comisión base"
+            className="w-16 bg-transparent py-2 text-right text-sm text-carbon outline-none"
+          />
+          <span className="select-none pl-1 text-sm text-carbon/50" aria-hidden>%</span>
+        </div>
+        <Button type="button" tamano="sm" onClick={guardar} cargando={guardando}>Guardar</Button>
+      </div>
+      {error && <p className="text-xs font-medium text-error">{error}</p>}
+      {exito && <p className="text-xs font-medium text-exito">Comisión base actualizada.</p>}
+      <p className="text-xs text-carbon/50">Se aplica a los servicios que no tienen una comisión especial.</p>
+      {!regla && (
+        <p className="text-xs text-advertencia">
+          Sin comisión base configurada todavía: no se generará comisión en los servicios sin excepción hasta que definas una.
+        </p>
+      )}
+      {regla?.tipo === 'fijo' && (
+        <p className="text-xs text-carbon/50">
+          Actualmente tiene un valor fijo configurado ({formatoMoneda(regla.valor)} por servicio); guardar aquí lo reemplaza por un porcentaje.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function ComisionesEspeciales({
+  profesionalId,
+  servicios,
+  excepciones,
+  onCambio,
+}: {
+  profesionalId: string
+  servicios: Servicio[]
+  excepciones: ReglaComision[]
+  onCambio: () => void
+}) {
+  const [formAbierto, setFormAbierto] = useState(false)
+  const [mensaje, setMensaje] = useState<string | null>(null)
+  const serviciosDisponibles = servicios.filter((s) => !excepciones.some((e) => e.servicioId === s.id))
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-semibold text-carbon">Comisiones especiales</p>
+      <p className="text-xs text-carbon/50">Las comisiones especiales reemplazan la comisión base únicamente para el servicio seleccionado.</p>
+      {mensaje && <p className="rounded-lg bg-piedra/30 px-3 py-2 text-xs text-carbon/70">{mensaje}</p>}
+      {excepciones.length === 0 ? (
+        <p className="text-sm text-carbon/60">Esta profesional recibe su comisión base en todos los servicios.</p>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-piedra">
+          <table className="w-full text-sm">
+            <thead className="bg-piedra/30 text-left text-xs uppercase tracking-wide text-carbon/50">
+              <tr>
+                <th className="px-3 py-2">Servicio</th>
+                <th className="px-3 py-2 text-right">Comisión</th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {excepciones.map((r) => (
+                <FilaExcepcion
+                  key={r.id}
+                  regla={r}
+                  profesionalId={profesionalId}
+                  onCambio={onCambio}
+                  onEliminada={(nombre) => setMensaje(`Las nuevas atenciones de "${nombre}" usarán la comisión base.`)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {formAbierto ? (
+        <FormularioExcepcion
+          profesionalId={profesionalId}
+          servicios={serviciosDisponibles}
+          onGuardado={() => { setFormAbierto(false); setMensaje(null); onCambio() }}
+          onCancelar={() => setFormAbierto(false)}
+        />
+      ) : serviciosDisponibles.length === 0 ? (
+        <p className="text-xs text-carbon/50">Ya hay una excepción configurada para todos los servicios.</p>
+      ) : (
+        <button type="button" onClick={() => setFormAbierto(true)} className="self-start text-sm font-semibold text-oliva hover:underline">
+          + Añadir excepción por servicio
+        </button>
+      )}
+    </div>
+  )
+}
+
+function FilaExcepcion({
+  regla,
+  profesionalId,
+  onCambio,
+  onEliminada,
+}: {
+  regla: ReglaComision
+  profesionalId: string
+  onCambio: () => void
+  onEliminada: (nombreServicio: string) => void
+}) {
+  const [editando, setEditando] = useState(false)
+  const [valor, setValor] = useState(String(regla.valor))
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+
+  async function guardar() {
+    setError(null)
+    const n = validarPorcentaje(valor)
+    if (n === null) { setError('Ingresa un porcentaje entre 0 y 100, con hasta dos decimales.'); return }
+    setGuardando(true)
+    try {
+      await guardarExcepcionComision(profesionalId, regla.servicioId!, n)
+      setEditando(false)
+      onCambio()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function eliminar() {
+    setEliminando(true)
+    try {
+      await eliminarExcepcionComision(profesionalId, regla.servicioId!)
+      onEliminada(regla.servicioNombre ?? 'este servicio')
+      onCambio()
+    } catch (e: any) {
+      setError(e.message)
+      setEliminando(false)
+    }
+  }
+
+  if (editando) {
+    return (
+      <tr className="border-t border-piedra/60">
+        <td className="px-3 py-2 text-carbon">{regla.servicioNombre}</td>
+        <td className="px-3 py-2">
+          <div className="flex items-center justify-end gap-1">
+            <input
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              aria-label={`Comisión especial para ${regla.servicioNombre}`}
+              className={`w-16 rounded border px-2 py-1 text-right text-sm ${error ? 'border-error' : 'border-piedra'}`}
+            />
+            <span className="text-sm text-carbon/60" aria-hidden>%</span>
+          </div>
+          {error && <p className="text-right text-xs font-medium text-error">{error}</p>}
+        </td>
+        <td className="px-3 py-2 text-right">
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={guardar} disabled={guardando} className="text-xs font-semibold text-oliva hover:underline">Guardar</button>
+            <button
+              type="button"
+              onClick={() => { setEditando(false); setValor(String(regla.valor)); setError(null) }}
+              className="text-xs text-carbon/50 hover:underline"
+            >
+              Cancelar
+            </button>
+          </div>
+        </td>
+      </tr>
+    )
+  }
+
+  return (
+    <tr className="border-t border-piedra/60">
+      <td className="px-3 py-2 text-carbon">{regla.servicioNombre}</td>
+      <td className="px-3 py-2 text-right font-semibold text-carbon">{regla.valor}%</td>
+      <td className="px-3 py-2 text-right">
+        {confirmandoEliminar ? (
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={eliminar} disabled={eliminando} className="text-xs font-semibold text-error hover:underline">Sí, eliminar</button>
+            <button type="button" onClick={() => setConfirmandoEliminar(false)} disabled={eliminando} className="text-xs text-carbon/50 hover:underline">Cancelar</button>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setEditando(true)} className="text-xs font-semibold text-oliva hover:underline">Editar</button>
+            <button type="button" onClick={() => setConfirmandoEliminar(true)} className="text-xs font-semibold text-error hover:underline">Eliminar</button>
+          </div>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+function FormularioExcepcion({
+  profesionalId,
+  servicios,
+  onGuardado,
+  onCancelar,
+}: {
+  profesionalId: string
+  servicios: Servicio[]
+  onGuardado: () => void
+  onCancelar: () => void
+}) {
+  const [servicioId, setServicioId] = useState('')
+  const [valor, setValor] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+
+  async function guardar() {
+    setError(null)
+    if (!servicioId) { setError('Elige un servicio.'); return }
+    const n = validarPorcentaje(valor)
+    if (n === null) { setError('Ingresa un porcentaje entre 0 y 100, con hasta dos decimales.'); return }
+    setGuardando(true)
+    try {
+      await guardarExcepcionComision(profesionalId, servicioId, n)
+      onGuardado()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-piedra bg-marfil p-3">
+      {error && <p className="text-xs font-medium text-error">{error}</p>}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1fr]">
+        <Select id="servicioExcepcion" etiqueta="Servicio" value={servicioId} onChange={(e) => setServicioId(e.target.value)}>
+          <option value="">Elegir…</option>
+          {servicios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+        </Select>
+        <Input id="valorExcepcion" etiqueta="Comisión (%)" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="60" inputMode="decimal" />
+      </div>
+      <div className="flex gap-2">
+        <Button type="button" tamano="sm" onClick={guardar} cargando={guardando}>Guardar excepción</Button>
+        <Button type="button" tamano="sm" variante="ghost" onClick={onCancelar}>Cancelar</Button>
+      </div>
+    </div>
   )
 }
 

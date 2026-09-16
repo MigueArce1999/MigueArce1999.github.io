@@ -7,6 +7,7 @@ import { useAuth } from '../../state/AuthContext'
 import { isDemoMode, supabase } from '../../lib/supabase'
 import { listarProfesionales, listarServicios } from '../../lib/api/catalogo'
 import { buscarClientes, completarYCobrarAtencion, listarClientesRecientes, registrarAtencion } from '../../lib/api/empleada'
+import { estimarComision, type EstimacionComision } from '../../lib/api/comisiones'
 import { formatoMoneda } from '../../lib/format'
 import type { Cliente, MetodoPago, Profesional, Servicio } from '../../lib/types'
 
@@ -264,6 +265,7 @@ export function EmpleadaAtender() {
                   )}
                 </p>
                 <p className="text-xs text-carbon/60">{equipo.find((p) => p.id === l.profesionalId)?.nombre ?? '—'}</p>
+                <VistaPreviaComision linea={l} />
               </div>
               <span className="font-semibold text-carbon">{formatoMoneda(l.precio)}</span>
             </div>
@@ -663,6 +665,46 @@ function ClienteSeccion({
   )
 }
 
+// Vista previa discreta de comisión y ganancia estimada (usada en el paso de registrar y en
+// el de cobrar, para que ambos reflejen la regla vigente en cada momento). Mismos permisos que
+// ya usa la RLS de regla_comision (admin, o la propia profesional viendo su propia línea) —
+// nadie ve la comisión de una compañera desde aquí. Es solo una estimación (ver
+// lib/api/comisiones.ts); el servidor la vuelve a calcular al confirmar el cobro, así que
+// nunca se muestra como ganancia definitiva.
+function VistaPreviaComision({ linea }: { linea: LineaServicioBorrador }) {
+  const { perfil, profesional: miProfesional } = useAuth()
+  const puedeVerComision = perfil?.rol === 'admin' || (!!miProfesional && linea.profesionalId === miProfesional.id)
+  const [estimacion, setEstimacion] = useState<EstimacionComision | null>(null)
+  const [cargando, setCargando] = useState(false)
+
+  useEffect(() => {
+    if (!puedeVerComision || linea.esColaboracion || !linea.servicioId || !linea.profesionalId || linea.precio == null || linea.precio <= 0) {
+      setEstimacion(null)
+      setCargando(false)
+      return
+    }
+    let activo = true
+    setCargando(true)
+    estimarComision(linea.profesionalId, linea.servicioId, linea.precio).then((r) => {
+      if (activo) { setEstimacion(r); setCargando(false) }
+    })
+    return () => { activo = false }
+  }, [puedeVerComision, linea.esColaboracion, linea.servicioId, linea.profesionalId, linea.precio])
+
+  const mostrar = puedeVerComision && !linea.esColaboracion && !!linea.servicioId && !!linea.profesionalId && linea.precio != null && linea.precio > 0 && !cargando
+  if (!mostrar) return null
+
+  return (
+    <p className="mt-2 text-xs text-carbon/50">
+      {estimacion?.encontrada
+        ? `Comisión ${estimacion.origen === 'excepcion' ? 'especial' : 'base'}: ${
+            estimacion.tipo === 'porcentaje' ? `${estimacion.valor}%` : formatoMoneda(estimacion.valor ?? 0)
+          } · Ganancia estimada: ${formatoMoneda(estimacion.comisionEstimada ?? 0)}`
+        : 'Configura la comisión de esta profesional para ver una estimación de ganancia (Equipo → Editar perfil y servicios).'}
+    </p>
+  )
+}
+
 // --- Servicio: selector con búsqueda (filtra el catálogo ya cargado), profesional
 // responsable, precio editable. "+ Añadir colaborador" crea una línea de servicio HERMANA
 // (no anidada): se suma al total y su valor es la ganancia completa de esa persona. ---
@@ -778,6 +820,8 @@ function ServicioTarjeta({
           error={mostrarErrorPrecio ? 'Ingresa el precio cobrado' : undefined}
         />
       </div>
+
+      <VistaPreviaComision linea={linea} />
 
       {colaboradores.length > 0 && (
         <div className="mt-3 flex flex-col gap-1.5">

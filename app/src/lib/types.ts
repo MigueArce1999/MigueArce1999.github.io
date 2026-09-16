@@ -169,6 +169,18 @@ export interface ComisionResumen {
   cliente_nombre?: string
 }
 
+// Fila vigente de regla_comision (ver supabase/migrations/0006/0023): servicio_id null es la
+// comisión base de la profesional; con servicio_id es una excepción que la reemplaza (nunca
+// se suma) únicamente para ese servicio.
+export interface ReglaComision {
+  id: string
+  profesionalId: string
+  servicioId: string | null
+  servicioNombre: string | null
+  tipo: 'porcentaje' | 'fijo'
+  valor: number
+}
+
 export interface ConfiguracionNegocio {
   moneda: string
   zona_horaria: string
