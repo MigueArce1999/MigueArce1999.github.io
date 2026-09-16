@@ -11,16 +11,11 @@ import { formatoMoneda } from '../../lib/format'
 import type { Cliente, MetodoPago, Profesional, Servicio } from '../../lib/types'
 
 // --- Tipos del borrador (solo viven en el navegador hasta el clic final en "Confirmar
-// cobro"; ver fn_registrar_atencion en supabase/migrations/0018_atender_avanzado.sql para
-// la validación de negocio que se repite aquí en el cliente como primera línea de defensa). ---
-
-interface ColaboradorBorrador {
-  tempId: string
-  colaboradorId: string
-  colaboradorNombre: string
-  participacion: string
-  valor: number
-}
+// cobro"; ver fn_registrar_atencion en supabase/migrations/0020_colaborador_como_servicio.sql
+// para la validación de negocio que se repite aquí en el cliente como primera línea de
+// defensa). Un colaborador NO es un campo anidado dentro de un servicio: es su PROPIA línea
+// de servicio (esColaboracion = true), sumada al total, cuyo valor asignado es su ganancia
+// completa (100%) — decisión explícita del negocio. ---
 
 interface LineaServicioBorrador {
   tempId: string
@@ -30,8 +25,7 @@ interface LineaServicioBorrador {
   // null = campo vacío (nunca "0" forzado); distinto de un 0 explícito para un servicio
   // cortesía. Ver docs/03-flujos.md y components/ui/Campos.tsx → CampoMoneda.
   precio: number | null
-  colaboradores: ColaboradorBorrador[]
-  colaboradorFormAbierto: boolean
+  esColaboracion: boolean
 }
 
 interface LineaProductoBorrador {
@@ -47,7 +41,7 @@ function idTemporal() {
 }
 
 function lineaVacia(profesionalPorDefecto: string): LineaServicioBorrador {
-  return { tempId: idTemporal(), servicioId: '', nombre: '', profesionalId: profesionalPorDefecto, precio: null, colaboradores: [], colaboradorFormAbierto: false }
+  return { tempId: idTemporal(), servicioId: '', nombre: '', profesionalId: profesionalPorDefecto, precio: null, esColaboracion: false }
 }
 
 function lineaIncompleta(l: LineaServicioBorrador) {
@@ -69,6 +63,22 @@ function useNavegacionLista(cantidad: number) {
     else if (e.key === 'Escape') { cerrar() }
   }
   return { indice, setIndice, onKeyDown }
+}
+
+function Stepper({ paso }: { paso: 'registrar' | 'cobrar' }) {
+  return (
+    <div className="hidden items-center gap-3 sm:flex">
+      <div className="flex items-center gap-2">
+        <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${paso === 'registrar' ? 'bg-oliva text-blanco' : 'bg-piedra/50 text-carbon/50'}`}>1</span>
+        <span className={`text-sm font-semibold ${paso === 'registrar' ? 'text-carbon' : 'text-carbon/40'}`}>Registrar atención</span>
+      </div>
+      <span className="h-px w-8 bg-piedra" />
+      <div className="flex items-center gap-2">
+        <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${paso === 'cobrar' ? 'bg-oliva text-blanco' : 'bg-piedra/50 text-carbon/50'}`}>2</span>
+        <span className={`text-sm font-semibold ${paso === 'cobrar' ? 'text-carbon' : 'text-carbon/40'}`}>Cobrar</span>
+      </div>
+    </div>
+  )
 }
 
 export function EmpleadaAtender() {
@@ -128,6 +138,9 @@ export function EmpleadaAtender() {
   function quitarLinea(tempId: string) {
     setLineas((prev) => prev.filter((l) => l.tempId !== tempId))
   }
+  function agregarLinea(nueva: LineaServicioBorrador) {
+    setLineas((prev) => [...prev, nueva])
+  }
   function actualizarProducto(tempId: string, cambios: Partial<LineaProductoBorrador>) {
     setProductos((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, ...cambios } : p)))
   }
@@ -145,9 +158,6 @@ export function EmpleadaAtender() {
     } else if (lineas.length > completas.length) {
       nuevosErrores.push('Hay un servicio sin terminar: elige servicio, profesional y precio, o quítalo con la ✕.')
     }
-    lineas.forEach((l, i) => {
-      if (l.colaboradorFormAbierto) nuevosErrores.push(`Termina o cancela el colaborador que estás agregando en el servicio ${i + 1}.`)
-    })
     if (productos.some(productoIncompleto)) {
       nuevosErrores.push('Hay un producto sin categoría, nombre o precio: complétalo o quítalo.')
     }
@@ -180,7 +190,7 @@ export function EmpleadaAtender() {
               servicioId: l.servicioId,
               profesionalId: l.profesionalId,
               precioSnapshot: l.precio ?? 0,
-              colaboradores: l.colaboradores.map((c) => ({ colaboradorId: c.colaboradorId, participacion: c.participacion, valor: c.valor })),
+              esColaboracion: l.esColaboracion,
             })),
           productos: productos.map((p) => ({ categoria: p.categoria, nombre: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioUnitario ?? 0 })),
           notas: notas.trim() || null,
@@ -213,13 +223,17 @@ export function EmpleadaAtender() {
   }
 
   if (paso === 'cobrar') {
+    const lineasCompletas = lineas.filter((l) => !lineaIncompleta(l))
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-4 pb-6">
-        <div className="flex items-center justify-between">
-          <h1 className="font-marca text-2xl font-semibold text-carbon">Cobrar</h1>
-          <button onClick={() => setPaso('registrar')} className="text-sm font-semibold text-oliva underline underline-offset-2">
-            ← Volver a editar
-          </button>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="font-marca text-2xl font-semibold text-carbon">Cobrar</h1>
+            <button onClick={() => setPaso('registrar')} className="text-sm font-semibold text-oliva underline underline-offset-2">
+              ← Volver a editar
+            </button>
+          </div>
+          <Stepper paso="cobrar" />
         </div>
 
         {error && <ErrorState mensaje={error} reintentar={confirmarCobro} />}
@@ -230,28 +244,20 @@ export function EmpleadaAtender() {
           {cliente?.telefono && <p className="text-sm text-carbon/60">{cliente.telefono}</p>}
         </Card>
 
-        <Card className="flex flex-col gap-4">
+        <Card className="flex flex-col gap-3">
           <p className="text-xs uppercase tracking-wide text-carbon/50">Servicios</p>
-          {lineas.filter((l) => !lineaIncompleta(l)).map((l) => (
-            <div key={l.tempId} className="flex flex-col gap-2 border-b border-piedra/60 pb-3 last:border-0 last:pb-0">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-carbon">{l.nombre}</p>
-                  <p className="text-xs text-carbon/60">{equipo.find((p) => p.id === l.profesionalId)?.nombre ?? '—'}</p>
-                </div>
-                <span className="font-semibold text-carbon">{formatoMoneda(l.precio)}</span>
+          {lineasCompletas.map((l) => (
+            <div key={l.tempId} className="flex items-center justify-between border-b border-piedra/60 pb-3 last:border-0 last:pb-0">
+              <div>
+                <p className="font-medium text-carbon">
+                  {l.nombre}
+                  {l.esColaboracion && (
+                    <span className="ml-2 rounded-full bg-champan/30 px-2 py-0.5 text-xs font-semibold text-carbon/70">Colaboración</span>
+                  )}
+                </p>
+                <p className="text-xs text-carbon/60">{equipo.find((p) => p.id === l.profesionalId)?.nombre ?? '—'}</p>
               </div>
-              {l.colaboradores.length > 0 && (
-                <div className="flex flex-col gap-1 rounded-lg bg-champan/15 px-3 py-2">
-                  <p className="text-xs font-semibold text-carbon/60">Distribución interna (no se suma a la cuenta)</p>
-                  {l.colaboradores.map((c) => (
-                    <div key={c.tempId} className="flex items-center justify-between text-xs text-carbon/70">
-                      <span>{c.colaboradorNombre}{c.participacion ? ` · ${c.participacion}` : ''}</span>
-                      <span>{formatoMoneda(c.valor)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <span className="font-semibold text-carbon">{formatoMoneda(l.precio)}</span>
             </div>
           ))}
         </Card>
@@ -302,9 +308,17 @@ export function EmpleadaAtender() {
     )
   }
 
+  const serviciosContados = lineas.filter((l) => l.servicioId).length
+
   return (
     <div className="mx-auto max-w-5xl pb-40 md:pb-24 lg:pb-6">
-      <h1 className="mb-4 font-marca text-2xl font-semibold text-carbon">Registrar atención</h1>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-marca text-2xl font-semibold text-carbon">Registrar atención</h1>
+          <p className="text-sm text-carbon/60">Añade los servicios y productos de esta visita.</p>
+        </div>
+        <Stepper paso="registrar" />
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-4">
@@ -318,12 +332,21 @@ export function EmpleadaAtender() {
           )}
 
           <Card>
-            <p className="mb-3 font-semibold text-carbon">Cliente</p>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-semibold text-carbon">Cliente</p>
+            </div>
             <ClienteSeccion cliente={cliente} onSeleccionar={setCliente} onCambiar={() => setCliente(null)} />
           </Card>
 
           <Card className="flex flex-col gap-4">
-            <p className="font-semibold text-carbon">Servicios</p>
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-carbon">Servicios</p>
+              {serviciosContados > 0 && (
+                <span className="rounded-full bg-piedra/50 px-2 py-0.5 text-xs font-semibold text-carbon/60">
+                  {serviciosContados} servicio{serviciosContados !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
             {cargandoCatalogo ? (
               <Cargando filas={1} />
             ) : (
@@ -337,33 +360,36 @@ export function EmpleadaAtender() {
                   mostrarErrorPrecio={intentoContinuar && (l.precio == null || l.precio < 0)}
                   onCambiar={(cambios) => actualizarLinea(l.tempId, cambios)}
                   onQuitar={lineas.length > 1 ? () => quitarLinea(l.tempId) : undefined}
+                  onAgregarColaboracion={agregarLinea}
                 />
               ))
             )}
             <button
-              onClick={() => setLineas((prev) => [...prev, lineaVacia(profesional?.id ?? '')])}
-              className="self-start text-sm font-semibold text-oliva hover:underline"
+              onClick={() => agregarLinea(lineaVacia(profesional?.id ?? ''))}
+              className="rounded-xl border border-dashed border-piedra py-3 text-center text-sm font-semibold text-oliva hover:border-oliva hover:bg-oliva/5"
             >
-              + Añadir servicio
+              + Añadir otro servicio
             </button>
           </Card>
 
           <Card className="flex flex-col gap-3">
-            <p className="font-semibold text-carbon">Productos <span className="font-normal text-carbon/50">· opcional</span></p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-carbon">Productos <span className="font-normal text-carbon/50">· Opcional</span></p>
+                <p className="text-xs text-carbon/50">Incluye los productos vendidos en esta visita.</p>
+              </div>
+              <button onClick={() => setProductos((prev) => [...prev, { tempId: idTemporal(), categoria: '', nombre: '', cantidad: 1, precioUnitario: null }])} className="text-sm font-semibold text-oliva hover:underline">
+                + Añadir producto
+              </button>
+            </div>
             {productos.map((p) => (
               <ProductoFila key={p.tempId} producto={p} onCambiar={(c) => actualizarProducto(p.tempId, c)} onQuitar={() => quitarProducto(p.tempId)} />
             ))}
-            <button
-              onClick={() => setProductos((prev) => [...prev, { tempId: idTemporal(), categoria: '', nombre: '', cantidad: 1, precioUnitario: null }])}
-              className="self-start text-sm font-semibold text-oliva hover:underline"
-            >
-              + Añadir producto
-            </button>
           </Card>
 
           <Card>
             <button onClick={() => setNotasAbiertas((v) => !v)} className="flex w-full items-center justify-between text-left">
-              <span className="font-semibold text-carbon">Añadir nota operativa <span className="font-normal text-carbon/50">· Opcional</span></span>
+              <span className="font-semibold text-carbon">Añadir nota <span className="font-normal text-carbon/50">· Opcional</span></span>
               <span className="text-carbon/50">{notasAbiertas ? '−' : '+'}</span>
             </button>
             {notasAbiertas && (
@@ -384,7 +410,7 @@ export function EmpleadaAtender() {
         {/* Resumen lateral fijo en escritorio */}
         <div className="hidden lg:block">
           <div className="sticky top-4">
-            <ResumenLateral subtotalServicios={subtotalServicios} subtotalProductos={subtotalProductos} total={total} onContinuar={irACobrar} />
+            <ResumenLateral lineas={lineas} subtotalServicios={subtotalServicios} subtotalProductos={subtotalProductos} total={total} onContinuar={irACobrar} />
           </div>
         </div>
       </div>
@@ -405,38 +431,68 @@ export function EmpleadaAtender() {
 }
 
 function ResumenLateral({
+  lineas,
   subtotalServicios,
   subtotalProductos,
   total,
   onContinuar,
 }: {
+  lineas: LineaServicioBorrador[]
   subtotalServicios: number
   subtotalProductos: number
   total: number
   onContinuar: () => void
 }) {
+  const completas = lineas.filter((l) => !lineaIncompleta(l))
   return (
     <Card className="flex flex-col gap-3">
-      <p className="font-semibold text-carbon">Resumen</p>
+      <div>
+        <p className="font-marca text-lg font-semibold text-carbon">Resumen de la atención</p>
+        <p className="text-xs text-carbon/50">
+          {completas.length === 0 ? 'Ningún servicio añadido' : `${completas.length} servicio${completas.length !== 1 ? 's' : ''} añadido${completas.length !== 1 ? 's' : ''}`}
+        </p>
+      </div>
+
+      {completas.length > 0 && (
+        <div className="flex flex-col gap-1.5 border-b border-piedra pb-3">
+          {completas.map((l) => (
+            <div key={l.tempId} className="flex items-center justify-between text-sm">
+              <span className="text-carbon/80">{l.nombre}</span>
+              <span className="font-medium text-carbon">{formatoMoneda(l.precio)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center justify-between text-sm text-carbon/60">
-        <span>Subtotal de servicios</span>
+        <span>Servicios</span>
         <span>{formatoMoneda(subtotalServicios)}</span>
       </div>
       <div className="flex items-center justify-between text-sm text-carbon/60">
-        <span>Subtotal de productos</span>
+        <span>Productos</span>
         <span>{formatoMoneda(subtotalProductos)}</span>
       </div>
-      <div className="flex items-center justify-between border-t border-piedra pt-2 text-base font-semibold text-carbon">
-        <span>Total a cobrar</span>
-        <span className="text-oliva">{formatoMoneda(total)}</span>
+
+      <div className="rounded-xl bg-marfil px-4 py-3">
+        <p className="text-xs text-carbon/50">Total a cobrar</p>
+        <p className="font-marca text-2xl font-semibold text-carbon">
+          {formatoMoneda(total)} <span className="text-sm font-normal text-carbon/50">COP</span>
+        </p>
       </div>
-      <Button onClick={onContinuar} tamano="lg">Continuar al cobro</Button>
+
+      <Button onClick={onContinuar} tamano="lg">
+        Continuar al cobro <span aria-hidden>→</span>
+      </Button>
+      <p className="text-center text-xs text-carbon/50">Revisa el detalle antes de cobrar.</p>
     </Card>
   )
 }
 
 // --- Cliente: buscador con recientes, coincidencias parciales, navegación por teclado y
-// estados de carga/sin resultados/error. Tras seleccionar, ficha compacta con "Cambiar". ---
+// estados de carga/sin resultados/error. Tras seleccionar, ficha compacta con "Cambiar".
+// "+ Crear cliente" es una acción siempre visible (no depende de escribir una búsqueda
+// primero), para que registrar a alguien nuevo sea igual de rápido que buscar a alguien
+// existente. ---
 
 function ClienteSeccion({
   cliente,
@@ -453,9 +509,12 @@ function ClienteSeccion({
   const [recientes, setRecientes] = useState<Cliente[]>([])
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [creandoNombre, setCreandoNombre] = useState('')
-  const [creandoTelefono, setCreandoTelefono] = useState('')
+
+  const [formularioAbierto, setFormularioAbierto] = useState(false)
+  const [nuevoNombre, setNuevoNombre] = useState('')
+  const [nuevoTelefono, setNuevoTelefono] = useState('')
   const [creando, setCreando] = useState(false)
+  const [errorCrear, setErrorCrear] = useState<string | null>(null)
 
   const opciones = query.trim() ? resultados : recientes
   const { indice, setIndice, onKeyDown } = useNavegacionLista(opciones.length)
@@ -486,14 +545,40 @@ function ClienteSeccion({
     onSeleccionar(c)
     setAbierto(false)
     setQuery('')
+    setFormularioAbierto(false)
+  }
+
+  async function crearCliente(e: React.FormEvent) {
+    e.preventDefault()
+    if (!nuevoNombre.trim()) return
+    if (isDemoMode) {
+      seleccionar({ id: 'demo-cliente-nuevo', usuario_id: null, nombre: nuevoNombre.trim(), telefono: nuevoTelefono || null, email: null, consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0 })
+      return
+    }
+    setCreando(true)
+    setErrorCrear(null)
+    const { data, error: err } = await supabase!
+      .from('cliente')
+      .insert({ nombre: nuevoNombre.trim(), telefono: nuevoTelefono || null, consentimiento_marketing: false })
+      .select()
+      .single()
+    setCreando(false)
+    if (err) { setErrorCrear(err.message); return }
+    setNuevoNombre(''); setNuevoTelefono('')
+    seleccionar(data)
   }
 
   if (cliente) {
     return (
       <div className="flex items-center justify-between rounded-lg border border-piedra bg-marfil px-4 py-3">
-        <div>
-          <p className="font-medium text-carbon">{cliente.nombre}</p>
-          {cliente.telefono && <p className="text-xs text-carbon/60">{cliente.telefono}</p>}
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-piedra font-marca text-carbon">
+            {cliente.nombre.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <p className="font-medium text-carbon">{cliente.nombre}</p>
+            {cliente.telefono && <p className="text-xs text-carbon/60">{cliente.telefono}</p>}
+          </div>
         </div>
         <button onClick={onCambiar} className="text-sm font-semibold text-oliva hover:underline">Cambiar</button>
       </div>
@@ -501,94 +586,74 @@ function ClienteSeccion({
   }
 
   return (
-    <div className="relative">
-      <input
-        value={query}
-        onChange={(e) => { setQuery(e.target.value); setAbierto(true) }}
-        onFocus={() => setAbierto(true)}
-        onBlur={() => setTimeout(() => setAbierto(false), 150)}
-        onKeyDown={(e) => onKeyDown(e, (i) => seleccionar(opciones[i]), () => setAbierto(false))}
-        placeholder="Buscar cliente por nombre o teléfono"
-        aria-label="Buscar cliente por nombre o teléfono"
-        role="combobox"
-        aria-expanded={abierto}
-        className="w-full rounded-lg border border-piedra bg-blanco px-3 py-2.5 text-sm text-carbon outline-none transition-colors focus:border-oliva"
-      />
-      {abierto && (
-        <div className="absolute z-20 mt-1 w-full rounded-lg border border-piedra bg-blanco shadow-lg">
-          {!query.trim() && recientes.length > 0 && (
-            <p className="border-b border-piedra/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-carbon/40">Clientes recientes</p>
-          )}
-          {cargando && <div className="p-3"><Cargando filas={2} /></div>}
-          {error && <p className="px-3 py-3 text-sm text-error">{error}</p>}
-          {!cargando && !error && opciones.length === 0 && query.trim() && (
-            <p className="px-3 py-3 text-sm text-carbon/60">Sin resultados para "{query}".</p>
-          )}
-          {!cargando && !error && opciones.map((c, i) => (
-            <button
-              key={c.id}
-              onMouseDown={() => seleccionar(c)}
-              onMouseEnter={() => setIndice(i)}
-              className={`flex w-full flex-col items-start px-3 py-2 text-left text-sm ${i === indice ? 'bg-piedra/40' : ''}`}
-            >
-              <span className="font-medium text-carbon">{c.nombre}</span>
-              {c.telefono && <span className="text-xs text-carbon/60">{c.telefono}</span>}
-            </button>
-          ))}
-          {!cargando && query.trim() && (
-            <div className="border-t border-piedra/60 p-3">
-              <p className="mb-2 text-xs text-carbon/60">¿No existe? Crea un registro básico (sin cuenta ni marketing):</p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  value={creandoNombre || query}
-                  onChange={(e) => setCreandoNombre(e.target.value)}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  placeholder="Nombre"
-                  className="flex-1 rounded-lg border border-piedra px-2 py-1.5 text-sm"
-                />
-                <input
-                  value={creandoTelefono}
-                  onChange={(e) => setCreandoTelefono(e.target.value)}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  placeholder="Teléfono (opcional)"
-                  className="w-32 rounded-lg border border-piedra px-2 py-1.5 text-sm"
-                />
-                <Button
-                  tamano="sm"
-                  disabled={creando}
-                  onMouseDown={async (e) => {
-                    e.preventDefault()
-                    const nombre = (creandoNombre || query).trim()
-                    if (!nombre) return
-                    if (isDemoMode) {
-                      seleccionar({ id: 'demo-cliente-nuevo', usuario_id: null, nombre, telefono: creandoTelefono || null, email: null, consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0 })
-                      return
-                    }
-                    setCreando(true)
-                    setError(null)
-                    const { data, error: err } = await supabase!
-                      .from('cliente')
-                      .insert({ nombre, telefono: creandoTelefono || null, consentimiento_marketing: false })
-                      .select()
-                      .single()
-                    setCreando(false)
-                    if (err) { setError(err.message); return }
-                    seleccionar(data)
-                  }}
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <input
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setAbierto(true) }}
+            onFocus={() => setAbierto(true)}
+            onBlur={() => setTimeout(() => setAbierto(false), 150)}
+            onKeyDown={(e) => onKeyDown(e, (i) => seleccionar(opciones[i]), () => setAbierto(false))}
+            placeholder="Buscar por nombre o teléfono"
+            aria-label="Buscar cliente por nombre o teléfono"
+            role="combobox"
+            aria-expanded={abierto}
+            className="w-full rounded-lg border border-piedra bg-blanco px-3 py-2.5 text-sm text-carbon outline-none transition-colors focus:border-oliva"
+          />
+          {abierto && (
+            <div className="absolute z-20 mt-1 w-full rounded-lg border border-piedra bg-blanco shadow-lg">
+              {!query.trim() && recientes.length > 0 && (
+                <p className="border-b border-piedra/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-carbon/40">Clientes recientes</p>
+              )}
+              {cargando && <div className="p-3"><Cargando filas={2} /></div>}
+              {error && <p className="px-3 py-3 text-sm text-error">{error}</p>}
+              {!cargando && !error && opciones.length === 0 && query.trim() && (
+                <p className="px-3 py-3 text-sm text-carbon/60">Sin resultados para "{query}".</p>
+              )}
+              {!cargando && !error && opciones.map((c, i) => (
+                <button
+                  key={c.id}
+                  onMouseDown={() => seleccionar(c)}
+                  onMouseEnter={() => setIndice(i)}
+                  className={`flex w-full flex-col items-start px-3 py-2 text-left text-sm ${i === indice ? 'bg-piedra/40' : ''}`}
                 >
-                  Crear
-                </Button>
-              </div>
+                  <span className="font-medium text-carbon">{c.nombre}</span>
+                  {c.telefono && <span className="text-xs text-carbon/60">{c.telefono}</span>}
+                </button>
+              ))}
             </div>
           )}
         </div>
+        <Button
+          type="button"
+          variante="secondary"
+          tamano="md"
+          onClick={() => setFormularioAbierto((v) => !v)}
+        >
+          + Crear cliente
+        </Button>
+      </div>
+
+      {formularioAbierto && (
+        <form onSubmit={crearCliente} className="flex flex-col gap-3 rounded-lg border border-piedra bg-marfil p-3 sm:flex-row sm:items-end">
+          {errorCrear && <div className="sm:basis-full"><ErrorState mensaje={errorCrear} /></div>}
+          <div className="flex-1">
+            <Input id="nuevoClienteNombre" etiqueta="Nombre" required value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} />
+          </div>
+          <div className="sm:w-40">
+            <Input id="nuevoClienteTelefono" etiqueta="Teléfono (opcional)" value={nuevoTelefono} onChange={(e) => setNuevoTelefono(e.target.value)} />
+          </div>
+          <Button type="submit" cargando={creando}>Crear</Button>
+        </form>
       )}
     </div>
   )
 }
 
 // --- Servicio: selector con búsqueda (filtra el catálogo ya cargado), profesional
-// responsable, precio editable y, dentro de la misma tarjeta, colaboradores opcionales. ---
+// responsable, precio editable. "+ Añadir colaborador" crea una línea de servicio HERMANA
+// (no anidada): se suma al total y su valor es la ganancia completa de esa persona. ---
 
 function ServicioTarjeta({
   numero,
@@ -598,6 +663,7 @@ function ServicioTarjeta({
   mostrarErrorPrecio,
   onCambiar,
   onQuitar,
+  onAgregarColaboracion,
 }: {
   numero: number
   linea: LineaServicioBorrador
@@ -606,6 +672,7 @@ function ServicioTarjeta({
   mostrarErrorPrecio: boolean
   onCambiar: (cambios: Partial<LineaServicioBorrador>) => void
   onQuitar?: () => void
+  onAgregarColaboracion: (nueva: LineaServicioBorrador) => void
 }) {
   const servicioSeleccionado = servicios.find((s) => s.id === linea.servicioId)
   const opcionesProfesional = servicioSeleccionado?.profesionales?.length ? servicioSeleccionado.profesionales : equipo
@@ -621,39 +688,57 @@ function ServicioTarjeta({
     })
   }
 
-  const sumaColaboradores = linea.colaboradores.reduce((acc, c) => acc + c.valor, 0)
-  const [errorColaborador, setErrorColaborador] = useState<string | null>(null)
+  const [formAbierto, setFormAbierto] = useState(false)
+  const [errorColaboracion, setErrorColaboracion] = useState<string | null>(null)
   const [colaboradorId, setColaboradorId] = useState('')
   const [participacion, setParticipacion] = useState('')
-  const [valorColaborador, setValorColaborador] = useState<number | null>(null)
+  const [valorColaboracion, setValorColaboracion] = useState<number | null>(null)
 
-  function agregarColaborador() {
-    if (!colaboradorId) { setErrorColaborador('Selecciona un colaborador.'); return }
-    if (colaboradorId === linea.profesionalId) { setErrorColaborador('El profesional responsable no puede ser su propio colaborador.'); return }
-    if (linea.colaboradores.some((c) => c.colaboradorId === colaboradorId)) { setErrorColaborador('Ese colaborador ya está agregado en este servicio.'); return }
-    if (valorColaborador == null || valorColaborador <= 0) { setErrorColaborador('Ingresa un valor mayor a cero.'); return }
-    if (sumaColaboradores + valorColaborador > (linea.precio ?? 0)) { setErrorColaborador('La suma de los colaboradores no puede superar el precio del servicio.'); return }
-    const nombre = equipo.find((p) => p.id === colaboradorId)?.nombre ?? '—'
-    onCambiar({ colaboradores: [...linea.colaboradores, { tempId: idTemporal(), colaboradorId, colaboradorNombre: nombre, participacion, valor: valorColaborador }], colaboradorFormAbierto: false })
-    setColaboradorId(''); setParticipacion(''); setValorColaborador(null); setErrorColaborador(null)
+  function agregarColaboracion() {
+    if (!colaboradorId) { setErrorColaboracion('Selecciona un colaborador.'); return }
+    if (colaboradorId === linea.profesionalId) { setErrorColaboracion('El profesional responsable no puede ser su propio colaborador.'); return }
+    if (valorColaboracion == null || valorColaboracion <= 0) { setErrorColaboracion('Ingresa un valor mayor a cero.'); return }
+    const nombreColaborador = equipo.find((p) => p.id === colaboradorId)?.nombre ?? '—'
+    const nombreBase = linea.nombre || 'Servicio'
+    onAgregarColaboracion({
+      tempId: idTemporal(),
+      servicioId: linea.servicioId,
+      nombre: participacion ? `${nombreBase} · ${participacion} (${nombreColaborador})` : `${nombreBase} (colaboración de ${nombreColaborador})`,
+      profesionalId: colaboradorId,
+      precio: valorColaboracion,
+      esColaboracion: true,
+    })
+    setColaboradorId(''); setParticipacion(''); setValorColaboracion(null); setErrorColaboracion(null); setFormAbierto(false)
   }
 
   return (
     <div className="rounded-xl border border-piedra p-4">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40">Servicio {numero}</p>
-        {onQuitar && <button onClick={onQuitar} aria-label="Quitar servicio" className="text-sm text-error hover:underline">Quitar</button>}
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-piedra/40 text-lg" aria-hidden>✂️</div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40">
+              {linea.esColaboracion ? 'Colaboración' : `Servicio ${numero}`}
+            </p>
+            <p className="text-sm text-carbon/60">{linea.nombre ? 'Servicio seleccionado' : 'Elige un servicio'}</p>
+          </div>
+        </div>
+        {onQuitar && (
+          <button onClick={onQuitar} aria-label="Quitar servicio" className="rounded-lg p-1.5 text-carbon/40 hover:bg-error/10 hover:text-error">
+            🗑
+          </button>
+        )}
       </div>
       {/* alinearAltura en los tres campos: reserva la misma altura de etiqueta (hasta 2
           líneas) para que "Profesional responsable" (la más larga, la única que a veces se
-          parte en dos líneas) no desplace su control hacia abajo respecto a Servicio/Precio. */}
-      {/* Precio cobrado recibe algo más de ancho que sus dos vecinos: el prefijo "$" y el
+          parte en dos líneas) no desplace su control hacia abajo respecto a Servicio/Precio.
+          Precio cobrado recibe algo más de ancho que sus dos vecinos: el prefijo "$" y el
           sufijo "COP" fijos le restan espacio útil al número frente a un input normal. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1.05fr_1.3fr]">
         <ServicioBuscador id={`servicio-${linea.tempId}`} servicios={servicios} valor={linea.nombre} onSeleccionar={elegirServicio} />
         <Select
           id={`prof-${linea.tempId}`}
-          etiqueta="Profesional responsable"
+          etiqueta="Profesional"
           alinearAltura
           value={linea.profesionalId}
           onChange={(e) => onCambiar({ profesionalId: e.target.value })}
@@ -671,42 +756,34 @@ function ServicioTarjeta({
         />
       </div>
 
-      {linea.colaboradores.map((c) => (
-        <div key={c.tempId} className="mt-3 flex items-center justify-between rounded-lg bg-champan/15 px-3 py-2 text-sm">
-          <div>
-            <span className="font-medium text-carbon">{c.colaboradorNombre}</span>
-            {c.participacion && <span className="text-carbon/60"> · {c.participacion}</span>}
+      {!linea.esColaboracion && (
+        formAbierto ? (
+          <div className="mt-3 flex flex-col gap-2 rounded-lg border border-piedra bg-marfil p-3">
+            {errorColaboracion && <p className="text-xs font-medium text-error">{errorColaboracion}</p>}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <Select id={`colab-${linea.tempId}`} etiqueta="Colaborador" value={colaboradorId} onChange={(e) => setColaboradorId(e.target.value)}>
+                <option value="">Elegir…</option>
+                {equipo.filter((p) => p.id !== linea.profesionalId).map((p) => (
+                  <option key={p.id} value={p.id}>{p.nombre}</option>
+                ))}
+              </Select>
+              <Input id={`part-${linea.tempId}`} etiqueta="Participación" placeholder="Apoyo en peinado" value={participacion} onChange={(e) => setParticipacion(e.target.value)} />
+              <CampoMoneda id={`valorcolab-${linea.tempId}`} etiqueta="Valor asignado" value={valorColaboracion} onChange={setValorColaboracion} />
+            </div>
+            <p className="text-xs text-carbon/50">
+              Se suma al total a cobrar y se registra como una línea de servicio nueva: ese valor queda como el 100%
+              de la ganancia del colaborador, sin aplicarle ninguna comisión adicional.
+            </p>
+            <div className="flex gap-2">
+              <Button tamano="sm" onClick={agregarColaboracion}>Añadir colaborador</Button>
+              <Button tamano="sm" variante="ghost" onClick={() => { setFormAbierto(false); setErrorColaboracion(null) }}>Cancelar</Button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-carbon/70">{formatoMoneda(c.valor)}</span>
-            <button onClick={() => onCambiar({ colaboradores: linea.colaboradores.filter((x) => x.tempId !== c.tempId) })} className="text-error hover:underline">Quitar</button>
-          </div>
-        </div>
-      ))}
-
-      {linea.colaboradorFormAbierto ? (
-        <div className="mt-3 flex flex-col gap-2 rounded-lg border border-piedra bg-marfil p-3">
-          {errorColaborador && <p className="text-xs font-medium text-error">{errorColaborador}</p>}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <Select id={`colab-${linea.tempId}`} etiqueta="Colaborador" value={colaboradorId} onChange={(e) => setColaboradorId(e.target.value)}>
-              <option value="">Elegir…</option>
-              {equipo.filter((p) => p.id !== linea.profesionalId && !linea.colaboradores.some((c) => c.colaboradorId === p.id)).map((p) => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
-            </Select>
-            <Input id={`part-${linea.tempId}`} etiqueta="Participación" placeholder="Apoyo en peinado" value={participacion} onChange={(e) => setParticipacion(e.target.value)} />
-            <CampoMoneda id={`valorcolab-${linea.tempId}`} etiqueta="Valor asignado" value={valorColaborador} onChange={setValorColaborador} />
-          </div>
-          <p className="text-xs text-carbon/50">Este valor se distribuye dentro del precio del servicio.</p>
-          <div className="flex gap-2">
-            <Button tamano="sm" onClick={agregarColaborador}>Agregar colaborador</Button>
-            <Button tamano="sm" variante="ghost" onClick={() => { onCambiar({ colaboradorFormAbierto: false }); setErrorColaborador(null) }}>Cancelar</Button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => onCambiar({ colaboradorFormAbierto: true })} className="mt-3 text-sm font-semibold text-oliva hover:underline">
-          + Colaborador
-        </button>
+        ) : (
+          <button onClick={() => setFormAbierto(true)} className="mt-3 text-sm font-semibold text-oliva hover:underline">
+            + Añadir colaborador
+          </button>
+        )
       )}
     </div>
   )

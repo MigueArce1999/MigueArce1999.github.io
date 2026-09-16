@@ -1,7 +1,6 @@
 import { isDemoMode, supabaseRequerido } from '../supabase'
 import {
   demoClientesAdmin,
-  demoColaboradoresVenta,
   demoEquipoResumen,
   demoHistorialAtenciones,
   demoProductosVenta,
@@ -100,6 +99,7 @@ export async function listarVentasDetalle(limite = 50): Promise<VentaLinea[]> {
         cliente_id: a.cliente_id,
         cliente_nombre: a.cliente_nombre ?? '',
         comision_total: Math.round(l.precio_snapshot * 0.4),
+        es_colaboracion: false,
       })),
     )
   }
@@ -119,36 +119,6 @@ export async function listarEquipoConRendimiento() {
   const { data, error } = await client.from('vista_profesional').select('*').order('orden_visualizacion')
   if (error) throw error
   return data
-}
-
-export interface ColaboradorVenta {
-  id: string
-  atencionServicioId: string
-  colaboradorNombre: string
-  participacion: string | null
-  valor: number
-  creadoPorNombre: string | null
-}
-
-// Colaboradores de las líneas de servicio ya cargadas en el detalle de ventas, con quién los
-// agregó (ver vista_atencion_servicio_colaborador en 0019_admin_colaboradores_productos.sql).
-export async function listarColaboradoresDeLineas(atencionServicioIds: string[]): Promise<ColaboradorVenta[]> {
-  if (isDemoMode) return demoColaboradoresVenta.filter((c) => atencionServicioIds.includes(c.atencionServicioId))
-  if (atencionServicioIds.length === 0) return []
-  const client = supabaseRequerido()
-  const { data, error } = await client
-    .from('vista_atencion_servicio_colaborador')
-    .select('*')
-    .in('atencion_servicio_id', atencionServicioIds)
-  if (error) throw error
-  return (data ?? []).map((r: any) => ({
-    id: r.id,
-    atencionServicioId: r.atencion_servicio_id,
-    colaboradorNombre: r.colaborador_nombre,
-    participacion: r.participacion,
-    valor: Number(r.valor),
-    creadoPorNombre: r.creado_por_nombre,
-  }))
 }
 
 export interface ProductoVenta {
