@@ -121,6 +121,23 @@ export async function listarEquipoConRendimiento() {
   return data
 }
 
+// "Eliminar" una empleada NO borra la fila de profesional ni su historial: atencion_servicio,
+// comision, regla_comision y liquidacion tienen su profesional_id con "on delete restrict"
+// justamente para que un borrado real sea imposible sin perder ventas/comisiones ya cobradas
+// (ver supabase/migrations/0005_atencion_pagos.sql y 0006_comisiones_liquidaciones.sql). En
+// vez de eso: le quita el rol de empleada (perfil.rol -> 'cliente', que es lo que de verdad
+// le bloquea el acceso a /equipo-app, tanto en el frontend como en la RLS vía fn_rol_actual())
+// y la marca inactiva (profesional.activo = false, la oculta del sitio público y de nuevas
+// reservas). Su cuenta sigue existiendo como clienta normal.
+export async function eliminarEmpleada(profesionalId: string): Promise<void> {
+  if (isDemoMode) return
+  const client = supabaseRequerido()
+  const { error: errRol } = await client.from('perfil').update({ rol: 'cliente' }).eq('id', profesionalId)
+  if (errRol) throw errRol
+  const { error: errProf } = await client.from('profesional').update({ activo: false }).eq('id', profesionalId)
+  if (errProf) throw errProf
+}
+
 export interface ProductoVenta {
   id: string
   fecha: string

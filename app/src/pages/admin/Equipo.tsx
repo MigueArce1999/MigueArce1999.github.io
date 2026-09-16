@@ -4,7 +4,7 @@ import { Input, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { Drawer, Modal } from '../../components/ui/Modal'
 import { isDemoMode, supabase, supabaseRequerido } from '../../lib/supabase'
-import { invitarEmpleada, listarEquipoConRendimiento } from '../../lib/api/admin'
+import { eliminarEmpleada, invitarEmpleada, listarEquipoConRendimiento } from '../../lib/api/admin'
 import { listarServicios } from '../../lib/api/catalogo'
 import type { Profesional, Servicio } from '../../lib/types'
 
@@ -98,6 +98,9 @@ function FormularioProfesional({
   const [serviciosAsignados, setServiciosAsignados] = useState<Set<string>>(new Set())
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null)
 
   useEffect(() => {
     if (isDemoMode) return
@@ -151,6 +154,18 @@ function FormularioProfesional({
     }
   }
 
+  async function eliminar() {
+    setEliminando(true)
+    setErrorEliminar(null)
+    try {
+      await eliminarEmpleada(profesional.id)
+      onGuardado()
+    } catch (e: any) {
+      setErrorEliminar(e.message)
+      setEliminando(false)
+    }
+  }
+
   return (
     <form onSubmit={guardar} className="flex flex-col gap-4">
       {error && <ErrorState mensaje={error} />}
@@ -181,6 +196,31 @@ function FormularioProfesional({
       </div>
 
       <Button type="submit" cargando={guardando}>Guardar cambios</Button>
+
+      <div className="mt-2 rounded-lg border border-error/30 bg-error/5 p-3">
+        <p className="mb-1 text-sm font-semibold text-error">Eliminar empleada</p>
+        <p className="mb-3 text-xs text-carbon/60">
+          Le quita el acceso a su portal de empleada (vuelve a ser una cuenta de clienta normal) y la
+          oculta del sitio público. No borra sus ventas, comisiones ni atenciones ya registradas: esa
+          información sigue intacta en los reportes.
+        </p>
+        {errorEliminar && <div className="mb-2"><ErrorState mensaje={errorEliminar} /></div>}
+        {!confirmandoEliminar ? (
+          <Button type="button" variante="danger" tamano="sm" onClick={() => setConfirmandoEliminar(true)}>
+            Eliminar empleada
+          </Button>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-carbon">¿Eliminar a {profesional.nombre}?</span>
+            <Button type="button" variante="danger" tamano="sm" cargando={eliminando} onClick={eliminar}>
+              Sí, eliminar
+            </Button>
+            <Button type="button" variante="secondary" tamano="sm" onClick={() => setConfirmandoEliminar(false)} disabled={eliminando}>
+              Cancelar
+            </Button>
+          </div>
+        )}
+      </div>
     </form>
   )
 }
