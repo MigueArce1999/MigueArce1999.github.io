@@ -1,11 +1,52 @@
 import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
-import { demoComisionesEmpleada, demoReservasAgendaEmpleada } from '../demoData'
-import type { Atencion, ComisionResumen, VentaLinea } from '../types'
+import { demoClientesAdmin, demoComisionesEmpleada, demoReservasAgendaEmpleada } from '../demoData'
+import type { Atencion, Cliente, ComisionResumen, VentaLinea } from '../types'
+
+// Clientes recién actualizados, para mostrar en el buscador de "Atender" antes de escribir
+// nada (actualizado_en es la mejor aproximación disponible a "actividad reciente" sin sumar
+// una consulta de reservas/atenciones aparte).
+export async function listarClientesRecientes(limite = 5): Promise<Cliente[]> {
+  if (isDemoMode) return demoClientesAdmin.slice(0, limite)
+  const { data, error } = await supabase!
+    .from('cliente')
+    .select('*')
+    .order('actualizado_en', { ascending: false })
+    .limit(limite)
+  if (error) throw error
+  return data
+}
+
+export async function buscarClientes(texto: string, limite = 6): Promise<Cliente[]> {
+  if (isDemoMode) {
+    const q = texto.toLowerCase()
+    return demoClientesAdmin.filter((c) => c.nombre.toLowerCase().includes(q) || c.telefono?.includes(q)).slice(0, limite)
+  }
+  const { data, error } = await supabase!
+    .from('cliente')
+    .select('*')
+    .or(`nombre.ilike.%${texto}%,telefono.ilike.%${texto}%`)
+    .order('nombre')
+    .limit(limite)
+  if (error) throw error
+  return data
+}
 
 export async function registrarAtencion(params: {
   clienteId: string
   reservaId: string | null
-  lineas: { servicioId: string; profesionalId: string; precioSnapshot?: number; descuento?: number; cantidad?: number }[]
+  lineas: {
+    servicioId: string
+    profesionalId: string
+    precioSnapshot?: number
+    descuento?: number
+    cantidad?: number
+    colaboradores?: { colaboradorId: string; participacion?: string; valor: number }[]
+  }[]
+  productos?: { categoria: string; nombre: string; cantidad?: number; precioUnitario: number }[]
+  notas?: string | null
+  // Clave estable generada UNA vez por intento de registro (ver Atender.tsx): si la petición
+  // se reintenta por un error de red, evita crear una segunda atención duplicada.
+  borradorKey: string
 }): Promise<{ id: string }> {
   const client = supabaseRequerido()
   const { data, error } = await client.rpc('fn_registrar_atencion', {
@@ -17,7 +58,20 @@ export async function registrarAtencion(params: {
       precio_snapshot: l.precioSnapshot,
       descuento: l.descuento ?? 0,
       cantidad: l.cantidad ?? 1,
+      colaboradores: (l.colaboradores ?? []).map((c) => ({
+        colaborador_id: c.colaboradorId,
+        participacion: c.participacion ?? null,
+        valor: c.valor,
+      })),
     })),
+    p_productos: (params.productos ?? []).map((p) => ({
+      categoria: p.categoria,
+      nombre: p.nombre,
+      cantidad: p.cantidad ?? 1,
+      precio_unitario: p.precioUnitario,
+    })),
+    p_notas: params.notas ?? null,
+    p_borrador_key: params.borradorKey,
   })
   if (error) throw error
   return data as { id: string }
@@ -26,15 +80,15 @@ export async function registrarAtencion(params: {
 export async function completarYCobrarAtencion(params: {
   atencionId: string
   pagos: { metodo: 'efectivo' | 'transferencia' | 'tarjeta' | 'otro'; monto: number }[]
+  // Clave estable generada UNA vez por intento de cobro y reutilizada en reintentos (mismo
+  // borrador, mismo clic repetido o recuperación tras error): evita cobrar dos veces.
+  idempotencyKey: string
 }): Promise<Atencion> {
   const client = supabaseRequerido()
-  // Clave de idempotencia estable por navegador+intento: evita doble cobro si la petición
-  // se reintenta por un problema de red (ver docs/03-flujos.md §3.3).
-  const idempotencyKey = `${params.atencionId}:${Date.now()}:${Math.random().toString(36).slice(2)}`
   const { data, error } = await client.rpc('fn_completar_y_cobrar_atencion', {
     p_atencion_id: params.atencionId,
     p_pagos: params.pagos,
-    p_idempotency_key: idempotencyKey,
+    p_idempotency_key: params.idempotencyKey,
   })
   if (error) throw error
   return data as Atencion

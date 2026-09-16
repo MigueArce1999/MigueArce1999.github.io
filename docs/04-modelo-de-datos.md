@@ -53,11 +53,23 @@ Ver SQL real y comentado en `supabase/migrations/`. Este documento es el mapa de
 - **`atencion_servicio`** — línea de detalle: `atencion_id`, `servicio_id`, `profesional_id`,
   `nombre_snapshot`, `precio_snapshot`, `descuento`, `cantidad`. Snapshot de nombre/precio para que un
   cambio futuro de precio del catálogo **no altere ventas ya registradas**.
+- **`atencion_servicio_colaborador`** — colaboradores internos de una línea de servicio:
+  `atencion_servicio_id`, `colaborador_id` (profesional), `participacion` (texto libre, ej. "Apoyo en
+  peinado"), `valor`. Es una **distribución interna** del precio ya cobrado en `atencion_servicio`, no un
+  cargo adicional: nunca se suma al total de la atención ni a `pago`. `unique(atencion_servicio_id,
+  colaborador_id)` evita duplicados; `fn_registrar_atencion` valida además que el colaborador no sea el
+  propio profesional responsable y que la suma de valores no supere el precio de la línea.
+- **`atencion_producto`** — productos vendidos a la clienta (no insumos consumidos durante el servicio):
+  `atencion_id`, `categoria`, `nombre`, `cantidad`, `precio_unitario`. Sin catálogo propio en este alcance
+  (recepción escribe categoría/nombre/precio en el momento); sí se incluyen en el total a cobrar y en
+  `vista_atencion.total_vendido`.
 - **`pago`** — dinero recibido: `atencion_id`, `metodo` (`efectivo`|`transferencia`|`tarjeta`|`otro`),
   `monto` (negativo para devoluciones), `referencia_pago_id` (self-FK para vincular una devolución con su
   pago original).
-- Los indicadores de "venta" (ver `docs/03-flujos.md`) se derivan de `atencion_servicio` + `pago`, no se
-  duplican en una tabla `venta` aparte — evita que ventas y pagos se desincronicen.
+- Los indicadores de "venta" (ver `docs/03-flujos.md`) se derivan de `atencion_servicio` +
+  `atencion_producto` + `pago`, no se duplican en una tabla `venta` aparte — evita que ventas y pagos se
+  desincronicen. Las comisiones (ver 4.5) se calculan solo sobre `atencion_servicio`: los productos y los
+  colaboradores no generan comisión propia en este alcance.
 
 ## 4.5 Comisiones y liquidaciones
 
