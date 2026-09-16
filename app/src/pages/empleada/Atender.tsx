@@ -422,8 +422,8 @@ export function EmpleadaAtender() {
           existe y esta baja a bottom-0. */}
       <div className="fixed inset-x-0 bottom-14 z-40 flex items-center justify-between gap-3 border-t border-piedra bg-blanco px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] md:bottom-0 lg:hidden">
         <div>
-          <p className="text-xs text-carbon/50">Total a cobrar</p>
-          <p className="font-marca text-lg font-semibold text-carbon">{formatoMoneda(total)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">Total a cobrar</p>
+          <p className="font-marca text-3xl font-semibold leading-tight text-carbon">{formatoMoneda(total)}</p>
         </div>
         <Button onClick={irACobrar} tamano="lg">Continuar al cobro</Button>
       </div>
