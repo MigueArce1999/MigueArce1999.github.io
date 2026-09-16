@@ -40,7 +40,9 @@ export async function registrarAtencion(params: {
     precioSnapshot?: number
     descuento?: number
     cantidad?: number
-    colaboradores?: { colaboradorId: string; participacion?: string; valor: number }[]
+    // Una colaboración es su PROPIA línea (no un campo anidado): se suma al total y su
+    // precio es la ganancia completa (100%) de esa persona, sin regla de comisión encima.
+    esColaboracion?: boolean
   }[]
   productos?: { categoria: string; nombre: string; cantidad?: number; precioUnitario: number }[]
   notas?: string | null
@@ -58,11 +60,7 @@ export async function registrarAtencion(params: {
       precio_snapshot: l.precioSnapshot,
       descuento: l.descuento ?? 0,
       cantidad: l.cantidad ?? 1,
-      colaboradores: (l.colaboradores ?? []).map((c) => ({
-        colaborador_id: c.colaboradorId,
-        participacion: c.participacion ?? null,
-        valor: c.valor,
-      })),
+      es_colaboracion: l.esColaboracion ?? false,
     })),
     p_productos: (params.productos ?? []).map((p) => ({
       categoria: p.categoria,

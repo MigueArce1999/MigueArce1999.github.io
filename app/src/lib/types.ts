@@ -144,6 +144,7 @@ export interface VentaLinea {
   cliente_id: string
   cliente_nombre: string
   comision_total: number
+  es_colaboracion: boolean
 }
 
 export interface MovimientoPuntos {
