@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../../state/AuthContext'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Campos'
-import { Card, ErrorState } from '../../components/ui/Estados'
+import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { isDemoMode, supabaseRequerido } from '../../lib/supabase'
+import { listarServicios, listarServiciosDeProfesional } from '../../lib/api/catalogo'
+import { guardarServiciosPropios } from '../../lib/api/empleada'
+import type { Servicio } from '../../lib/types'
 
 export function EmpleadaPerfil() {
   const { profesional, perfil } = useAuth()
@@ -24,12 +27,85 @@ export function EmpleadaPerfil() {
         <p className="mb-2 font-semibold text-carbon">Presentación</p>
         <p className="text-sm text-carbon/70">{profesional?.bio ?? 'Aún no tienes una presentación configurada. Pídele a administración que la complete desde el panel de Equipo.'}</p>
       </Card>
+      <MisServicios />
       <CambiarContrasena />
       <p className="text-xs text-carbon/50">
-        La edición de especialidades, servicios autorizados y horarios está sujeta a los permisos que
-        defina administración desde /admin/equipo.
+        La edición de especialidades, foto y horarios está sujeta a los permisos que defina
+        administración desde /admin/equipo.
       </p>
     </div>
+  )
+}
+
+// Antes solo admin podía marcar qué servicios realiza cada profesional (0014_rls.sql). 0022
+// agrega una policy que permite a cada quien gestionar sus PROPIAS filas de
+// servicio_profesional, así que esto ya no depende de pedírselo a administración.
+function MisServicios() {
+  const { profesional } = useAuth()
+  const [servicios, setServicios] = useState<Servicio[] | null>(null)
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set())
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [exito, setExito] = useState(false)
+
+  useEffect(() => {
+    if (!profesional) return
+    Promise.all([listarServicios(), listarServiciosDeProfesional(profesional.id)])
+      .then(([todos, propios]) => {
+        setServicios(todos)
+        setSeleccionados(new Set(propios.map((s) => s.id)))
+      })
+      .catch((e) => setError(e.message))
+  }, [profesional])
+
+  function alternar(id: string) {
+    setSeleccionados((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+    setExito(false)
+  }
+
+  async function guardar() {
+    if (!profesional) return
+    setGuardando(true)
+    setError(null)
+    setExito(false)
+    try {
+      await guardarServiciosPropios(profesional.id, Array.from(seleccionados))
+      setExito(true)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <Card>
+      <p className="mb-2 font-semibold text-carbon">Mis servicios</p>
+      <p className="mb-3 text-sm text-carbon/60">
+        Marca los servicios que realizas. Puedes registrar cualquier servicio desde Atender sin
+        importar esta lista; esto solo controla cuáles apareces ofreciendo en el sitio público.
+      </p>
+      {error && <div className="mb-3"><ErrorState mensaje={error} /></div>}
+      {exito && <p className="mb-3 rounded-lg bg-exito/10 px-3 py-2 text-sm font-medium text-exito">Servicios actualizados.</p>}
+      {!servicios ? (
+        <Cargando filas={3} />
+      ) : (
+        <div className="flex flex-col gap-1.5 rounded-lg border border-piedra p-3">
+          {servicios.map((s) => (
+            <label key={s.id} className="flex items-center gap-2 text-sm text-carbon">
+              <input type="checkbox" checked={seleccionados.has(s.id)} onChange={() => alternar(s.id)} />
+              {s.nombre}
+            </label>
+          ))}
+        </div>
+      )}
+      <Button className="mt-3" onClick={guardar} cargando={guardando} disabled={!servicios}>Guardar cambios</Button>
+    </Card>
   )
 }
 

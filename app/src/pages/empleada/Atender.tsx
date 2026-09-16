@@ -416,12 +416,11 @@ export function EmpleadaAtender() {
         </div>
       </div>
 
-      {/* Barra inferior en móvil. Se apoya sobre la navegación inferior propia del portal
-          (fixed, md:hidden en PortalLayout, ~72px de alto): por debajo de md ambas conviven
-          apiladas, con un espacio visible entre ellas (bottom-24 = 96px: deja los 72px de esa
-          barra libres más un margen, en vez de quedar pegada); de md a lg, esa navegación ya
-          no existe y esta baja a bottom-0. */}
-      <div className="fixed inset-x-0 bottom-24 z-40 flex items-center justify-between gap-3 rounded-2xl border border-piedra bg-blanco px-4 py-3 shadow-[0_4px_16px_rgba(0,0,0,0.08)] md:bottom-0 md:rounded-none md:border-x-0 md:border-b-0 lg:hidden">
+      {/* Barra inferior en móvil. Se apoya justo encima de la navegación inferior propia del
+          portal (fixed, md:hidden en PortalLayout): el offset (72px) es la altura real de esa
+          barra, para quedar alineada justo arriba de ella, sin superponerse ni dejar un hueco
+          de por medio; de md a lg, esa navegación ya no existe y esta baja a bottom-0. */}
+      <div className="fixed inset-x-0 bottom-[72px] z-40 flex items-center justify-between gap-3 border-t border-piedra bg-blanco px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] md:bottom-0 lg:hidden">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">Total a cobrar</p>
           <p className="font-marca text-3xl font-semibold leading-tight text-carbon">{formatoMoneda(total)}</p>
