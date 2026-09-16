@@ -61,3 +61,14 @@ h3,
 * {
   box-sizing: border-box;
 }
+
+/* Safari en iPhone hace zoom automático al enfocar un campo con font-size menor a 16px,
+   dejando la pantalla "saltada"/desalineada hasta que se sale del campo. Se sube el tamaño
+   solo en pantallas angostas para no afectar el diseño de escritorio (donde no aplica). */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
