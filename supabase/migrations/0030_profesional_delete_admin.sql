@@ -1,0 +1,14 @@
+-- 0030_profesional_delete_admin.sql
+-- `profesional` tiene RLS activo pero nunca tuvo una política de DELETE (0014_rls.sql solo
+-- definió select/insert/update) — sin política para un comando, RLS lo niega por defecto para
+-- todo el mundo, sin importar el GRANT de tabla. Eso hacía imposible borrar de verdad una
+-- cuenta de prueba/duplicada desde el panel; la única opción era "Eliminar empleada"
+-- (perfil.rol -> 'cliente' + profesional.activo = false, que no borra nada).
+--
+-- Solo admin puede borrar, y aun así la base de datos protege el historial real: cualquier
+-- profesional con una reserva, atención o liquidación ya registrada bloquea el DELETE por las
+-- llaves foráneas "on delete restrict" de esas tablas (0004/0005/0006: reserva, atencion_servicio,
+-- comision, liquidacion) — el borrado de verdad solo funciona para cuentas de prueba sin ninguna
+-- venta detrás. (regla_comision y horario_disponibilidad sí son "on delete cascade": una
+-- comisión configurada pero nunca usada no debe impedir borrar una cuenta de prueba.)
+create policy profesional_delete_admin on profesional for delete using (fn_es_admin());

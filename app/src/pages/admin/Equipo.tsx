@@ -5,8 +5,10 @@ import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { Drawer, Modal } from '../../components/ui/Modal'
 import { isDemoMode, supabase, supabaseRequerido } from '../../lib/supabase'
 import {
+  actualizarNombreProfesional,
   eliminarEmpleada,
   eliminarExcepcionComision,
+  eliminarProfesionalDefinitivo,
   guardarComisionBase,
   guardarExcepcionComision,
   invitarEmpleada,
@@ -109,6 +111,7 @@ function FormularioProfesional({
   servicios: Servicio[]
   onGuardado: () => void
 }) {
+  const [nombre, setNombre] = useState(profesional.nombre ?? '')
   const [bio, setBio] = useState(profesional.bio ?? '')
   const [especialidades, setEspecialidades] = useState((profesional.especialidades ?? []).join(', '))
   const [fotoUrl, setFotoUrl] = useState(profesional.foto_url ?? '')
@@ -119,6 +122,9 @@ function FormularioProfesional({
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
   const [eliminando, setEliminando] = useState(false)
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null)
+  const [confirmandoBorrar, setConfirmandoBorrar] = useState(false)
+  const [borrando, setBorrando] = useState(false)
+  const [errorBorrar, setErrorBorrar] = useState<string | null>(null)
 
   useEffect(() => {
     if (isDemoMode) return
@@ -145,6 +151,9 @@ function FormularioProfesional({
     setError(null)
     try {
       const client = supabaseRequerido()
+      if (nombre.trim() && nombre.trim() !== profesional.nombre) {
+        await actualizarNombreProfesional(profesional.id, nombre.trim())
+      }
       const { error: err1 } = await client
         .from('profesional')
         .update({
@@ -184,9 +193,22 @@ function FormularioProfesional({
     }
   }
 
+  async function borrar() {
+    setBorrando(true)
+    setErrorBorrar(null)
+    try {
+      await eliminarProfesionalDefinitivo(profesional.id)
+      onGuardado()
+    } catch (e: any) {
+      setErrorBorrar(e.message)
+      setBorrando(false)
+    }
+  }
+
   return (
     <form onSubmit={guardar} className="flex flex-col gap-4">
       {error && <ErrorState mensaje={error} />}
+      <Input id="nombre" etiqueta="Nombre" required value={nombre} onChange={(e) => setNombre(e.target.value)} />
       <Textarea id="bio" etiqueta="Presentación" value={bio} onChange={(e) => setBio(e.target.value)} />
       <Input
         id="especialidades"
@@ -236,6 +258,31 @@ function FormularioProfesional({
               Sí, eliminar
             </Button>
             <Button type="button" variante="secondary" tamano="sm" onClick={() => setConfirmandoEliminar(false)} disabled={eliminando}>
+              Cancelar
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-error/30 bg-error/5 p-3">
+        <p className="mb-1 text-sm font-semibold text-error">Borrar definitivamente</p>
+        <p className="mb-3 text-xs text-carbon/60">
+          Borra por completo la fila de esta empleada (a diferencia de "Eliminar empleada", que solo la
+          desactiva). Solo funciona si nunca tuvo ventas, comisiones ni liquidaciones registradas — úsalo
+          para cuentas de prueba o duplicadas, no para empleadas reales.
+        </p>
+        {errorBorrar && <div className="mb-2"><ErrorState mensaje={errorBorrar} /></div>}
+        {!confirmandoBorrar ? (
+          <Button type="button" variante="danger" tamano="sm" onClick={() => setConfirmandoBorrar(true)}>
+            Borrar definitivamente
+          </Button>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-carbon">¿Borrar a {profesional.nombre} para siempre?</span>
+            <Button type="button" variante="danger" tamano="sm" cargando={borrando} onClick={borrar}>
+              Sí, borrar
+            </Button>
+            <Button type="button" variante="secondary" tamano="sm" onClick={() => setConfirmandoBorrar(false)} disabled={borrando}>
               Cancelar
             </Button>
           </div>
