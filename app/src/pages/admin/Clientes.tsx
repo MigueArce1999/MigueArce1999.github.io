@@ -254,8 +254,25 @@ function FilaCliente({
     <tr className="border-b border-piedra/60 last:border-0">
       <td className="px-3 py-3"><input type="checkbox" checked={seleccionado} onChange={onSeleccionar} /></td>
       <td className="px-4 py-3">
-        <Link to={`/admin/clientes/${cliente.id}`} className="font-medium text-carbon hover:text-oliva hover:underline">{cliente.nombre}</Link>
-        {!cliente.activo && <span className="ml-2 rounded-full bg-carbon/10 px-2 py-0.5 text-xs text-carbon/50">Archivado</span>}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to={`/admin/clientes/${cliente.id}`} className="font-medium text-carbon hover:text-oliva hover:underline">{cliente.nombre}</Link>
+          {!cliente.activo && <span className="rounded-full bg-carbon/10 px-2 py-0.5 text-xs text-carbon/50">Archivado</span>}
+          {!cliente.ultima_visita && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-champan/25 px-2 py-0.5 text-xs font-semibold text-carbon">
+              <span aria-hidden>✨</span> Nuevo cliente
+            </span>
+          )}
+          {!cliente.ultima_visita && cliente.telefono && (
+            <a
+              href={`https://wa.me/${cliente.telefono.replace(/\D/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-full bg-exito/15 px-2 py-0.5 text-xs font-semibold text-exito hover:bg-exito/25"
+            >
+              WhatsApp
+            </a>
+          )}
+        </div>
       </td>
       <td className="px-4 py-3 text-carbon/70">{cliente.telefono ?? '—'}</td>
       <td className="px-4 py-3 text-carbon/70">{cliente.ultima_visita ? formatoFecha(cliente.ultima_visita) : 'Sin visitas'}</td>

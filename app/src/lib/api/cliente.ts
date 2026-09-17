@@ -18,6 +18,16 @@ export async function actualizarPerfilCliente(
   if (error) throw error
 }
 
+// La clienta marca "ya la dejé" desde su propio portal — igual que el toggle que ya existe en
+// Admin → Clientes, sigue siendo un registro manual (no se verifica contra Google), solo que
+// ahora también lo puede marcar ella misma, no solo el personal del salón.
+export async function marcarMiResenaGoogle(clienteId: string): Promise<void> {
+  if (isDemoMode) return
+  const client = supabaseRequerido()
+  const { error } = await client.from('cliente').update({ resena_google_confirmada: true }).eq('id', clienteId)
+  if (error) throw error
+}
+
 export async function listarHistorialAtenciones(clienteId: string): Promise<Atencion[]> {
   if (isDemoMode) return demoHistorialAtenciones
   const { data, error } = await supabase!

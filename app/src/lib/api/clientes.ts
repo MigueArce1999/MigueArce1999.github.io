@@ -11,7 +11,14 @@ import type { ClienteResumen } from '../types'
 export async function listarClientesAdmin(): Promise<ClienteResumen[]> {
   if (isDemoMode) return demoClientesAdmin
   const client = supabaseRequerido()
-  const { data, error } = await client.from('vista_cliente_resumen').select('*').order('nombre')
+  // Sin ninguna visita todavía (recién registrada, ej. desde "+ Crear cliente" en Atender) va
+  // primero — es la clienta más nueva y la que más urge contactar — y luego por última visita
+  // más reciente, en vez de alfabético (una clienta nueva podía quedar enterrada varias páginas
+  // atrás solo por el orden de su nombre).
+  const { data, error } = await client
+    .from('vista_cliente_resumen')
+    .select('*')
+    .order('ultima_visita', { ascending: false, nullsFirst: true })
   if (error) throw error
   return data
 }

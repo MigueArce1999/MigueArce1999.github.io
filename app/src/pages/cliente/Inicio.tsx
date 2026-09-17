@@ -4,24 +4,46 @@ import { Button } from '../../components/ui/Button'
 import { Card, Cargando, EmptyState } from '../../components/ui/Estados'
 import { EstadoReservaBadge } from '../../components/ui/StatusBadge'
 import { useAuth } from '../../state/AuthContext'
-import { listarMovimientosPuntos, saldoPuntos } from '../../lib/api/cliente'
+import { listarMovimientosPuntos, marcarMiResenaGoogle, saldoPuntos } from '../../lib/api/cliente'
 import { listarPromocionesVigentes } from '../../lib/api/catalogo'
 import { listarReservasDeCliente } from '../../lib/api/reservas'
 import { formatoFecha, formatoHora } from '../../lib/format'
 import type { Promocion, Reserva } from '../../lib/types'
+
+// Ficha real de Google Maps del salón (la misma que ya usa Admin → Clientes para "marcar
+// reseña"). Se enlaza tal cual: Google no permite armar una URL directa a "escribir reseña",
+// pero desde la ficha del lugar el botón para reseñar queda a un scroll de distancia.
+const ENLACE_RESENA_GOOGLE =
+  'https://www.google.com/maps/place/Sala+de+Belleza+Claudia+Patricia/@10.3941637,-75.4860455,17z/data=!4m8!3m7!1s0x8ef625cb04633c93:0x2124798d6ac3e4d4!8m2!3d10.3941637!4d-75.4834706!9m1!1b1!16s%2Fg%2F1ptxhsxgb'
 
 export function ClienteInicio() {
   const { cliente, perfil } = useAuth()
   const [reservas, setReservas] = useState<Reserva[] | null>(null)
   const [puntos, setPuntos] = useState<number | null>(null)
   const [promos, setPromos] = useState<Promocion[] | null>(null)
+  // Estado local para poder ocultar la tarjeta apenas la clienta confirma, sin depender de que
+  // AuthContext vuelva a leer su fila de `cliente` (solo lo hace al iniciar sesión).
+  const [resenaConfirmada, setResenaConfirmada] = useState(cliente?.resena_google_confirmada ?? false)
+  const [marcandoResena, setMarcandoResena] = useState(false)
 
   useEffect(() => {
     if (!cliente) return
     listarReservasDeCliente(cliente.id).then(setReservas)
     listarMovimientosPuntos(cliente.id).then((m) => setPuntos(saldoPuntos(m)))
     listarPromocionesVigentes().then(setPromos)
+    setResenaConfirmada(cliente.resena_google_confirmada)
   }, [cliente])
+
+  async function confirmarResena() {
+    if (!cliente) return
+    setMarcandoResena(true)
+    try {
+      await marcarMiResenaGoogle(cliente.id)
+      setResenaConfirmada(true)
+    } finally {
+      setMarcandoResena(false)
+    }
+  }
 
   const proxima = reservas
     ?.filter((r) => ['confirmada', 'pendiente'].includes(r.estado) && new Date(r.rango_inicio) > new Date())
@@ -88,6 +110,23 @@ export function ClienteInicio() {
           </div>
         )}
       </div>
+
+      {!resenaConfirmada && (
+        <Card className="flex flex-col gap-3 bg-champan/10">
+          <div>
+            <p className="font-semibold text-carbon">¿Nos dejas una reseña en Google?</p>
+            <p className="text-sm text-carbon/60">Nos ayuda muchísimo a que más personas nos conozcan. Toma un minuto.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a href={ENLACE_RESENA_GOOGLE} target="_blank" rel="noopener noreferrer">
+              <Button tamano="sm">Escribir reseña ↗</Button>
+            </a>
+            <Button tamano="sm" variante="outline" onClick={confirmarResena} cargando={marcandoResena}>
+              Ya la dejé ✓
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {promos && promos.length > 0 && (
         <div>
