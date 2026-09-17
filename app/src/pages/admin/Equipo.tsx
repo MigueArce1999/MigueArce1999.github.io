@@ -596,7 +596,9 @@ function InvitarEmpleada({ onCreada }: { onCreada: () => void }) {
       setExito(
         resultado === 'ya_era_empleada'
           ? `${nombre} ya forma parte del equipo.`
-          : `Invitación enviada a ${email}. En cuanto abra el enlace del correo, su cuenta quedará activa como empleada.`,
+          : resultado === 'creada_sin_correo'
+            ? `La cuenta de ${nombre} ya quedó creada y activa como empleada, pero el correo con el enlace de acceso no se pudo enviar por el límite diario de correos del sistema. Vuelve a enviar la invitación con el mismo correo más tarde (no hace falta borrar nada) y esta vez el enlace sí le llegará.`
+            : `Invitación enviada a ${email}. En cuanto abra el enlace del correo, su cuenta quedará activa como empleada.`,
       )
       setNombre('')
       setEmail('')
