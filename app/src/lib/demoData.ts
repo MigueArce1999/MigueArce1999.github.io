@@ -326,6 +326,32 @@ export const demoResumenNegocio = {
   comisionesPendientes: 450000,
 }
 
+// Desglose de ventas para las gráficas de pastel del Dashboard (modo demostración): el único
+// historial real (demoHistorialAtenciones) trae una sola línea, muy poco para mostrar cómo se
+// ven las gráficas, así que aquí se arma un desglose de ejemplo aparte, coherente con
+// demoResumenNegocio.ventasNetas pero sin pretender ser la misma atención.
+export const demoMetricasVentas = {
+  ventasPorProfesional: [
+    { etiqueta: 'Claudia', valor: 1180000 },
+    { etiqueta: 'Naldi', valor: 850000 },
+    { etiqueta: 'Ana', valor: 640000 },
+    { etiqueta: 'Valery', valor: 580000 },
+  ],
+  ventasPorServicio: [
+    { etiqueta: 'Color', valor: 900000 },
+    { etiqueta: 'Corte de dama', valor: 620000 },
+    { etiqueta: 'Tratamiento capilar', valor: 540000 },
+    { etiqueta: 'Diseño de cejas', valor: 420000 },
+    { etiqueta: 'Manicura clásica', valor: 380000 },
+    { etiqueta: 'Otros', valor: 390000 },
+  ],
+  ventasPorMetodoPago: [
+    { etiqueta: 'Transferencia', valor: 1450000 },
+    { etiqueta: 'Efectivo', valor: 980000 },
+    { etiqueta: 'Tarjeta', valor: 670000 },
+  ],
+}
+
 export const demoClientesAdmin: ClienteResumen[] = [
   { ...demoClienteActual, ultima_visita: '2026-09-10T15:00:00Z', ultimo_servicio_nombre: 'Corte de dama', ultimo_profesional_nombre: 'Naldi' },
   {

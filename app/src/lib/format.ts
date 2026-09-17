@@ -58,3 +58,22 @@ export function fechaBogotaISO(fecha: Date = new Date()): string {
 export function diaSemanaBogota(fecha: Date = new Date()): string {
   return new Intl.DateTimeFormat('es-CO', { timeZone: ZONA_HORARIA, weekday: 'long' }).format(fecha)
 }
+
+export type PeriodoResumen = 'hoy' | 'semana' | 'mes'
+
+// Compartido por Resumen y Dashboard (ambos filtran por el mismo periodo con el mismo
+// criterio), para no repetir dos veces la aritmética de fechas.
+export function rangoPeriodo(periodo: PeriodoResumen): { desde: string; hasta: string } {
+  const hoy = new Date()
+  if (periodo === 'hoy') {
+    const d = fechaBogotaISO(hoy)
+    return { desde: `${d}T00:00:00`, hasta: `${d}T23:59:59` }
+  }
+  if (periodo === 'semana') {
+    const inicio = new Date(hoy)
+    inicio.setDate(inicio.getDate() - inicio.getDay())
+    return { desde: inicio.toISOString(), hasta: new Date().toISOString() }
+  }
+  const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+  return { desde: inicio.toISOString(), hasta: new Date().toISOString() }
+}

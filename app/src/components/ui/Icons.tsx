@@ -88,6 +88,15 @@ export function IconoResumen(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconoDashboard(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3v9l7 4" />
+    </Svg>
+  )
+}
+
 export function IconoClientes(props: SVGProps<SVGSVGElement>) {
   return (
     <Svg {...props}>
