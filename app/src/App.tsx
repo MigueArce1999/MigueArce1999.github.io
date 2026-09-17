@@ -92,6 +92,7 @@ const navAdmin: ItemNav[] = [
   { to: '/admin/equipo', label: 'Equipo', icono: IconoEquipo },
   { to: '/admin/servicios', label: 'Servicios', icono: IconoAtender },
   { to: '/admin/ventas', label: 'Ventas', icono: IconoVentas },
+  { to: '/admin/ventas/nueva', label: 'Registrar venta', icono: IconoAtender },
   { to: '/admin/comisiones', label: 'Comisiones', icono: IconoComisiones },
   { to: '/admin/gastos', label: 'Gastos', icono: IconoGastos },
   { to: '/admin/fidelizacion', label: 'Fidelización', icono: IconoPuntos },
@@ -151,6 +152,7 @@ function App() {
             <Route path="/admin/equipo" element={<AdminEquipo />} />
             <Route path="/admin/servicios" element={<AdminServicios />} />
             <Route path="/admin/ventas" element={<AdminVentas />} />
+            <Route path="/admin/ventas/nueva" element={<EmpleadaAtender rutaFinalizar="/admin/ventas" etiquetaFinalizar="Volver a Ventas" />} />
             <Route path="/admin/comisiones" element={<AdminComisiones />} />
             <Route path="/admin/gastos" element={<AdminGastos />} />
             <Route path="/admin/fidelizacion" element={<AdminFidelizacion />} />
