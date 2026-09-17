@@ -154,6 +154,47 @@ export function IconoReportes(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconoCampanas(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="m3 3 18 9-18 9 4-9-4-9Z" />
+      <path d="M7 12h11" />
+    </Svg>
+  )
+}
+
+export function IconoMenu(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </Svg>
+  )
+}
+
+export function IconoX(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </Svg>
+  )
+}
+
+export function IconoChevronIzquierda(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="m15 18-6-6 6-6" />
+    </Svg>
+  )
+}
+
+export function IconoChevronDerecha(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="m9 18 6-6-6-6" />
+    </Svg>
+  )
+}
+
 export function IconoConfiguracion(props: SVGProps<SVGSVGElement>) {
   return (
     <Svg {...props}>

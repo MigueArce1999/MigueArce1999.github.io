@@ -566,7 +566,11 @@ function ClienteSeccion({
     e.preventDefault()
     if (!nuevoNombre.trim()) return
     if (isDemoMode) {
-      seleccionar({ id: 'demo-cliente-nuevo', usuario_id: null, nombre: nuevoNombre.trim(), telefono: nuevoTelefono || null, email: null, consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0 })
+      seleccionar({
+        id: 'demo-cliente-nuevo', usuario_id: null, nombre: nuevoNombre.trim(), telefono: nuevoTelefono || null, email: null,
+        consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0, activo: true, origen_registro: 'admin',
+        notas: null, resena_google_confirmada: false,
+      })
       return
     }
     setCreando(true)
