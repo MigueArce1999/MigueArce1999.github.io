@@ -3,6 +3,7 @@ import {
   demoClientesAdmin,
   demoEquipoResumen,
   demoHistorialAtenciones,
+  demoMetricasVentas,
   demoProductosVenta,
   demoResumenNegocio,
 } from '../demoData'
@@ -59,6 +60,76 @@ export async function resumenNegocio(desdeISO: string, hastaISO: string) {
     comisionesPendientes,
     clientesNuevos: 0, // requiere comparar cliente.creado_en contra el periodo; ver Fase 2
     clientesRecurrentes: 0,
+  }
+}
+
+export interface SegmentoVentas {
+  etiqueta: string
+  valor: number
+}
+
+const METODO_PAGO_ETIQUETA: Record<string, string> = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  tarjeta: 'Tarjeta',
+  otro: 'Otro',
+}
+
+// Agrupa una lista de {etiqueta, valor} y, si hay más de "maximo" grupos, deja los más
+// grandes y suma el resto en "Otros" — evita gráficas de pastel con más de ~6-8 porciones,
+// que dejan de leerse (ver skill de dataviz, "Series-count ladder").
+function agruparYLimitar(filas: { etiqueta: string; valor: number }[], maximo = 5): SegmentoVentas[] {
+  const totales = new Map<string, number>()
+  for (const f of filas) totales.set(f.etiqueta, (totales.get(f.etiqueta) ?? 0) + f.valor)
+  const ordenado = [...totales.entries()].sort((a, b) => b[1] - a[1])
+  if (ordenado.length <= maximo) return ordenado.map(([etiqueta, valor]) => ({ etiqueta, valor }))
+  const principales = ordenado.slice(0, maximo)
+  const restoValor = ordenado.slice(maximo).reduce((acc, [, v]) => acc + v, 0)
+  return [...principales.map(([etiqueta, valor]) => ({ etiqueta, valor })), { etiqueta: 'Otros', valor: restoValor }]
+}
+
+// Ventas por profesional, por servicio y por método de pago, para las gráficas de pastel del
+// Dashboard. Reutiliza las mismas fuentes que resumenNegocio y listarVentasDetalle: solo
+// servicios de atenciones YA completadas cuentan como venta (nunca reservas futuras), y solo
+// se cuenta la porción realmente cobrada — no el precio de lista con descuento sin más — para
+// que la suma de las porciones coincida con "ventas netas" del resumen.
+export async function metricasVentasDashboard(desdeISO: string, hastaISO: string) {
+  if (isDemoMode) return demoMetricasVentas
+  const client = supabaseRequerido()
+
+  const { data: servicios, error: e1 } = await client
+    .from('vista_atencion_servicio')
+    .select('nombre_snapshot, profesional_nombre, precio_snapshot, descuento, cantidad, atencion_estado, atencion_creado_en')
+    .eq('atencion_estado', 'completada')
+    .gte('atencion_creado_en', desdeISO)
+    .lt('atencion_creado_en', hastaISO)
+  if (e1) throw e1
+
+  const lineas = (servicios ?? []).map((s) => ({
+    profesional: s.profesional_nombre as string,
+    servicio: s.nombre_snapshot as string,
+    valor: (Number(s.precio_snapshot) - Number(s.descuento)) * Number(s.cantidad),
+  }))
+
+  const { data: pagos, error: e2 } = await client
+    .from('pago')
+    .select('metodo, monto, creado_en')
+    .gte('creado_en', desdeISO)
+    .lt('creado_en', hastaISO)
+  if (e2) throw e2
+
+  const porMetodo = new Map<string, number>()
+  for (const p of pagos ?? []) porMetodo.set(p.metodo, (porMetodo.get(p.metodo) ?? 0) + Number(p.monto))
+
+  return {
+    ventasPorProfesional: agruparYLimitar(lineas.map((l) => ({ etiqueta: l.profesional, valor: l.valor }))),
+    ventasPorServicio: agruparYLimitar(lineas.map((l) => ({ etiqueta: l.servicio, valor: l.valor }))),
+    // Sin agrupar en "Otros": metodo_pago solo tiene 4 valores posibles, ya dentro del límite.
+    // Un método que solo tuvo devoluciones (neto <= 0) no tiene sentido como porción de pastel.
+    ventasPorMetodoPago: [...porMetodo.entries()]
+      .filter(([, valor]) => valor > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([metodo, valor]) => ({ etiqueta: METODO_PAGO_ETIQUETA[metodo] ?? metodo, valor })),
   }
 }
 

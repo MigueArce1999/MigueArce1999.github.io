@@ -30,6 +30,7 @@ import { EmpleadaVentas } from './pages/empleada/Ventas'
 import { EmpleadaPerfil } from './pages/empleada/Perfil'
 
 import { AdminResumen } from './pages/admin/Resumen'
+import { AdminDashboard } from './pages/admin/Dashboard'
 import { AdminAgenda } from './pages/admin/Agenda'
 import { AdminClientes } from './pages/admin/Clientes'
 import { ClientePerfilAdmin } from './pages/admin/ClientePerfilAdmin'
@@ -52,6 +53,7 @@ import {
   IconoComisiones,
   IconoConfiguracion,
   IconoContenido,
+  IconoDashboard,
   IconoEquipo,
   IconoGastos,
   IconoHistorial,
@@ -83,6 +85,7 @@ const navEmpleada: ItemNav[] = [
 
 const navAdmin: ItemNav[] = [
   { to: '/admin', label: 'Resumen', icono: IconoResumen },
+  { to: '/admin/dashboard', label: 'Dashboard', icono: IconoDashboard },
   { to: '/admin/agenda', label: 'Agenda', icono: IconoAgenda },
   { to: '/admin/clientes', label: 'Clientes', icono: IconoClientes },
   { to: '/admin/campanas', label: 'Campañas', icono: IconoCampanas },
@@ -140,6 +143,7 @@ function App() {
 
           <Route element={<RutaProtegida rolRequerido="admin"><PortalLayout items={navAdmin} titulo="Administración" /></RutaProtegida>}>
             <Route path="/admin" element={<AdminResumen />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/agenda" element={<AdminAgenda />} />
             <Route path="/admin/clientes" element={<AdminClientes />} />
             <Route path="/admin/clientes/:id" element={<ClientePerfilAdmin />} />

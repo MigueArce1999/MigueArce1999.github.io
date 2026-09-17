@@ -1,32 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { resumenNegocio } from '../../lib/api/admin'
-import { fechaBogotaISO, formatoMoneda } from '../../lib/format'
-
-type Periodo = 'hoy' | 'semana' | 'mes'
-
-function rango(periodo: Periodo) {
-  const hoy = new Date()
-  if (periodo === 'hoy') {
-    const d = fechaBogotaISO(hoy)
-    return { desde: `${d}T00:00:00`, hasta: `${d}T23:59:59` }
-  }
-  if (periodo === 'semana') {
-    const inicio = new Date(hoy)
-    inicio.setDate(inicio.getDate() - inicio.getDay())
-    return { desde: inicio.toISOString(), hasta: new Date().toISOString() }
-  }
-  const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
-  return { desde: inicio.toISOString(), hasta: new Date().toISOString() }
-}
+import { formatoMoneda, rangoPeriodo, type PeriodoResumen } from '../../lib/format'
 
 export function AdminResumen() {
-  const [periodo, setPeriodo] = useState<Periodo>('mes')
+  const [periodo, setPeriodo] = useState<PeriodoResumen>('mes')
   const [datos, setDatos] = useState<Awaited<ReturnType<typeof resumenNegocio>> | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const { desde, hasta } = rango(periodo)
+    const { desde, hasta } = rangoPeriodo(periodo)
     setDatos(null)
     resumenNegocio(desde, hasta).then(setDatos).catch((e) => setError(e.message))
   }, [periodo])
@@ -36,7 +19,7 @@ export function AdminResumen() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-marca text-2xl font-semibold text-carbon">Resumen del negocio</h1>
         <div className="flex gap-2">
-          {(['hoy', 'semana', 'mes'] as Periodo[]).map((p) => (
+          {(['hoy', 'semana', 'mes'] as PeriodoResumen[]).map((p) => (
             <button key={p} onClick={() => setPeriodo(p)} className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${periodo === p ? 'bg-oliva text-blanco' : 'bg-piedra/40 text-carbon'}`}>
               {p}
             </button>
