@@ -184,6 +184,53 @@ export async function listarVentasDetalle(limite = 50): Promise<VentaLinea[]> {
   return data
 }
 
+// Corrige una venta ya registrada: clienta, notas y, por línea, profesional/precio/descuento/
+// cantidad — recalculando la comisión de cada línea con la regla vigente (ver fn_editar_venta
+// en supabase/migrations/0025). NO toca los pagos ya cobrados: el dinero que entró a caja es
+// un hecho histórico que un error de captura en el precio no cambia.
+export async function editarVenta(params: {
+  atencionId: string
+  clienteId: string
+  notas: string | null
+  lineas: { id: string; profesionalId: string; precioSnapshot: number; descuento: number; cantidad: number }[]
+}): Promise<void> {
+  if (isDemoMode) throw new Error('En modo demostración no se pueden editar ventas.')
+  const client = supabaseRequerido()
+  const { error } = await client.rpc('fn_editar_venta', {
+    p_atencion_id: params.atencionId,
+    p_cliente_id: params.clienteId,
+    p_notas: params.notas,
+    p_lineas: params.lineas.map((l) => ({
+      id: l.id,
+      profesional_id: l.profesionalId,
+      precio_snapshot: l.precioSnapshot,
+      descuento: l.descuento,
+      cantidad: l.cantidad,
+    })),
+  })
+  if (error) throw error
+}
+
+// Borra una venta completa (todas sus líneas, pagos, comisiones y los puntos que generó). Si
+// alguna de sus comisiones ya fue liquidada a la profesional, fn_eliminar_venta la rechaza con
+// un mensaje explicando por qué, en vez de dejar una liquidación pagada sin sustento.
+export async function eliminarVenta(atencionId: string): Promise<void> {
+  if (isDemoMode) throw new Error('En modo demostración no se pueden borrar ventas.')
+  const client = supabaseRequerido()
+  const { error } = await client.rpc('fn_eliminar_venta', { p_atencion_id: atencionId })
+  if (error) throw error
+}
+
+// vista_atencion_servicio no expone atencion.notas (no hace falta para el listado); se busca
+// aparte solo al abrir el formulario de editar, para no perder lo que ya se había anotado.
+export async function obtenerNotasVenta(atencionId: string): Promise<string | null> {
+  if (isDemoMode) return null
+  const client = supabaseRequerido()
+  const { data, error } = await client.from('atencion').select('notas').eq('id', atencionId).maybeSingle()
+  if (error) throw error
+  return data?.notas ?? null
+}
+
 export async function listarVentasDeCliente(clienteId: string): Promise<VentaLinea[]> {
   if (isDemoMode) return []
   const client = supabaseRequerido()
