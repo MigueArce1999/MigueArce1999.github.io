@@ -74,6 +74,20 @@ function useNavegacionLista(cantidad: number) {
   return { indice, setIndice, onKeyDown }
 }
 
+// Numeral de paso dentro del formulario de registrar (Cliente → Servicios → Productos →
+// Nota): puramente visual, no controla el orden real de llenado (los 4 bloques se pueden
+// completar en cualquier orden), solo le da a la empleada una guía de "por dónde voy".
+function PasoBadge({ numero }: { numero: number }) {
+  return (
+    <span
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-oliva text-xs font-semibold text-blanco"
+      aria-hidden
+    >
+      {numero}
+    </span>
+  )
+}
+
 function Stepper({ paso }: { paso: 'registrar' | 'cobrar' }) {
   return (
     <div className="hidden items-center gap-3 sm:flex">
@@ -342,15 +356,17 @@ export function EmpleadaAtender() {
           )}
 
           <Card>
-            <div className="mb-3 flex items-center justify-between">
-              <p className="font-semibold text-carbon">Cliente</p>
+            <div className="mb-3 flex items-center gap-2">
+              <PasoBadge numero={1} />
+              <p className="font-semibold text-carbon">Paso 1 · Cliente</p>
             </div>
             <ClienteSeccion cliente={cliente} onSeleccionar={setCliente} onCambiar={() => setCliente(null)} />
           </Card>
 
           <Card className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-carbon">Servicios</p>
+              <PasoBadge numero={2} />
+              <p className="font-semibold text-carbon">Paso 2 · Servicios</p>
               {serviciosContados > 0 && (
                 <span className="rounded-full bg-piedra/50 px-2 py-0.5 text-xs font-semibold text-carbon/60">
                   {serviciosContados} servicio{serviciosContados !== 1 ? 's' : ''}
@@ -387,10 +403,13 @@ export function EmpleadaAtender() {
           </Card>
 
           <Card className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-carbon">Productos <span className="font-normal text-carbon/50">· Opcional</span></p>
-                <p className="text-xs text-carbon/50">Incluye los productos vendidos en esta visita.</p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5"><PasoBadge numero={3} /></span>
+                <div>
+                  <p className="font-semibold text-carbon">Paso 3 · Productos <span className="font-normal text-carbon/50">· Opcional</span></p>
+                  <p className="text-xs text-carbon/50">Incluye los productos vendidos en esta visita.</p>
+                </div>
               </div>
               <button onClick={() => setProductos((prev) => [...prev, { tempId: idTemporal(), categoria: '', nombre: '', cantidad: 1, precioUnitario: null }])} className="text-sm font-semibold text-oliva hover:underline">
                 + Añadir producto
@@ -403,7 +422,10 @@ export function EmpleadaAtender() {
 
           <Card>
             <button onClick={() => setNotasAbiertas((v) => !v)} className="flex w-full items-center justify-between text-left">
-              <span className="font-semibold text-carbon">Añadir nota <span className="font-normal text-carbon/50">· Opcional</span></span>
+              <span className="flex items-center gap-2">
+                <PasoBadge numero={4} />
+                <span className="font-semibold text-carbon">Paso 4 · Nota adicional <span className="font-normal text-carbon/50">· Opcional</span></span>
+              </span>
               <span className="text-carbon/50">{notasAbiertas ? '−' : '+'}</span>
             </button>
             {notasAbiertas && (
