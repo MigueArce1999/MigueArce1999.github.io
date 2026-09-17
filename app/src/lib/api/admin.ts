@@ -252,7 +252,9 @@ export async function listarProductosVendidos(limite = 50): Promise<ProductoVent
 // enlace de acceso. Si el correo ya pertenece a una clienta, se reutiliza esa misma cuenta.
 // El trigger on_auth_user_created (0002_identidad.sql) ya crea perfil+cliente en la misma
 // transacción, así que justo después se puede buscar el usuario por email y ascenderlo.
-export async function invitarEmpleada(params: { nombre: string; email: string; slug: string }): Promise<'invitada' | 'ya_era_empleada'> {
+export async function invitarEmpleada(
+  params: { nombre: string; email: string; slug: string },
+): Promise<'invitada' | 'ya_era_empleada' | 'creada_sin_correo'> {
   if (isDemoMode) return 'invitada'
   const client = supabaseRequerido()
   // Sin sufijo de ruta (#/ingresar): la app usa HashRouter, y Supabase añade su propio
@@ -271,7 +273,13 @@ export async function invitarEmpleada(params: { nombre: string; email: string; s
       emailRedirectTo: origen,
     },
   })
-  if (errInvitar) throw errInvitar
+  // El proyecto usa el correo compartido de Supabase (cuota muy baja, pensada solo para
+  // pruebas): "email rate limit exceeded" significa que YA se agotó por hoy/por hora. Supabase
+  // a veces crea la cuenta igual aunque el envío falle, así que en vez de abandonar la
+  // invitación de una, seguimos intentando promoverla si el perfil ya quedó creado — mejor
+  // que perder por completo lo que la administradora acaba de escribir.
+  const correoLimitado = !!errInvitar && /rate limit/i.test(errInvitar.message)
+  if (errInvitar && !correoLimitado) throw errInvitar
 
   const { data: candidatos, error: errBuscar } = await client
     .from('cliente')
@@ -283,6 +291,13 @@ export async function invitarEmpleada(params: { nombre: string; email: string; s
   if (errBuscar) throw errBuscar
   const usuarioId = candidatos?.[0]?.usuario_id
   if (!usuarioId) {
+    if (correoLimitado) {
+      throw new Error(
+        'Se alcanzó el límite de correos del proyecto y la cuenta tampoco llegó a crearse. Espera unos minutos y vuelve a ' +
+          'intentarlo, o configura un proveedor de correo propio en Supabase (Authentication → Settings → SMTP Settings) ' +
+          'para dejar de depender de esa cuota compartida.',
+      )
+    }
     throw new Error('La invitación se envió, pero el perfil todavía no aparece. Espera unos segundos y vuelve a intentarlo.')
   }
 
@@ -294,5 +309,8 @@ export async function invitarEmpleada(params: { nombre: string; email: string; s
   if (errRol) throw errRol
   const { error: errProf } = await client.from('profesional').insert({ id: usuarioId, slug: params.slug })
   if (errProf) throw errProf
-  return 'invitada'
+  // La cuenta y el rol quedaron listos, pero si el correo de acceso nunca salió (límite de envíos),
+  // la empleada no tiene forma de entrar por su cuenta todavía — se lo dejamos claro a quien invita
+  // para que pueda avisarle por otro medio o pedir que se le asigne una contraseña manualmente.
+  return correoLimitado ? 'creada_sin_correo' : 'invitada'
 }
