@@ -1,0 +1,11 @@
+-- 0029_cliente_delete_admin.sql
+-- `cliente` tiene RLS activo pero nunca tuvo una política de DELETE (0014_rls.sql solo definió
+-- select/insert/update) — sin política para un comando, RLS lo niega por defecto para todo el
+-- mundo, sin importar el GRANT de tabla. Eso hacía imposible borrar de verdad un registro de
+-- prueba/duplicado desde el panel; la única opción era "Archivar" (activo = false).
+--
+-- Solo admin puede borrar, y aun así la base de datos protege el historial real: cualquier
+-- clienta con una atención o reserva ya registrada bloquea el DELETE por las llaves foráneas
+-- "on delete restrict" de esas tablas (0004/0005) — el borrado de verdad solo funciona para
+-- registros de prueba/duplicados sin ninguna venta ni cita detrás.
+create policy cliente_delete_admin on cliente for delete using (fn_es_admin());

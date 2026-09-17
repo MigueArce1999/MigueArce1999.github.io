@@ -39,6 +39,7 @@ export interface Cliente {
   notas: string | null
   // Se marca a mano desde el panel; nunca es una verificación automática contra Google.
   resena_google_confirmada: boolean
+  creado_en: string
 }
 
 // vista_cliente_resumen (ver supabase/migrations/0024): agrega a Cliente lo que no es una
