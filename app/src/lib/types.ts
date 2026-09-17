@@ -229,4 +229,66 @@ export interface ConfiguracionNegocio {
   reserva_pendiente_expira_minutos: number
   cancelacion_horas_limite: number
   tasa_puntos_por_defecto: number
+  anticipacion_minima_reserva_minutos: number
+  horizonte_reservas_dias: number
+  margen_entre_citas_minutos: number
+}
+
+// --- Agenda compartida (ver supabase/migrations/0031/0032) -----------------------------
+
+export type EstadoSolicitud = 'pendiente' | 'aprobada' | 'rechazada' | 'retirada'
+export type TipoBloqueoAusencia = 'bloqueo' | 'ausencia_dia' | 'ausencia_rango'
+
+// Un intervalo del horario habitual de una profesional. dia_semana sigue la convención de
+// Postgres EXTRACT(DOW): 0 = domingo … 6 = sábado.
+export interface IntervaloHorario {
+  dia_semana: number
+  hora_inicio: string // "HH:MM" o "HH:MM:SS"
+  hora_fin: string
+}
+
+// Fila de horario_disponibilidad ya resuelta a la versión vigente (una fecha de referencia).
+export interface HorarioDisponibilidad extends IntervaloHorario {
+  id: string
+  profesional_id: string
+  activo: boolean
+  vigente_desde: string
+}
+
+export interface BloqueoAusencia {
+  id: string
+  profesional_id: string
+  profesional_nombre?: string
+  rango_inicio: string
+  rango_fin: string
+  motivo: string | null
+  tipo: TipoBloqueoAusencia
+  todo_el_dia: boolean
+  estado: EstadoSolicitud
+  creado_por: string | null
+  creado_en: string
+  revisado_por: string | null
+  revisado_en: string | null
+  motivo_rechazo: string | null
+}
+
+export interface SolicitudHorario {
+  id: string
+  profesional_id: string
+  profesional_nombre?: string
+  estado: EstadoSolicitud
+  intervalos: IntervaloHorario[]
+  vigente_desde: string
+  motivo: string | null
+  creado_por: string | null
+  creado_en: string
+  revisado_por: string | null
+  revisado_en: string | null
+  motivo_rechazo: string | null
+}
+
+// Slot de fn_disponibilidad_equipo: mismo horario, con la lista de profesionales elegibles
+// que de verdad lo tienen libre en este momento ("Cualquier profesional").
+export interface SlotEquipoDisponible extends SlotDisponible {
+  profesionales_disponibles: string[]
 }

@@ -12,6 +12,9 @@ const configDemo: ConfiguracionNegocio = {
   reserva_pendiente_expira_minutos: 30,
   cancelacion_horas_limite: 2,
   tasa_puntos_por_defecto: 0.02,
+  anticipacion_minima_reserva_minutos: 0,
+  horizonte_reservas_dias: 60,
+  margen_entre_citas_minutos: 0,
 }
 
 export function AdminConfiguracion() {
@@ -58,19 +61,46 @@ export function AdminConfiguracion() {
             <option value="automatica">Automática</option>
             <option value="manual">Manual</option>
           </Select>
-          <Input
-            id="expira"
-            etiqueta="Minutos para liberar una reserva pendiente sin confirmar"
-            type="number"
-            value={config.reserva_pendiente_expira_minutos}
-            onChange={(e) => setConfig({ ...config, reserva_pendiente_expira_minutos: Number(e.target.value) })}
-          />
+          {config.modo_confirmacion === 'manual' && (
+            <Input
+              id="expira"
+              etiqueta="Minutos para liberar una reserva pendiente sin confirmar"
+              type="number"
+              value={config.reserva_pendiente_expira_minutos}
+              onChange={(e) => setConfig({ ...config, reserva_pendiente_expira_minutos: Number(e.target.value) })}
+              ayuda="Solo aplica en modo manual: una vez pasado este tiempo, la cita deja de retener el horario aunque nadie la revise."
+            />
+          )}
           <Input
             id="cancelacion"
             etiqueta="Horas mínimas de anticipación para cancelar/reprogramar"
             type="number"
             value={config.cancelacion_horas_limite}
             onChange={(e) => setConfig({ ...config, cancelacion_horas_limite: Number(e.target.value) })}
+          />
+          <Input
+            id="anticipacion"
+            etiqueta="Anticipación mínima para reservar en línea (minutos)"
+            type="number"
+            value={config.anticipacion_minima_reserva_minutos}
+            onChange={(e) => setConfig({ ...config, anticipacion_minima_reserva_minutos: Number(e.target.value) })}
+            ayuda="Una clienta no puede reservar un horario que empiece en menos de este tiempo. No aplica a citas creadas desde recepción/admin."
+          />
+          <Input
+            id="horizonte"
+            etiqueta="Horizonte de reservas (días hacia adelante)"
+            type="number"
+            value={config.horizonte_reservas_dias}
+            onChange={(e) => setConfig({ ...config, horizonte_reservas_dias: Number(e.target.value) })}
+            ayuda="Qué tan lejos en el futuro se puede reservar en línea."
+          />
+          <Input
+            id="margen"
+            etiqueta="Margen entre citas (minutos)"
+            type="number"
+            value={config.margen_entre_citas_minutos}
+            onChange={(e) => setConfig({ ...config, margen_entre_citas_minutos: Number(e.target.value) })}
+            ayuda="Tiempo libre que se reserva automáticamente antes y después de cada cita, para que dos citas seguidas nunca queden pegadas."
           />
           <Button type="submit" cargando={guardando}>Guardar configuración</Button>
           {guardado && <p className="text-sm font-medium text-exito">Configuración guardada.</p>}

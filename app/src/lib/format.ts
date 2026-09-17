@@ -73,6 +73,21 @@ export function diaSemanaBogota(fecha: Date = new Date()): string {
   return new Intl.DateTimeFormat('es-CO', { timeZone: ZONA_HORARIA, weekday: 'long' }).format(fecha)
 }
 
+// Hora (0-23) de un instante en la zona horaria del negocio — nunca Date.getHours(), que usa
+// la zona horaria del navegador y agruparía mal "mañana/tarde" para alguien fuera de Colombia.
+export function horaBogota(iso: string): number {
+  return Number(new Intl.DateTimeFormat('en-US', { timeZone: ZONA_HORARIA, hour: 'numeric', hourCycle: 'h23' }).format(new Date(iso)))
+}
+
+// Minutos desde medianoche (hora de Bogotá) de un instante — usado para posicionar bloques en
+// la agenda del admin (columna por profesional) por altura/posición proporcional a la hora.
+export function minutosDesdeMedianocheBogota(iso: string): number {
+  const partes = new Intl.DateTimeFormat('en-US', { timeZone: ZONA_HORARIA, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(iso))
+  const hora = Number(partes.find((p) => p.type === 'hour')?.value ?? 0)
+  const minuto = Number(partes.find((p) => p.type === 'minute')?.value ?? 0)
+  return hora * 60 + minuto
+}
+
 export type PeriodoResumen = 'hoy' | 'semana' | 'mes'
 
 // Compartido por Resumen y Dashboard (ambos filtran por el mismo periodo con el mismo
