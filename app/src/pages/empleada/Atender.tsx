@@ -104,7 +104,16 @@ function Stepper({ paso }: { paso: 'registrar' | 'cobrar' }) {
   )
 }
 
-export function EmpleadaAtender() {
+// Mismo flujo para el portal de empleadas y para Admin → Ventas → Registrar venta: la única
+// diferencia entre los dos contextos es a dónde vuelve al terminar (cada portal tiene su
+// propia ruta protegida por rol, ver RutaProtegida — un admin no puede navegar a /equipo-app).
+export function EmpleadaAtender({
+  rutaFinalizar = '/equipo-app',
+  etiquetaFinalizar = 'Volver a Mi día',
+}: {
+  rutaFinalizar?: string
+  etiquetaFinalizar?: string
+} = {}) {
   const navigate = useNavigate()
   const { profesional } = useAuth()
 
@@ -239,7 +248,7 @@ export function EmpleadaAtender() {
           <p className="text-3xl">✓</p>
           <p className="font-semibold text-carbon">Servicio registrado y cobrado</p>
           <p className="text-sm text-carbon/60">El historial del cliente, tus ventas, tu comisión y sus puntos ya se actualizaron.</p>
-          <Button onClick={() => navigate('/equipo-app')}>Volver a Mi día</Button>
+          <Button onClick={() => navigate(rutaFinalizar)}>{etiquetaFinalizar}</Button>
         </Card>
       </div>
     )

@@ -11,16 +11,18 @@ import type { CategoriaServicio, Servicio, TipoPrecioServicio } from '../../lib/
 export function AdminServicios() {
   const [servicios, setServicios] = useState<Servicio[] | null>(null)
   const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null)
   const [modalServicio, setModalServicio] = useState<'nuevo' | Servicio | null>(null)
   const [modalCategoria, setModalCategoria] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function recargar() {
-    listarServicios().then(setServicios).catch((e) => setError(e.message))
+    setServicios(null)
+    listarServicios(categoriaFiltro ?? undefined).then(setServicios).catch((e) => setError(e.message))
     listarCategorias().then(setCategorias)
   }
 
-  useEffect(recargar, [])
+  useEffect(recargar, [categoriaFiltro])
 
   async function alternarActivo(s: Servicio) {
     if (isDemoMode) return
@@ -42,10 +44,24 @@ export function AdminServicios() {
 
       {categorias.length > 0 && (
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setCategoriaFiltro(null)}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+              categoriaFiltro === null ? 'bg-oliva text-blanco' : 'bg-piedra/40 text-carbon hover:bg-piedra/60'
+            }`}
+          >
+            Todas
+          </button>
           {categorias.map((c) => (
-            <span key={c.id} className="rounded-full bg-piedra/40 px-3 py-1 text-xs font-semibold text-carbon">
+            <button
+              key={c.id}
+              onClick={() => setCategoriaFiltro(c.id === categoriaFiltro ? null : c.id)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                categoriaFiltro === c.id ? 'bg-oliva text-blanco' : 'bg-piedra/40 text-carbon hover:bg-piedra/60'
+              }`}
+            >
               {c.nombre}
-            </span>
+            </button>
           ))}
         </div>
       )}
