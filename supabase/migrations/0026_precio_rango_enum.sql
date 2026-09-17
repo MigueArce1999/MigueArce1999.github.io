@@ -1,0 +1,11 @@
+-- 0026_precio_rango_enum.sql
+-- Nuevo valor del enum de tipo de precio, para servicios con un rango ("$100.000–$200.000")
+-- en vez de un precio fijo/"desde" único (ver 0027 para la columna que guarda el tope
+-- superior, y 0028 para el catálogo que lo usa).
+--
+-- IMPORTANTE: este archivo debe ejecutarse SOLO (su propia sentencia), nunca junto con otra
+-- sentencia que YA use el valor 'rango' en la misma transacción — Postgres no permite usar un
+-- valor de enum recién agregado hasta que la transacción que lo agregó haya terminado. Si
+-- pegas este archivo en el SQL Editor de Supabase, dale "Run" a este archivo solo, y luego
+-- corre 0027/0028 en otra ejecución aparte.
+alter type tipo_precio_servicio add value if not exists 'rango';
