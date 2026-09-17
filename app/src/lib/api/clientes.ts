@@ -3,24 +3,27 @@ import { demoClientesAdmin } from '../demoData'
 import { soloDigitos } from '../telefono'
 import type { ClienteResumen } from '../types'
 
+// Fecha "más reciente" de una clienta para ordenar la lista: su última visita si ya tuvo
+// alguna, o su fecha de registro si todavía no — así una clienta recién registrada (sin
+// visitas) compite en la misma línea de tiempo que las que sí han vuelto, en vez de quedar
+// separada en un bloque aparte sin orden entre sí.
+function fechaOrdenCliente(c: ClienteResumen): number {
+  return new Date(c.ultima_visita ?? c.creado_en).getTime()
+}
+
 // Trae TODO el histórico de clientes de una vez (activos + archivados): para el tamaño de un
 // salón (decenas/cientos, no millones), es más simple y igual de correcto filtrar/paginar en
 // memoria que reconstruir la misma lógica de filtros en cada consulta — mismo patrón que ya
 // usan AdminVentas/AdminComisiones en este proyecto. listarClientesAdmin es la única fuente:
 // los indicadores y la tabla siempre leen del mismo arreglo, así nunca se desincronizan.
 export async function listarClientesAdmin(): Promise<ClienteResumen[]> {
-  if (isDemoMode) return demoClientesAdmin
-  const client = supabaseRequerido()
-  // Sin ninguna visita todavía (recién registrada, ej. desde "+ Crear cliente" en Atender) va
-  // primero — es la clienta más nueva y la que más urge contactar — y luego por última visita
-  // más reciente, en vez de alfabético (una clienta nueva podía quedar enterrada varias páginas
-  // atrás solo por el orden de su nombre).
-  const { data, error } = await client
-    .from('vista_cliente_resumen')
-    .select('*')
-    .order('ultima_visita', { ascending: false, nullsFirst: true })
-  if (error) throw error
-  return data
+  const datos = isDemoMode ? demoClientesAdmin : await (async () => {
+    const client = supabaseRequerido()
+    const { data, error } = await client.from('vista_cliente_resumen').select('*')
+    if (error) throw error
+    return data
+  })()
+  return [...datos].sort((a, b) => fechaOrdenCliente(b) - fechaOrdenCliente(a))
 }
 
 export async function obtenerClienteAdmin(id: string): Promise<ClienteResumen | null> {
@@ -76,6 +79,22 @@ export async function archivarCliente(id: string, activo: boolean): Promise<void
   const client = supabaseRequerido()
   const { error } = await client.from('cliente').update({ activo }).eq('id', id)
   if (error) throw error
+}
+
+// Borrado real (no "Archivar"): solo para registros de prueba/duplicados. La base de datos
+// misma protege el historial real — cualquier clienta con una atención o reserva ya registrada
+// bloquea el DELETE (llaves foráneas "on delete restrict"), así que ese caso se traduce a un
+// mensaje claro en vez del error técnico de Postgres (código 23503 = violación de llave foránea).
+export async function eliminarClienteAdmin(id: string): Promise<void> {
+  if (isDemoMode) return
+  const client = supabaseRequerido()
+  const { error } = await client.from('cliente').delete().eq('id', id)
+  if (error) {
+    if (error.code === '23503') {
+      throw new Error('Esta clienta ya tiene ventas o citas registradas; no se puede borrar. Usa "Archivar" en su lugar.')
+    }
+    throw error
+  }
 }
 
 // Confirmación manual de que alguien del salón vio la reseña — nunca una verificación

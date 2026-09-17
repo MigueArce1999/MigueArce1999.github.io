@@ -600,7 +600,7 @@ function ClienteSeccion({
       seleccionar({
         id: 'demo-cliente-nuevo', usuario_id: null, nombre: nuevoNombre.trim(), telefono: nuevoTelefono || null, email: null,
         consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0, activo: true, origen_registro: 'admin',
-        notas: null, resena_google_confirmada: false,
+        notas: null, resena_google_confirmada: false, creado_en: new Date().toISOString(),
       })
       return
     }

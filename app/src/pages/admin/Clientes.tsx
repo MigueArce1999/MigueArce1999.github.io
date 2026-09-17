@@ -11,6 +11,7 @@ import {
   buscarPosiblesDuplicados,
   crearClienteAdmin,
   actualizarClienteAdmin,
+  eliminarClienteAdmin,
   exportarClientesCSV,
   listarClientesAdmin,
   marcarResenaGoogle,
@@ -18,7 +19,13 @@ import {
 } from '../../lib/api/clientes'
 import { formatoFecha } from '../../lib/format'
 import { telefonosEquivalentes } from '../../lib/telefono'
+import { ENLACE_RESENA_GOOGLE } from '../../lib/constantes'
 import type { ClienteResumen } from '../../lib/types'
+
+function enlaceWhatsapp(telefono: string, mensaje?: string): string {
+  const digitos = telefono.replace(/\D/g, '')
+  return mensaje ? `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}` : `https://wa.me/${digitos}`
+}
 
 // Ruta pública estable (no cambia entre despliegues: mismo dominio, mismo hash) a la que
 // apuntan el QR, "Copiar enlace" y "Ver formulario" — los tres deben llevar al mismo destino.
@@ -250,6 +257,18 @@ function FilaCliente({
     }
   }
 
+  async function borrar() {
+    if (!confirm(`¿Borrar a ${cliente.nombre} por completo? Esto no se puede deshacer.`)) return
+    setOcupado(true)
+    try {
+      await eliminarClienteAdmin(cliente.id)
+      onCambio()
+    } catch (e: any) {
+      alert(e.message)
+      setOcupado(false)
+    }
+  }
+
   return (
     <tr className="border-b border-piedra/60 last:border-0">
       <td className="px-3 py-3"><input type="checkbox" checked={seleccionado} onChange={onSeleccionar} /></td>
@@ -258,13 +277,11 @@ function FilaCliente({
           <Link to={`/admin/clientes/${cliente.id}`} className="font-medium text-carbon hover:text-oliva hover:underline">{cliente.nombre}</Link>
           {!cliente.activo && <span className="rounded-full bg-carbon/10 px-2 py-0.5 text-xs text-carbon/50">Archivado</span>}
           {!cliente.ultima_visita && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-champan/25 px-2 py-0.5 text-xs font-semibold text-carbon">
-              <span aria-hidden>✨</span> Nuevo cliente
-            </span>
+            <span className="rounded-full bg-champan/25 px-2 py-0.5 text-xs font-semibold text-carbon">Nuevo</span>
           )}
           {!cliente.ultima_visita && cliente.telefono && (
             <a
-              href={`https://wa.me/${cliente.telefono.replace(/\D/g, '')}`}
+              href={enlaceWhatsapp(cliente.telefono)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 rounded-full bg-exito/15 px-2 py-0.5 text-xs font-semibold text-exito hover:bg-exito/25"
@@ -283,17 +300,39 @@ function FilaCliente({
         </span>
       </td>
       <td className="px-4 py-3">
-        <button onClick={alternarResena} disabled={ocupado} className="text-xs font-semibold text-oliva hover:underline">
-          {cliente.resena_google_confirmada ? 'Sí dejó reseña' : 'Sin confirmar'}
-        </button>
+        {cliente.resena_google_confirmada ? (
+          <button onClick={alternarResena} disabled={ocupado} className="text-xs font-semibold text-exito hover:underline">
+            ✓ Confirmada
+          </button>
+        ) : (
+          <div className="flex flex-col items-start gap-1">
+            {cliente.telefono && (
+              <a
+                href={enlaceWhatsapp(
+                  cliente.telefono,
+                  `¡Hola ${cliente.nombre.split(' ')[0]}! ¿Nos regalas una reseña en Google? Nos ayuda muchísimo 💛 ${ENLACE_RESENA_GOOGLE}`,
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-oliva hover:underline"
+              >
+                Enviar enlace
+              </a>
+            )}
+            <button onClick={alternarResena} disabled={ocupado} className="text-xs font-semibold text-carbon/60 hover:underline">
+              Confirmar reseña
+            </button>
+          </div>
+        )}
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-3 text-xs font-semibold">
           {cliente.telefono && (
-            <a href={`https://wa.me/${cliente.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-oliva hover:underline">WhatsApp</a>
+            <a href={enlaceWhatsapp(cliente.telefono)} target="_blank" rel="noopener noreferrer" className="text-oliva hover:underline">WhatsApp</a>
           )}
           <button onClick={onEditar} className="text-oliva hover:underline">Editar</button>
           <button onClick={alternarArchivado} disabled={ocupado} className="text-carbon/50 hover:underline">{cliente.activo ? 'Archivar' : 'Reactivar'}</button>
+          <button onClick={borrar} disabled={ocupado} className="text-error hover:underline">Borrar</button>
         </div>
       </td>
     </tr>
