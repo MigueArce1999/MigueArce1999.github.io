@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes } from 'react'
 
-type Variante = 'primary' | 'secondary' | 'ghost' | 'danger'
+type Variante = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger'
 type Tamano = 'sm' | 'md' | 'lg'
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -12,6 +12,10 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 const variantes: Record<Variante, string> = {
   primary: 'bg-oliva text-blanco hover:bg-oliva-hover disabled:opacity-60',
   secondary: 'bg-blanco text-carbon border border-piedra hover:border-oliva disabled:opacity-60',
+  // Mismo trazo/tamaño que "primary" pero sin relleno: una acción secundaria que sigue
+  // llamando la atención con el color de marca (a diferencia de "secondary", que es neutra) —
+  // pensada para acciones que pruebas de usabilidad mostraron que la gente no notaba.
+  outline: 'bg-transparent text-oliva border-2 border-oliva hover:bg-oliva/5 disabled:opacity-60',
   ghost: 'bg-transparent text-carbon hover:bg-piedra/50 disabled:opacity-60',
   danger: 'bg-error text-blanco hover:opacity-90 disabled:opacity-60',
 }
