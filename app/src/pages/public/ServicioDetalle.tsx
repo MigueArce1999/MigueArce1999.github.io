@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Cargando, EmptyState, ErrorState } from '../../components/ui/Estados'
 import { obtenerServicio } from '../../lib/api/catalogo'
-import { formatoMoneda } from '../../lib/format'
+import { formatoPrecioServicio } from '../../lib/format'
 import type { Servicio } from '../../lib/types'
 
 export function ServicioDetalle() {
@@ -27,17 +27,15 @@ export function ServicioDetalle() {
       {servicio.descripcion && <p className="mt-3 text-lg text-carbon/70">{servicio.descripcion}</p>}
 
       <div className="mt-6 flex flex-wrap gap-6 text-sm">
-        <div>
-          <p className="text-carbon/50">Duración estimada</p>
-          <p className="font-semibold text-carbon">{servicio.duracion_minutos} minutos</p>
-        </div>
+        {servicio.duracion_minutos != null && (
+          <div>
+            <p className="text-carbon/50">Duración estimada</p>
+            <p className="font-semibold text-carbon">{servicio.duracion_minutos} minutos</p>
+          </div>
+        )}
         <div>
           <p className="text-carbon/50">Precio</p>
-          <p className="font-semibold text-oliva">
-            {servicio.tipo_precio === 'a_valorar'
-              ? 'A valorar en salón'
-              : `${servicio.tipo_precio === 'desde' ? 'Desde ' : ''}${formatoMoneda(servicio.precio)}`}
-          </p>
+          <p className="font-semibold text-oliva">{formatoPrecioServicio(servicio, 'A valorar en salón')}</p>
         </div>
       </div>
 

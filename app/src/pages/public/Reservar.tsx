@@ -8,7 +8,7 @@ import { listarProfesionales, listarServicios } from '../../lib/api/catalogo'
 import { consultarDisponibilidad, crearReserva } from '../../lib/api/reservas'
 import { iniciarSesion, registrarCliente } from '../../lib/api/auth'
 import { obtenerClientePorUsuario } from '../../lib/api/cliente'
-import { fechaBogotaISO, formatoFecha, formatoHora, formatoMoneda } from '../../lib/format'
+import { fechaBogotaISO, formatoFecha, formatoHora, formatoPrecioServicio } from '../../lib/format'
 import type { Profesional, Servicio, SlotDisponible } from '../../lib/types'
 
 type Paso = 'servicio' | 'profesional' | 'horario' | 'cuenta' | 'confirmar' | 'listo'
@@ -122,11 +122,9 @@ export function Reservar() {
               >
                 <div>
                   <p className="font-semibold text-carbon">{s.nombre}</p>
-                  <p className="text-xs text-carbon/60">{s.duracion_minutos} min</p>
+                  {s.duracion_minutos != null && <p className="text-xs text-carbon/60">{s.duracion_minutos} min</p>}
                 </div>
-                <p className="font-semibold text-oliva">
-                  {s.tipo_precio === 'a_valorar' ? 'A valorar' : formatoMoneda(s.precio)}
-                </p>
+                <p className="font-semibold text-oliva">{formatoPrecioServicio(s)}</p>
               </button>
             ))
           )}
@@ -232,8 +230,8 @@ export function Reservar() {
           <Fila etiqueta="Servicio" valor={servicio.nombre} />
           <Fila etiqueta="Fecha" valor={formatoFecha(slotElegido.inicio)} />
           <Fila etiqueta="Hora" valor={formatoHora(slotElegido.inicio)} />
-          <Fila etiqueta="Duración" valor={`${servicio.duracion_minutos} min`} />
-          <Fila etiqueta="Precio" valor={servicio.tipo_precio === 'a_valorar' ? 'Se acuerda en salón' : formatoMoneda(servicio.precio)} />
+          {servicio.duracion_minutos != null && <Fila etiqueta="Duración" valor={`${servicio.duracion_minutos} min`} />}
+          <Fila etiqueta="Precio" valor={formatoPrecioServicio(servicio, 'Se acuerda en salón')} />
           {servicio.tipo_precio === 'a_valorar' && (
             <p className="text-xs text-carbon/50">El valor final se define al momento de prestar el servicio.</p>
           )}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { listarCategorias, listarServicios } from '../../lib/api/catalogo'
-import { formatoMoneda } from '../../lib/format'
+import { formatoPrecioServicio } from '../../lib/format'
 import type { CategoriaServicio, Servicio } from '../../lib/types'
 
 export function Servicios() {
@@ -61,10 +61,8 @@ export function Servicios() {
               <p className="font-marca text-lg font-semibold text-carbon">{s.nombre}</p>
               {s.descripcion && <p className="text-sm text-carbon/60">{s.descripcion}</p>}
               <div className="mt-1 flex items-center justify-between text-sm">
-                <span className="text-carbon/60">{s.duracion_minutos} min</span>
-                <span className="font-semibold text-oliva">
-                  {s.tipo_precio === 'a_valorar' ? 'Valoración en salón' : `${s.tipo_precio === 'desde' ? 'Desde ' : ''}${formatoMoneda(s.precio)}`}
-                </span>
+                <span className="text-carbon/60">{s.duracion_minutos != null ? `${s.duracion_minutos} min` : ''}</span>
+                <span className="font-semibold text-oliva">{formatoPrecioServicio(s, 'Valoración en salón')}</span>
               </div>
               {s.tipo_precio === 'a_valorar' && (
                 <p className="text-xs text-carbon/50">El valor se acuerda en salón antes de confirmar el cobro.</p>

@@ -5,7 +5,7 @@ import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { Modal } from '../../components/ui/Modal'
 import { isDemoMode, supabase, supabaseRequerido } from '../../lib/supabase'
 import { listarCategorias, listarServicios } from '../../lib/api/catalogo'
-import { formatoMoneda } from '../../lib/format'
+import { formatoPrecioServicio } from '../../lib/format'
 import type { CategoriaServicio, Servicio, TipoPrecioServicio } from '../../lib/types'
 
 export function AdminServicios() {
@@ -77,12 +77,10 @@ export function AdminServicios() {
             <Card key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
               <button className="text-left" onClick={() => setModalServicio(s)}>
                 <p className="font-medium text-carbon underline-offset-2 hover:underline">{s.nombre}</p>
-                <p className="text-xs text-carbon/60">{s.categoria_nombre} · {s.duracion_minutos} min</p>
+                <p className="text-xs text-carbon/60">{s.categoria_nombre}{s.duracion_minutos != null ? ` · ${s.duracion_minutos} min` : ''}</p>
               </button>
               <div className="flex items-center gap-3">
-                <span className="font-semibold text-oliva">
-                  {s.tipo_precio === 'a_valorar' ? 'A valorar' : formatoMoneda(s.precio)}
-                </span>
+                <span className="font-semibold text-oliva">{formatoPrecioServicio(s)}</span>
                 <button onClick={() => setModalServicio(s)} className="text-xs font-semibold text-oliva underline underline-offset-2">
                   Editar
                 </button>
@@ -137,9 +135,12 @@ function FormularioServicio({
   const [nombre, setNombre] = useState(servicio?.nombre ?? '')
   const [descripcion, setDescripcion] = useState(servicio?.descripcion ?? '')
   const [categoriaId, setCategoriaId] = useState(servicio?.categoria_id ?? categorias[0]?.id ?? '')
-  const [duracion, setDuracion] = useState(servicio?.duracion_minutos ?? 60)
+  // Vacío = sin confirmar todavía (ver 0027): un servicio nuevo puede quedar así, seleccionable
+  // igual en Atender, solo sin ofrecerse para reservar en línea hasta que se defina.
+  const [duracion, setDuracion] = useState<number | ''>(servicio?.duracion_minutos ?? '')
   const [tipoPrecio, setTipoPrecio] = useState<TipoPrecioServicio>(servicio?.tipo_precio ?? 'fijo')
   const [precio, setPrecio] = useState(servicio?.precio ?? 0)
+  const [precioMaximo, setPrecioMaximo] = useState(servicio?.precio_maximo ?? 0)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -153,9 +154,10 @@ function FormularioServicio({
         nombre,
         descripcion: descripcion || null,
         categoria_id: categoriaId,
-        duracion_minutos: duracion,
+        duracion_minutos: duracion === '' ? null : duracion,
         tipo_precio: tipoPrecio,
         precio: tipoPrecio === 'a_valorar' ? null : precio,
+        precio_maximo: tipoPrecio === 'rango' ? precioMaximo : null,
       }
       const { error: err } = servicio
         ? await supabase!.from('servicio').update(datos).eq('id', servicio.id)
@@ -177,14 +179,39 @@ function FormularioServicio({
       <Select id="categoria" etiqueta="Categoría" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
         {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
       </Select>
-      <Input id="duracion" etiqueta="Duración (minutos)" type="number" required value={duracion} onChange={(e) => setDuracion(Number(e.target.value))} />
+      <Input
+        id="duracion"
+        etiqueta="Duración (minutos)"
+        type="number"
+        value={duracion}
+        onChange={(e) => setDuracion(e.target.value === '' ? '' : Number(e.target.value))}
+        ayuda="Déjalo vacío si todavía no está confirmada — el servicio se puede elegir igual al registrar una atención, solo no se ofrece para reservar en línea hasta que tenga una duración."
+      />
       <Select id="tipoPrecio" etiqueta="Tipo de precio" value={tipoPrecio} onChange={(e) => setTipoPrecio(e.target.value as TipoPrecioServicio)}>
         <option value="fijo">Fijo</option>
         <option value="desde">Desde</option>
+        <option value="rango">Rango (entre dos precios)</option>
         <option value="a_valorar">A valorar en salón</option>
       </Select>
       {tipoPrecio !== 'a_valorar' && (
-        <Input id="precio" etiqueta="Precio (COP)" type="number" required value={precio ?? 0} onChange={(e) => setPrecio(Number(e.target.value))} />
+        <Input
+          id="precio"
+          etiqueta={tipoPrecio === 'rango' ? 'Precio mínimo (COP)' : 'Precio (COP)'}
+          type="number"
+          required
+          value={precio ?? 0}
+          onChange={(e) => setPrecio(Number(e.target.value))}
+        />
+      )}
+      {tipoPrecio === 'rango' && (
+        <Input
+          id="precioMaximo"
+          etiqueta="Precio máximo (COP)"
+          type="number"
+          required
+          value={precioMaximo ?? 0}
+          onChange={(e) => setPrecioMaximo(Number(e.target.value))}
+        />
       )}
       <Button type="submit" cargando={guardando}>{servicio ? 'Guardar cambios' : 'Crear servicio'}</Button>
     </form>

@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Cargando, EmptyState, ErrorState } from '../../components/ui/Estados'
 import { listarServiciosDeProfesional, obtenerProfesional } from '../../lib/api/catalogo'
-import { formatoMoneda } from '../../lib/format'
+import { formatoPrecioServicio } from '../../lib/format'
 import type { Profesional, Servicio } from '../../lib/types'
 
 export function ProfesionalDetalle() {
@@ -57,11 +57,9 @@ export function ProfesionalDetalle() {
             >
               <div>
                 <p className="font-semibold text-carbon">{s.nombre}</p>
-                <p className="text-xs text-carbon/60">{s.duracion_minutos} min</p>
+                {s.duracion_minutos != null && <p className="text-xs text-carbon/60">{s.duracion_minutos} min</p>}
               </div>
-              <p className="font-semibold text-oliva">
-                {s.tipo_precio === 'a_valorar' ? 'A valorar' : formatoMoneda(s.precio)}
-              </p>
+              <p className="font-semibold text-oliva">{formatoPrecioServicio(s)}</p>
             </Link>
           ))}
         </div>

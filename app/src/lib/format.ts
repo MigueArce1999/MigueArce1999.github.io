@@ -13,6 +13,20 @@ export function formatoMoneda(valor: number | null | undefined): string {
   }).format(valor)
 }
 
+// Cómo mostrar el precio de un servicio según su tipo — un solo lugar para las 4 variantes
+// (fijo/desde/rango/a_valorar), reutilizado por el sitio público y el panel admin. El texto
+// para "a_valorar" varía un poco según el contexto (p. ej. "A valorar" en una tarjeta corta,
+// "Se acuerda en salón" en el detalle de una reserva), así que es el único parámetro opcional.
+export function formatoPrecioServicio(
+  servicio: { tipo_precio: string; precio: number | null; precio_maximo?: number | null },
+  etiquetaAValorar = 'A valorar',
+): string {
+  if (servicio.tipo_precio === 'a_valorar') return etiquetaAValorar
+  if (servicio.tipo_precio === 'rango') return `${formatoMoneda(servicio.precio)}–${formatoMoneda(servicio.precio_maximo)}`
+  if (servicio.tipo_precio === 'desde') return `Desde ${formatoMoneda(servicio.precio)}`
+  return formatoMoneda(servicio.precio)
+}
+
 // Solo el número con separador de miles colombiano ("45000" -> "45.000"), sin símbolo de
 // moneda: para el texto editable de un campo de dinero, donde el "$"/"COP" van fuera del
 // valor (ver components/ui/Campos.tsx → CampoMoneda).
