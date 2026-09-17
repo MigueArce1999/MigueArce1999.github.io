@@ -14,7 +14,7 @@ export type EstadoReserva =
 
 export type EstadoAtencion = 'en_progreso' | 'completada' | 'anulada'
 export type MetodoPago = 'efectivo' | 'transferencia' | 'tarjeta' | 'otro'
-export type TipoPrecioServicio = 'fijo' | 'desde' | 'a_valorar'
+export type TipoPrecioServicio = 'fijo' | 'desde' | 'rango' | 'a_valorar'
 export type TipoMovimientoPuntos = 'abono' | 'canje' | 'reversion' | 'ajuste' | 'vencimiento'
 
 export interface Perfil {
@@ -96,9 +96,13 @@ export interface Servicio {
   nombre: string
   descripcion: string | null
   imagen_url: string | null
-  duracion_minutos: number
+  // null = todavía sin confirmar; seleccionable igual en Atender (no depende de este campo),
+  // pero no se ofrece para reservar en línea hasta que se configure (ver fn_crear_reserva).
+  duracion_minutos: number | null
   tipo_precio: TipoPrecioServicio
   precio: number | null
+  // Solo aplica cuando tipo_precio = 'rango': el extremo superior ("$100.000–$200.000").
+  precio_maximo?: number | null
   activo: boolean
   profesionales?: Profesional[]
 }

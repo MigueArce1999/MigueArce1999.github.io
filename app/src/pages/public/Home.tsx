@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { listarProfesionales, listarPromocionesVigentes, listarServicios } from '../../lib/api/catalogo'
-import { formatoFecha, formatoMoneda } from '../../lib/format'
+import { formatoFecha, formatoPrecioServicio } from '../../lib/format'
 import { isDemoMode } from '../../lib/supabase'
 import { useAuth } from '../../state/AuthContext'
 import type { Profesional, Promocion, Rol, Servicio } from '../../lib/types'
@@ -66,10 +66,8 @@ export function Home() {
               <Card key={s.id} className="flex flex-col gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-champan">{s.categoria_nombre}</p>
                 <p className="font-semibold text-carbon">{s.nombre}</p>
-                <p className="text-sm text-carbon/60">{s.duracion_minutos} min</p>
-                <p className="font-semibold text-oliva">
-                  {s.tipo_precio === 'a_valorar' ? 'Valoración en salón' : `${s.tipo_precio === 'desde' ? 'Desde ' : ''}${formatoMoneda(s.precio)}`}
-                </p>
+                {s.duracion_minutos != null && <p className="text-sm text-carbon/60">{s.duracion_minutos} min</p>}
+                <p className="font-semibold text-oliva">{formatoPrecioServicio(s, 'Valoración en salón')}</p>
                 <Link to={`/servicios/${s.id}`} className="mt-1 text-sm font-semibold text-oliva underline underline-offset-2">
                   Ver y reservar
                 </Link>
