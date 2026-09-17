@@ -268,6 +268,33 @@ export async function eliminarEmpleada(profesionalId: string): Promise<void> {
   if (errProf) throw errProf
 }
 
+// Borrado real de la fila de `profesional` (no solo desactivarla): solo para cuentas de
+// prueba/duplicadas sin historial. La base de datos misma protege el historial real —
+// cualquier profesional con una reserva, atención o liquidación ya registrada bloquea el
+// DELETE (llaves foráneas "on delete restrict"), así que ese caso se traduce a un mensaje
+// claro en vez del error técnico de Postgres (código 23503 = violación de llave foránea).
+// La fila de `perfil` (y la cuenta de auth) NO se toca: sigue existiendo como clienta normal.
+export async function eliminarProfesionalDefinitivo(profesionalId: string): Promise<void> {
+  if (isDemoMode) return
+  const client = supabaseRequerido()
+  const { error } = await client.from('profesional').delete().eq('id', profesionalId)
+  if (error) {
+    if (error.code === '23503') {
+      throw new Error('Esta empleada ya tiene reservas, ventas o liquidaciones registradas; no se puede borrar. Usa "Eliminar empleada" en su lugar.')
+    }
+    throw error
+  }
+}
+
+// Actualiza el nombre visible de la profesional: vive en perfil.nombre (profesional no tiene
+// columna propia — ver fn_manejar_usuario_nuevo en 0002_identidad.sql), no en la tabla profesional.
+export async function actualizarNombreProfesional(profesionalId: string, nombre: string): Promise<void> {
+  if (isDemoMode) return
+  const client = supabaseRequerido()
+  const { error } = await client.from('perfil').update({ nombre }).eq('id', profesionalId)
+  if (error) throw error
+}
+
 // --- Comisión base y excepciones por servicio (Equipo → Editar perfil y servicios → Comisiones) ---
 //
 // Misma lógica de prioridad que ya usa fn_completar_y_cobrar_atencion al cobrar (servicio_id
