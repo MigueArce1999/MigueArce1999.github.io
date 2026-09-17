@@ -15,6 +15,7 @@ import {
   listarEquipoConRendimiento,
   listarReglasComision,
 } from '../../lib/api/admin'
+import { fijarPermisoHorarioPropio, tienePermisoHorarioPropio } from '../../lib/api/agenda'
 import { listarServicios } from '../../lib/api/catalogo'
 import { formatoMoneda } from '../../lib/format'
 import type { Profesional, ReglaComision, Servicio } from '../../lib/types'
@@ -116,6 +117,7 @@ function FormularioProfesional({
   const [especialidades, setEspecialidades] = useState((profesional.especialidades ?? []).join(', '))
   const [fotoUrl, setFotoUrl] = useState(profesional.foto_url ?? '')
   const [activo, setActivo] = useState(profesional.activo)
+  const [puedeHorario, setPuedeHorario] = useState(false)
   const [serviciosAsignados, setServiciosAsignados] = useState<Set<string>>(new Set())
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -133,6 +135,7 @@ function FormularioProfesional({
       .select('servicio_id')
       .eq('profesional_id', profesional.id)
       .then(({ data }) => setServiciosAsignados(new Set((data ?? []).map((r: any) => r.servicio_id))))
+    tienePermisoHorarioPropio(profesional.id).then(setPuedeHorario)
   }, [profesional.id])
 
   function alternarServicio(id: string) {
@@ -154,6 +157,7 @@ function FormularioProfesional({
       if (nombre.trim() && nombre.trim() !== profesional.nombre) {
         await actualizarNombreProfesional(profesional.id, nombre.trim())
       }
+      await fijarPermisoHorarioPropio(profesional.id, puedeHorario)
       const { error: err1 } = await client
         .from('profesional')
         .update({
@@ -221,6 +225,10 @@ function FormularioProfesional({
       <label className="flex items-center gap-2 text-sm text-carbon">
         <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
         Visible en el sitio público y disponible para nuevas reservas
+      </label>
+      <label className="flex items-center gap-2 text-sm text-carbon">
+        <input type="checkbox" checked={puedeHorario} onChange={(e) => setPuedeHorario(e.target.checked)} />
+        Puede editar su propio horario y ausencias sin aprobación (si no, sus cambios quedan como solicitud pendiente)
       </label>
 
       <div>

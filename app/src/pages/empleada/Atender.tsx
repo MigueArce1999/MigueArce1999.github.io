@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { CampoBase, CampoMoneda, Input, Select, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
@@ -7,8 +7,10 @@ import { useAuth } from '../../state/AuthContext'
 import { isDemoMode, supabase } from '../../lib/supabase'
 import { listarProfesionales, listarServicios } from '../../lib/api/catalogo'
 import { buscarClientes, completarYCobrarAtencion, listarClientesRecientes, registrarAtencion } from '../../lib/api/empleada'
+import { obtenerClienteAdmin } from '../../lib/api/clientes'
+import { obtenerReservaPorId } from '../../lib/api/reservas'
 import { estimarComision, type EstimacionComision } from '../../lib/api/comisiones'
-import { formatoMoneda } from '../../lib/format'
+import { formatoFecha, formatoHora, formatoMoneda } from '../../lib/format'
 import type { Cliente, MetodoPago, Profesional, Servicio } from '../../lib/types'
 
 // --- Tipos del borrador (solo viven en el navegador hasta el clic final en "Confirmar
@@ -116,10 +118,16 @@ export function EmpleadaAtender({
 } = {}) {
   const navigate = useNavigate()
   const { profesional } = useAuth()
+  const [searchParams] = useSearchParams()
+  // Llegar aquí desde "Iniciar atención" en Mi agenda (?reservaId=...) precarga cliente y
+  // servicio de esa cita, reutilizando el mismo flujo de registrar/cobrar — nunca uno paralelo.
+  const reservaIdParam = searchParams.get('reservaId')
 
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [equipo, setEquipo] = useState<Profesional[]>([])
   const [cargandoCatalogo, setCargandoCatalogo] = useState(true)
+  const [cargandoReserva, setCargandoReserva] = useState(!!reservaIdParam)
+  const [citaOrigen, setCitaOrigen] = useState<{ inicio: string; servicioNombre?: string } | null>(null)
 
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [lineas, setLineas] = useState<LineaServicioBorrador[]>([lineaVacia(profesional?.id ?? '')])
@@ -152,6 +160,30 @@ export function EmpleadaAtender({
       setCargandoCatalogo(false)
     })
   }, [])
+
+  useEffect(() => {
+    if (!reservaIdParam) return
+    let activo = true
+    obtenerReservaPorId(reservaIdParam)
+      .then(async (reserva) => {
+        if (!reserva || !activo) return
+        const c = await obtenerClienteAdmin(reserva.cliente_id)
+        if (!activo) return
+        if (c) setCliente(c)
+        setLineas([{
+          tempId: idTemporal(),
+          servicioId: reserva.servicio_id,
+          nombre: reserva.servicio_nombre ?? '',
+          profesionalId: reserva.profesional_id,
+          precio: reserva.precio_estimado,
+          esColaboracion: false,
+        }])
+        setCitaOrigen({ inicio: reserva.rango_inicio, servicioNombre: reserva.servicio_nombre })
+      })
+      .catch((e: any) => setError(e.message))
+      .finally(() => { if (activo) setCargandoReserva(false) })
+    return () => { activo = false }
+  }, [reservaIdParam])
 
   useEffect(() => {
     if (profesional && lineas.length === 1 && !lineas[0].profesionalId) {
@@ -215,7 +247,7 @@ export function EmpleadaAtender({
       if (!idAtencion) {
         const { id } = await registrarAtencion({
           clienteId: cliente!.id,
-          reservaId: null,
+          reservaId: reservaIdParam,
           lineas: lineas
             .filter((l) => !lineaIncompleta(l))
             .map((l) => ({
@@ -343,12 +375,24 @@ export function EmpleadaAtender({
 
   const serviciosContados = lineas.filter((l) => l.servicioId && !l.colaboracionDe).length
 
+  if (cargandoReserva) {
+    return (
+      <div className="mx-auto max-w-5xl">
+        <Cargando filas={4} />
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-5xl pb-40 md:pb-24 lg:pb-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-marca text-2xl font-semibold text-carbon">Registrar atención</h1>
-          <p className="text-sm text-carbon/60">Añade los servicios y productos de esta visita.</p>
+          <p className="text-sm text-carbon/60">
+            {citaOrigen
+              ? `Cita de las ${formatoHora(citaOrigen.inicio)} del ${formatoFecha(citaOrigen.inicio)}${citaOrigen.servicioNombre ? ` · ${citaOrigen.servicioNombre}` : ''}`
+              : 'Añade los servicios y productos de esta visita.'}
+          </p>
         </div>
         <Stepper paso="registrar" />
       </div>

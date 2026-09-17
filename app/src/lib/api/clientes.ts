@@ -42,20 +42,25 @@ export interface DatosCliente {
   notas?: string | null
 }
 
-export async function crearClienteAdmin(datos: DatosCliente): Promise<void> {
-  if (isDemoMode) return
+export async function crearClienteAdmin(datos: DatosCliente): Promise<{ id: string }> {
+  if (isDemoMode) return { id: 'demo-cliente' }
   const client = supabaseRequerido()
-  const { error } = await client.from('cliente').insert({
-    nombre: datos.nombre,
-    telefono: datos.telefono,
-    email: datos.email,
-    consentimiento_marketing: datos.consentimientoMarketing,
-    notas: datos.notas ?? null,
-    origen_registro: 'admin',
-    consentimiento_marketing_fecha: datos.consentimientoMarketing ? new Date().toISOString() : null,
-    consentimiento_marketing_version: datos.consentimientoMarketing ? 'registro-admin-v1' : null,
-  })
+  const { data, error } = await client
+    .from('cliente')
+    .insert({
+      nombre: datos.nombre,
+      telefono: datos.telefono,
+      email: datos.email,
+      consentimiento_marketing: datos.consentimientoMarketing,
+      notas: datos.notas ?? null,
+      origen_registro: 'admin',
+      consentimiento_marketing_fecha: datos.consentimientoMarketing ? new Date().toISOString() : null,
+      consentimiento_marketing_version: datos.consentimientoMarketing ? 'registro-admin-v1' : null,
+    })
+    .select('id')
+    .single()
   if (error) throw error
+  return { id: data.id }
 }
 
 export async function actualizarClienteAdmin(id: string, datos: DatosCliente): Promise<void> {

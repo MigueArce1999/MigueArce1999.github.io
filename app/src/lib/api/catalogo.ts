@@ -5,7 +5,29 @@ import {
   demoPromociones,
   demoServicios,
 } from '../demoData'
-import type { CategoriaServicio, Profesional, Promocion, Servicio } from '../types'
+import type { CategoriaServicio, ConfiguracionNegocio, Profesional, Promocion, Servicio } from '../types'
+
+const configuracionDemo: ConfiguracionNegocio = {
+  moneda: 'COP',
+  zona_horaria: 'America/Bogota',
+  modo_confirmacion: 'automatica',
+  reserva_pendiente_expira_minutos: 30,
+  cancelacion_horas_limite: 2,
+  tasa_puntos_por_defecto: 0.02,
+  anticipacion_minima_reserva_minutos: 0,
+  horizonte_reservas_dias: 60,
+  margen_entre_citas_minutos: 0,
+}
+
+// Solo los campos que le importan al flujo público de reserva (política de cancelación, modo
+// de confirmación, cuánto dura una reserva pendiente): configuracion_negocio es de lectura
+// pública (0014_rls.sql), la misma fila que ya administra Admin → Configuración.
+export async function obtenerConfiguracionNegocio(): Promise<ConfiguracionNegocio> {
+  if (isDemoMode) return configuracionDemo
+  const { data, error } = await supabase!.from('configuracion_negocio').select('*').maybeSingle()
+  if (error) throw error
+  return data ?? configuracionDemo
+}
 
 export async function listarCategorias(): Promise<CategoriaServicio[]> {
   if (isDemoMode) return demoCategorias

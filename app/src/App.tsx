@@ -25,6 +25,7 @@ import { ClientePerfil } from './pages/cliente/Perfil'
 
 import { EmpleadaDia } from './pages/empleada/Dia'
 import { EmpleadaAgenda } from './pages/empleada/Agenda'
+import { EmpleadaDisponibilidad } from './pages/empleada/Disponibilidad'
 import { EmpleadaAtender } from './pages/empleada/Atender'
 import { EmpleadaVentas } from './pages/empleada/Ventas'
 import { EmpleadaPerfil } from './pages/empleada/Perfil'
@@ -78,6 +79,7 @@ const navCliente: ItemNav[] = [
 const navEmpleada: ItemNav[] = [
   { to: '/equipo-app', label: 'Mi día', icono: IconoInicio },
   { to: '/equipo-app/agenda', label: 'Agenda', icono: IconoAgenda },
+  { to: '/equipo-app/disponibilidad', label: 'Disponibilidad', icono: IconoConfiguracion },
   { to: '/equipo-app/atender', label: 'Atender', icono: IconoAtender },
   { to: '/equipo-app/ventas', label: 'Ventas', icono: IconoVentas },
   { to: '/equipo-app/perfil', label: 'Perfil', icono: IconoPerfil },
@@ -137,6 +139,7 @@ function App() {
           <Route element={<RutaProtegida rolRequerido="empleada"><PortalLayout items={navEmpleada} titulo="Portal de empleadas" /></RutaProtegida>}>
             <Route path="/equipo-app" element={<EmpleadaDia />} />
             <Route path="/equipo-app/agenda" element={<EmpleadaAgenda />} />
+            <Route path="/equipo-app/disponibilidad" element={<EmpleadaDisponibilidad />} />
             <Route path="/equipo-app/atender" element={<EmpleadaAtender />} />
             <Route path="/equipo-app/ventas" element={<EmpleadaVentas />} />
             <Route path="/equipo-app/perfil" element={<EmpleadaPerfil />} />
