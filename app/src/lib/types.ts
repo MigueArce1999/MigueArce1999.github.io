@@ -34,6 +34,42 @@ export interface Cliente {
   consentimiento_marketing: boolean
   visitas_completadas: number
   gasto_acumulado: number
+  activo: boolean
+  origen_registro: 'admin' | 'publico'
+  notas: string | null
+  // Se marca a mano desde el panel; nunca es una verificación automática contra Google.
+  resena_google_confirmada: boolean
+}
+
+// vista_cliente_resumen (ver supabase/migrations/0024): agrega a Cliente lo que no es una
+// columna real sino derivado del historial de atenciones — nunca confundir con creado_en.
+export interface ClienteResumen extends Cliente {
+  ultima_visita: string | null
+  ultimo_servicio_nombre: string | null
+  ultimo_profesional_nombre: string | null
+}
+
+export type CampanaTipo = 'general' | 'promocional'
+export type CampanaEstado = 'borrador' | 'lista' | 'en_progreso' | 'finalizada'
+export type DestinatarioEstado = 'pendiente' | 'whatsapp_abierto' | 'marcado_enviado' | 'excluido'
+
+export interface Campana {
+  id: string
+  nombre: string
+  mensaje: string
+  tipo: CampanaTipo
+  estado: CampanaEstado
+  creado_en: string
+}
+
+export interface CampanaDestinatario {
+  id: string
+  campana_id: string
+  cliente_id: string
+  cliente_nombre?: string
+  cliente_telefono?: string | null
+  estado: DestinatarioEstado
+  motivo_exclusion: string | null
 }
 
 export interface Profesional {

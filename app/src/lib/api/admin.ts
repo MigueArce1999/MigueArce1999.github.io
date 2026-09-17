@@ -113,6 +113,18 @@ export async function listarVentasDetalle(limite = 50): Promise<VentaLinea[]> {
   return data
 }
 
+export async function listarVentasDeCliente(clienteId: string): Promise<VentaLinea[]> {
+  if (isDemoMode) return []
+  const client = supabaseRequerido()
+  const { data, error } = await client
+    .from('vista_atencion_servicio')
+    .select('*')
+    .eq('cliente_id', clienteId)
+    .order('atencion_creado_en', { ascending: false })
+  if (error) throw error
+  return data
+}
+
 export async function listarEquipoConRendimiento() {
   if (isDemoMode) return demoEquipoResumen
   const client = supabaseRequerido()

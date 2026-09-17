@@ -14,6 +14,7 @@ import { ProfesionalDetalle } from './pages/public/ProfesionalDetalle'
 import { Ubicacion } from './pages/public/Ubicacion'
 import { Ingresar } from './pages/public/Ingresar'
 import { Registro } from './pages/public/Registro'
+import { RegistroSalon } from './pages/public/RegistroSalon'
 import { Reservar } from './pages/public/Reservar'
 
 import { ClienteInicio } from './pages/cliente/Inicio'
@@ -31,6 +32,8 @@ import { EmpleadaPerfil } from './pages/empleada/Perfil'
 import { AdminResumen } from './pages/admin/Resumen'
 import { AdminAgenda } from './pages/admin/Agenda'
 import { AdminClientes } from './pages/admin/Clientes'
+import { ClientePerfilAdmin } from './pages/admin/ClientePerfilAdmin'
+import { AdminCampanas } from './pages/admin/Campanas'
 import { AdminEquipo } from './pages/admin/Equipo'
 import { AdminServicios } from './pages/admin/Servicios'
 import { AdminVentas } from './pages/admin/Ventas'
@@ -44,6 +47,7 @@ import { AdminConfiguracion } from './pages/admin/Configuracion'
 import {
   IconoAgenda,
   IconoAtender,
+  IconoCampanas,
   IconoClientes,
   IconoComisiones,
   IconoConfiguracion,
@@ -81,6 +85,7 @@ const navAdmin: ItemNav[] = [
   { to: '/admin', label: 'Resumen', icono: IconoResumen },
   { to: '/admin/agenda', label: 'Agenda', icono: IconoAgenda },
   { to: '/admin/clientes', label: 'Clientes', icono: IconoClientes },
+  { to: '/admin/campanas', label: 'Campañas', icono: IconoCampanas },
   { to: '/admin/equipo', label: 'Equipo', icono: IconoEquipo },
   { to: '/admin/servicios', label: 'Servicios', icono: IconoAtender },
   { to: '/admin/ventas', label: 'Ventas', icono: IconoVentas },
@@ -112,6 +117,11 @@ function App() {
             <Route path="/reservar" element={<Reservar />} />
           </Route>
 
+          {/* Fuera de PublicLayout a propósito: es la pantalla que abre el QR/enlace de
+              "Compartir registro" (Admin → Clientes) y debe verse sin el header/nav del sitio,
+              sin sesión de ningún tipo. */}
+          <Route path="/registro-salon" element={<RegistroSalon />} />
+
           <Route element={<RutaProtegida rolRequerido="cliente"><PortalLayout items={navCliente} titulo="Portal cliente" /></RutaProtegida>}>
             <Route path="/cliente" element={<ClienteInicio />} />
             <Route path="/cliente/reservas" element={<ClienteReservas />} />
@@ -132,6 +142,8 @@ function App() {
             <Route path="/admin" element={<AdminResumen />} />
             <Route path="/admin/agenda" element={<AdminAgenda />} />
             <Route path="/admin/clientes" element={<AdminClientes />} />
+            <Route path="/admin/clientes/:id" element={<ClientePerfilAdmin />} />
+            <Route path="/admin/campanas" element={<AdminCampanas />} />
             <Route path="/admin/equipo" element={<AdminEquipo />} />
             <Route path="/admin/servicios" element={<AdminServicios />} />
             <Route path="/admin/ventas" element={<AdminVentas />} />

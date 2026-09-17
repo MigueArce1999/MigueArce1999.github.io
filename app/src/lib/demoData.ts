@@ -5,6 +5,7 @@ import type {
   Atencion,
   CategoriaServicio,
   Cliente,
+  ClienteResumen,
   ComisionResumen,
   MovimientoPuntos,
   Profesional,
@@ -157,6 +158,10 @@ export const demoClienteActual: Cliente = {
   consentimiento_marketing: false,
   visitas_completadas: 3,
   gasto_acumulado: 245000,
+  activo: true,
+  origen_registro: 'admin',
+  notas: null,
+  resena_google_confirmada: false,
 }
 
 export const demoReservasCliente: Reserva[] = [
@@ -321,8 +326,8 @@ export const demoResumenNegocio = {
   comisionesPendientes: 450000,
 }
 
-export const demoClientesAdmin: Cliente[] = [
-  demoClienteActual,
+export const demoClientesAdmin: ClienteResumen[] = [
+  { ...demoClienteActual, ultima_visita: '2026-09-10T15:00:00Z', ultimo_servicio_nombre: 'Corte de dama', ultimo_profesional_nombre: 'Naldi' },
   {
     id: 'demo-cliente-2',
     usuario_id: null,
@@ -332,6 +337,13 @@ export const demoClientesAdmin: Cliente[] = [
     consentimiento_marketing: false,
     visitas_completadas: 5,
     gasto_acumulado: 380000,
+    activo: true,
+    origen_registro: 'admin',
+    notas: null,
+    resena_google_confirmada: true,
+    ultima_visita: '2026-08-20T18:00:00Z',
+    ultimo_servicio_nombre: 'Color y tinte',
+    ultimo_profesional_nombre: 'Claudia',
   },
   {
     id: 'demo-cliente-3',
@@ -342,6 +354,13 @@ export const demoClientesAdmin: Cliente[] = [
     consentimiento_marketing: true,
     visitas_completadas: 2,
     gasto_acumulado: 95000,
+    activo: true,
+    origen_registro: 'publico',
+    notas: null,
+    resena_google_confirmada: false,
+    ultima_visita: null,
+    ultimo_servicio_nombre: null,
+    ultimo_profesional_nombre: null,
   },
 ]
 
