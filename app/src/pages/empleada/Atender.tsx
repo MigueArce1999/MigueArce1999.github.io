@@ -908,9 +908,9 @@ function ServicioTarjeta({
           </div>
         </div>
       ) : (
-        <button onClick={() => setFormAbierto(true)} className="mt-3 text-sm font-semibold text-oliva hover:underline">
-          {colaboradores.length > 0 ? '+ Añadir otro colaborador' : '+ Añadir colaborador'}
-        </button>
+        <Button type="button" variante="outline" tamano="sm" onClick={() => setFormAbierto(true)} className="mt-3 self-start">
+          + {colaboradores.length > 0 ? 'Añadir otro colaborador' : 'Añadir colaborador'}
+        </Button>
       )}
     </div>
   )
