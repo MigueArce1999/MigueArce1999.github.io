@@ -4,7 +4,7 @@ import { Input, Select, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { Modal } from '../../components/ui/Modal'
 import { isDemoMode, supabase, supabaseRequerido } from '../../lib/supabase'
-import { listarCategorias, listarServicios } from '../../lib/api/catalogo'
+import { eliminarServicio, listarCategorias, listarServiciosAdmin } from '../../lib/api/catalogo'
 import { formatoPrecioServicio } from '../../lib/format'
 import type { CategoriaServicio, Servicio, TipoPrecioServicio } from '../../lib/types'
 
@@ -18,7 +18,7 @@ export function AdminServicios() {
 
   function recargar() {
     setServicios(null)
-    listarServicios(categoriaFiltro ?? undefined).then(setServicios).catch((e) => setError(e.message))
+    listarServiciosAdmin(categoriaFiltro ?? undefined).then(setServicios).catch((e) => setError(e.message))
     listarCategorias().then(setCategorias)
   }
 
@@ -30,6 +30,16 @@ export function AdminServicios() {
     // Desactivar nunca borra: solo dejan de ofrecerse en el sitio público y en nuevas reservas.
     await client.from('servicio').update({ activo: !s.activo }).eq('id', s.id)
     recargar()
+  }
+
+  async function borrar(s: Servicio) {
+    if (!confirm(`¿Borrar "${s.nombre}" por completo? Esto no se puede deshacer.`)) return
+    try {
+      await eliminarServicio(s.id)
+      recargar()
+    } catch (e: any) {
+      alert(e.message)
+    }
   }
 
   return (
@@ -89,6 +99,9 @@ export function AdminServicios() {
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${s.activo ? 'bg-exito/15 text-exito' : 'bg-carbon/10 text-carbon/60'}`}
                 >
                   {s.activo ? 'Activo' : 'Desactivado'}
+                </button>
+                <button onClick={() => borrar(s)} className="text-xs font-semibold text-error hover:underline">
+                  Borrar
                 </button>
               </div>
             </Card>

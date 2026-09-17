@@ -36,6 +36,43 @@ export async function listarServicios(categoriaId?: string): Promise<Servicio[]>
   }))
 }
 
+// Borrado real (no "Desactivar"): la base de datos misma protege el historial real —
+// cualquier servicio con una reserva o atención ya registrada bloquea el DELETE (llaves
+// foráneas "on delete restrict" en 0004/0005), así que ese caso se traduce a un mensaje
+// claro en vez del error técnico de Postgres (código 23503 = violación de llave foránea).
+// La política servicio_admin_escribe (0014_rls.sql) ya cubre "for all", incluyendo DELETE.
+export async function eliminarServicio(id: string): Promise<void> {
+  if (isDemoMode) return
+  const { error } = await supabase!.from('servicio').delete().eq('id', id)
+  if (error) {
+    if (error.code === '23503') {
+      throw new Error('Este servicio ya tiene reservas o ventas registradas; no se puede borrar. Usa "Desactivar" en su lugar.')
+    }
+    throw error
+  }
+}
+
+// A diferencia de listarServicios (que solo trae los activos, para el sitio público y los
+// formularios de reservar/atender), el panel de administración necesita ver también los
+// desactivados — si no, "Desactivar" los saca del panel para siempre y ya no se pueden
+// reactivar ni borrar una vez que pierdan su historial.
+export async function listarServiciosAdmin(categoriaId?: string): Promise<Servicio[]> {
+  if (isDemoMode) {
+    return categoriaId ? demoServicios.filter((s) => s.categoria_id === categoriaId) : demoServicios
+  }
+  let query = supabase!
+    .from('servicio')
+    .select('*, categoria:categoria_id(nombre), servicio_profesional(profesional:profesional_id(*))')
+  if (categoriaId) query = query.eq('categoria_id', categoriaId)
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []).map((s: any) => ({
+    ...s,
+    categoria_nombre: s.categoria?.nombre,
+    profesionales: (s.servicio_profesional ?? []).map((sp: any) => sp.profesional),
+  }))
+}
+
 export async function obtenerServicio(id: string): Promise<Servicio | null> {
   if (isDemoMode) return demoServicios.find((s) => s.id === id) ?? null
   const { data, error } = await supabase!
