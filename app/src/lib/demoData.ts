@@ -436,6 +436,7 @@ export const demoCategoriasGasto: CategoriaGasto[] = [
   { id: 'demo-cat-internet', nombre: 'Internet y telefonía', activa: true },
   { id: 'demo-cat-aseo', nombre: 'Aseo y lavandería', activa: true },
   { id: 'demo-cat-insumos', nombre: 'Insumos desechables', activa: true },
+  { id: 'demo-cat-insumos-general', nombre: 'Insumos', activa: true },
   { id: 'demo-cat-mantenimiento', nombre: 'Mantenimiento', activa: true },
   { id: 'demo-cat-publicidad', nombre: 'Publicidad y marketing', activa: true },
   { id: 'demo-cat-software', nombre: 'Software y suscripciones', activa: true },
