@@ -10,6 +10,8 @@ import {
   obtenerUrlComprobante,
   registrarPagoGasto,
   revertirPagoGasto,
+  subirComprobante,
+  TIPOS_COMPROBANTE_PERMITIDOS,
 } from '../../lib/api/gastos'
 import { fechaBogotaISO, formatoFecha, formatoFechaHora, formatoMoneda } from '../../lib/format'
 import type { Gasto, GastoEvento, GastoPago, MetodoPago } from '../../lib/types'
@@ -266,16 +268,43 @@ function EtiquetaEstado({ gasto }: { gasto: Gasto }) {
 }
 
 function FilaPago({ pago, onRevertir }: { pago: GastoPago; onRevertir: () => void }) {
+  const [abriendoComprobante, setAbriendoComprobante] = useState(false)
+  const [errorComprobante, setErrorComprobante] = useState<string | null>(null)
+
+  async function verComprobante() {
+    if (!pago.comprobante_path) return
+    setAbriendoComprobante(true)
+    setErrorComprobante(null)
+    try {
+      const url = await obtenerUrlComprobante(pago.comprobante_path)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (e: any) {
+      setErrorComprobante(e.message)
+    } finally {
+      setAbriendoComprobante(false)
+    }
+  }
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-piedra px-3 py-2 text-sm">
-      <div>
-        <p className="font-medium text-carbon">{formatoMoneda(pago.importe)} · {pago.metodo}</p>
-        <p className="text-xs text-carbon/50">
-          {formatoFecha(pago.fecha)} · {pago.cuenta_nombre ?? 'cuenta'} · {pago.registrado_por_nombre ?? '—'}
-          {pago.referencia ? ` · ref. ${pago.referencia}` : ''}
-        </p>
+    <div className="flex flex-col gap-1 rounded-lg border border-piedra px-3 py-2 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="font-medium text-carbon">{formatoMoneda(pago.importe)} · {pago.metodo}</p>
+          <p className="text-xs text-carbon/50">
+            {formatoFecha(pago.fecha)} · {pago.cuenta_nombre ?? 'cuenta'} · {pago.registrado_por_nombre ?? '—'}
+            {pago.referencia ? ` · ref. ${pago.referencia}` : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {pago.comprobante_path && (
+            <button onClick={verComprobante} disabled={abriendoComprobante} className="text-xs font-semibold text-oliva underline underline-offset-2 disabled:opacity-50">
+              {abriendoComprobante ? 'Abriendo…' : 'Ver comprobante'}
+            </button>
+          )}
+          <button onClick={onRevertir} className="text-xs font-semibold text-error underline underline-offset-2">Revertir</button>
+        </div>
       </div>
-      <button onClick={onRevertir} className="text-xs font-semibold text-error underline underline-offset-2">Revertir</button>
+      {errorComprobante && <p className="text-xs text-error">{errorComprobante}</p>}
     </div>
   )
 }
@@ -292,11 +321,13 @@ function FormularioPagoInline({
   onRegistrado: (actualizado: Gasto) => void
 }) {
   const [idempotencyKey] = useState(() => claveTemporal())
+  const [claveComprobante] = useState(() => claveTemporal())
   const [importe, setImporte] = useState<number | null>(gasto.saldo_pendiente)
   const [fecha, setFecha] = useState(fechaBogotaISO())
   const [metodo, setMetodo] = useState<MetodoPago>('efectivo')
   const [cuentaId, setCuentaId] = useState(cuentas.find((c) => c.activa)?.id ?? '')
   const [referencia, setReferencia] = useState('')
+  const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
@@ -307,7 +338,11 @@ function FormularioPagoInline({
     if (!cuentaId) { setError('Elige la cuenta de origen.'); return }
     setGuardando(true)
     try {
-      await registrarPagoGasto({ gastoId: gasto.id, importe, fecha, metodo, cuentaId, referencia: referencia.trim() || null, idempotencyKey })
+      let comprobantePath: string | null = null
+      if (archivoComprobante) {
+        comprobantePath = await subirComprobante(archivoComprobante, claveComprobante)
+      }
+      await registrarPagoGasto({ gastoId: gasto.id, importe, fecha, metodo, cuentaId, referencia: referencia.trim() || null, comprobantePath, idempotencyKey })
       const actualizado: Gasto = {
         ...gasto,
         total_pagado: gasto.total_pagado + importe,
@@ -345,6 +380,17 @@ function FormularioPagoInline({
         </Select>
       </div>
       <Input id="rpReferencia" etiqueta="Referencia (opcional)" value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+      <div>
+        <label htmlFor="rpComprobante" className="mb-1.5 block text-sm font-semibold text-carbon">Comprobante de este pago (opcional)</label>
+        <input
+          id="rpComprobante"
+          type="file"
+          accept={TIPOS_COMPROBANTE_PERMITIDOS.join(',')}
+          onChange={(e) => setArchivoComprobante(e.target.files?.[0] ?? null)}
+          className="block w-full text-sm text-carbon/70 file:mr-3 file:rounded-full file:border-0 file:bg-piedra file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-carbon hover:file:bg-piedra/70"
+        />
+        <p className="mt-1 text-xs text-carbon/50">Sube la foto o el PDF de la factura de este abono, si la tienes.</p>
+      </div>
       <div className="flex gap-2">
         <Button tamano="sm" onClick={registrar} cargando={guardando}>Confirmar pago</Button>
         <Button tamano="sm" variante="secondary" onClick={onCancelar} disabled={guardando}>Cancelar</Button>

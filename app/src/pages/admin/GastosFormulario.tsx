@@ -36,6 +36,7 @@ export function GastosFormulario({
   const editando = !!gasto
   const [idempotencyKey] = useState(() => claveTemporal())
   const [claveComprobante] = useState(() => claveTemporal())
+  const [clavePagoComprobante] = useState(() => claveTemporal())
 
   const [concepto, setConcepto] = useState(gasto?.concepto ?? '')
   const [valorTotal, setValorTotal] = useState<number | null>(gasto?.valor_total ?? null)
@@ -54,6 +55,7 @@ export function GastosFormulario({
   const [pagoMetodo, setPagoMetodo] = useState<MetodoPago>('efectivo')
   const [pagoCuentaId, setPagoCuentaId] = useState(cuentas[0]?.id ?? '')
   const [pagoReferencia, setPagoReferencia] = useState('')
+  const [pagoArchivoComprobante, setPagoArchivoComprobante] = useState<File | null>(null)
   const [fechaVencimiento, setFechaVencimiento] = useState(gasto?.fecha_vencimiento ?? '')
 
   const [errores, setErrores] = useState<Record<string, string>>({})
@@ -104,6 +106,11 @@ export function GastosFormulario({
         idProveedor = nuevo.id
       }
 
+      let pagoComprobantePath: string | null = null
+      if (estadoPago !== 'no' && pagoArchivoComprobante) {
+        pagoComprobantePath = await subirComprobante(pagoArchivoComprobante, clavePagoComprobante)
+      }
+
       if (editando) {
         const actualizado = await editarGasto({
           gastoId: gasto!.id,
@@ -140,6 +147,7 @@ export function GastosFormulario({
                 metodo: pagoMetodo,
                 cuentaId: pagoCuentaId,
                 referencia: pagoReferencia.trim() || null,
+                comprobantePath: pagoComprobantePath,
               },
         idempotencyKey,
       })
@@ -242,6 +250,17 @@ export function GastosFormulario({
                 </Select>
               </div>
               <Input id="gPagoReferencia" etiqueta="Referencia del pago (opcional)" value={pagoReferencia} onChange={(e) => setPagoReferencia(e.target.value)} />
+              <div>
+                <label htmlFor="gPagoComprobante" className="mb-1.5 block text-sm font-semibold text-carbon">Comprobante de este pago (opcional)</label>
+                <input
+                  id="gPagoComprobante"
+                  type="file"
+                  accept={TIPOS_COMPROBANTE_PERMITIDOS.join(',')}
+                  onChange={(e) => setPagoArchivoComprobante(e.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-carbon/70 file:mr-3 file:rounded-full file:border-0 file:bg-piedra file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-carbon hover:file:bg-piedra/70"
+                />
+                <p className="mt-1 text-xs text-carbon/50">Distinto del comprobante del gasto de arriba: este es el soporte de este abono puntual.</p>
+              </div>
             </div>
           )}
 
