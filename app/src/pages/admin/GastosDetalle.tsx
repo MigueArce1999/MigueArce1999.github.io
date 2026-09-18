@@ -59,6 +59,7 @@ export function GastosDetalle({
   const [mostrarFormularioPago, setMostrarFormularioPago] = useState(false)
   const [mostrarAnular, setMostrarAnular] = useState(false)
   const [pagoARevertir, setPagoARevertir] = useState<GastoPago | null>(null)
+  const [pagoAEditar, setPagoAEditar] = useState<GastoPago | null>(null)
   const [accionEnCurso, setAccionEnCurso] = useState(false)
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
 
@@ -216,7 +217,7 @@ export function GastosDetalle({
         ) : (
           <div className="flex flex-col gap-2">
             {pagos.map((p) => (
-              <FilaPago key={p.id} pago={p} onRevertir={() => setPagoARevertir(p)} />
+              <FilaPago key={p.id} pago={p} onEditar={() => setPagoAEditar(p)} onBorrar={() => setPagoARevertir(p)} />
             ))}
           </div>
         )}
@@ -225,11 +226,28 @@ export function GastosDetalle({
       {pagoARevertir && (
         <FormularioRevertirInline
           pago={pagoARevertir}
+          gasto={gasto}
           onCancelar={() => setPagoARevertir(null)}
-          onRevertido={() => {
+          onRevertido={(actualizado) => {
             setPagoARevertir(null)
+            onCambio(actualizado)
             listarPagosDeGasto(gasto.id).then(setPagos)
-            cargar()
+            listarEventosDeGasto(gasto.id).then(setEventos)
+          }}
+        />
+      )}
+
+      {pagoAEditar && (
+        <FormularioEditarPagoInline
+          pago={pagoAEditar}
+          gasto={gasto}
+          cuentas={cuentas}
+          onCancelar={() => setPagoAEditar(null)}
+          onEditado={(actualizado) => {
+            setPagoAEditar(null)
+            onCambio(actualizado)
+            listarPagosDeGasto(gasto.id).then(setPagos)
+            listarEventosDeGasto(gasto.id).then(setEventos)
           }}
         />
       )}
@@ -267,7 +285,7 @@ function EtiquetaEstado({ gasto }: { gasto: Gasto }) {
   )
 }
 
-function FilaPago({ pago, onRevertir }: { pago: GastoPago; onRevertir: () => void }) {
+function FilaPago({ pago, onEditar, onBorrar }: { pago: GastoPago; onEditar: () => void; onBorrar: () => void }) {
   const [abriendoComprobante, setAbriendoComprobante] = useState(false)
   const [errorComprobante, setErrorComprobante] = useState<string | null>(null)
 
@@ -301,7 +319,8 @@ function FilaPago({ pago, onRevertir }: { pago: GastoPago; onRevertir: () => voi
               {abriendoComprobante ? 'Abriendo…' : 'Ver comprobante'}
             </button>
           )}
-          <button onClick={onRevertir} className="text-xs font-semibold text-error underline underline-offset-2">Revertir</button>
+          <button onClick={onEditar} className="text-xs font-semibold text-oliva underline underline-offset-2">Editar</button>
+          <button onClick={onBorrar} className="text-xs font-semibold text-error underline underline-offset-2">Borrar</button>
         </div>
       </div>
       {errorComprobante && <p className="text-xs text-error">{errorComprobante}</p>}
@@ -399,7 +418,20 @@ function FormularioPagoInline({
   )
 }
 
-function FormularioRevertirInline({ pago, onCancelar, onRevertido }: { pago: GastoPago; onCancelar: () => void; onRevertido: () => void }) {
+// "Borrar un pago" nunca es un DELETE físico (ver reglas de historial del módulo): equivale a
+// revertir su importe completo, con motivo obligatorio. El importe queda editable por si solo
+// se necesita corregir una parte del pago sin anularlo del todo.
+function FormularioRevertirInline({
+  pago,
+  gasto,
+  onCancelar,
+  onRevertido,
+}: {
+  pago: GastoPago
+  gasto: Gasto
+  onCancelar: () => void
+  onRevertido: (actualizado: Gasto) => void
+}) {
   const [importe, setImporte] = useState<number | null>(pago.importe)
   const [motivo, setMotivo] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -408,11 +440,17 @@ function FormularioRevertirInline({ pago, onCancelar, onRevertido }: { pago: Gas
   async function revertir() {
     setError(null)
     if (!importe || importe <= 0) { setError('Ingresa un importe mayor que cero.'); return }
-    if (!motivo.trim()) { setError('Indica el motivo de la reversión.'); return }
+    if (!motivo.trim()) { setError('Indica el motivo.'); return }
     setGuardando(true)
     try {
       await revertirPagoGasto({ gastoPagoId: pago.id, importe, motivo: motivo.trim() })
-      onRevertido()
+      const nuevoPagado = gasto.total_pagado - importe
+      onRevertido({
+        ...gasto,
+        total_pagado: nuevoPagado,
+        saldo_pendiente: gasto.valor_total - nuevoPagado,
+        estado: nuevoPagado <= 0 ? 'pendiente' : nuevoPagado >= gasto.valor_total ? 'pagado' : 'pago_parcial',
+      })
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -422,12 +460,124 @@ function FormularioRevertirInline({ pago, onCancelar, onRevertido }: { pago: Gas
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-error/30 bg-error/5 p-3.5">
-      <p className="text-sm font-semibold text-carbon">Revertir pago de {formatoMoneda(pago.importe)}</p>
+      <p className="text-sm font-semibold text-carbon">Borrar pago de {formatoMoneda(pago.importe)}</p>
+      <p className="text-xs text-carbon/60">Esto revierte el pago (nunca se borra la fila): el saldo vuelve a quedar pendiente y el historial conserva el registro original.</p>
       {error && <ErrorState mensaje={error} />}
       <CampoMoneda id="revImporte" etiqueta="Importe a revertir" value={importe} onChange={setImporte} />
       <Textarea id="revMotivo" etiqueta="Motivo (obligatorio)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
       <div className="flex gap-2">
-        <Button tamano="sm" variante="danger" onClick={revertir} cargando={guardando}>Confirmar reversión</Button>
+        <Button tamano="sm" variante="danger" onClick={revertir} cargando={guardando}>Borrar pago</Button>
+        <Button tamano="sm" variante="secondary" onClick={onCancelar} disabled={guardando}>Cancelar</Button>
+      </div>
+    </div>
+  )
+}
+
+// "Editar" un pago tampoco muta la fila original: la revierte por completo (con un motivo fijo
+// de corrección) y de inmediato registra un pago nuevo con los datos corregidos — dos
+// movimientos en el historial en vez de uno silencioso, pero el efecto neto para quien usa la
+// pantalla es "edité el pago".
+function FormularioEditarPagoInline({
+  pago,
+  gasto,
+  cuentas,
+  onCancelar,
+  onEditado,
+}: {
+  pago: GastoPago
+  gasto: Gasto
+  cuentas: { id: string; nombre: string; activa: boolean }[]
+  onCancelar: () => void
+  onEditado: (actualizado: Gasto) => void
+}) {
+  const [idempotencyKey] = useState(() => claveTemporal())
+  const [claveComprobante] = useState(() => claveTemporal())
+  const [importe, setImporte] = useState<number | null>(pago.importe)
+  const [fecha, setFecha] = useState(pago.fecha)
+  const [metodo, setMetodo] = useState<MetodoPago>(pago.metodo)
+  const [cuentaId, setCuentaId] = useState(pago.cuenta_id)
+  const [referencia, setReferencia] = useState(pago.referencia ?? '')
+  const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+
+  async function guardar() {
+    setError(null)
+    if (!importe || importe <= 0) { setError('Ingresa un importe mayor que cero.'); return }
+    if (!cuentaId) { setError('Elige la cuenta de origen.'); return }
+    const saldoDisponibleParaEdicion = gasto.saldo_pendiente + pago.importe
+    if (importe > saldoDisponibleParaEdicion) {
+      setError(`El importe no puede superar ${formatoMoneda(saldoDisponibleParaEdicion)} (el saldo si este pago no existiera).`)
+      return
+    }
+    setGuardando(true)
+    try {
+      await revertirPagoGasto({ gastoPagoId: pago.id, importe: pago.importe, motivo: 'Corrección: pago reemplazado por edición' })
+      let comprobantePath = pago.comprobante_path
+      if (archivoComprobante) {
+        comprobantePath = await subirComprobante(archivoComprobante, claveComprobante)
+      }
+      await registrarPagoGasto({
+        gastoId: pago.gasto_id,
+        importe,
+        fecha,
+        metodo,
+        cuentaId,
+        referencia: referencia.trim() || null,
+        comprobantePath,
+        idempotencyKey,
+      })
+      const nuevoPagado = gasto.total_pagado - pago.importe + importe
+      onEditado({
+        ...gasto,
+        total_pagado: nuevoPagado,
+        saldo_pendiente: gasto.valor_total - nuevoPagado,
+        estado: nuevoPagado <= 0 ? 'pendiente' : nuevoPagado >= gasto.valor_total ? 'pagado' : 'pago_parcial',
+      })
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-oliva/40 bg-oliva/5 p-3.5">
+      <p className="text-sm font-semibold text-carbon">Editar pago</p>
+      <p className="text-xs text-carbon/60">Se revierte el pago original y se registra uno nuevo con estos datos — el historial conserva ambos movimientos.</p>
+      {error && <ErrorState mensaje={error} />}
+      <div className="grid grid-cols-2 gap-3">
+        <CampoMoneda id="edImporte" etiqueta="Importe" value={importe} onChange={setImporte} />
+        <Input id="edFecha" etiqueta="Fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Select id="edMetodo" etiqueta="Método" value={metodo} onChange={(e) => setMetodo(e.target.value as MetodoPago)}>
+          <option value="efectivo">Efectivo</option>
+          <option value="transferencia">Transferencia</option>
+          <option value="tarjeta">Tarjeta</option>
+          <option value="otro">Otro</option>
+        </Select>
+        <Select id="edCuenta" etiqueta="Cuenta de origen" value={cuentaId} onChange={(e) => setCuentaId(e.target.value)}>
+          <option value="">Elige una cuenta</option>
+          {cuentas.filter((c) => c.activa).map((c) => (
+            <option key={c.id} value={c.id}>{c.nombre}</option>
+          ))}
+        </Select>
+      </div>
+      <Input id="edReferencia" etiqueta="Referencia (opcional)" value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+      <div>
+        <label htmlFor="edComprobante" className="mb-1.5 block text-sm font-semibold text-carbon">Comprobante (opcional)</label>
+        <input
+          id="edComprobante"
+          type="file"
+          accept={TIPOS_COMPROBANTE_PERMITIDOS.join(',')}
+          onChange={(e) => setArchivoComprobante(e.target.files?.[0] ?? null)}
+          className="block w-full text-sm text-carbon/70 file:mr-3 file:rounded-full file:border-0 file:bg-piedra file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-carbon hover:file:bg-piedra/70"
+        />
+        {pago.comprobante_path && !archivoComprobante && <p className="mt-1 text-xs text-oliva">Ya tiene un comprobante; sube uno nuevo para reemplazarlo.</p>}
+      </div>
+      <div className="flex gap-2">
+        <Button tamano="sm" onClick={guardar} cargando={guardando}>Guardar cambios</Button>
         <Button tamano="sm" variante="secondary" onClick={onCancelar} disabled={guardando}>Cancelar</Button>
       </div>
     </div>

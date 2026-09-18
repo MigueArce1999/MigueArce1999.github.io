@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Input, Select } from '../../components/ui/Campos'
 import { Card, Cargando, EmptyState, ErrorState } from '../../components/ui/Estados'
-import { Drawer } from '../../components/ui/Modal'
+import { Drawer, Modal } from '../../components/ui/Modal'
 import {
   listarCategoriasGasto,
   listarCuentas,
@@ -15,6 +15,7 @@ import {
 } from '../../lib/api/gastos'
 import { fechaBogotaISO, formatoFecha, formatoMoneda, rangoPeriodo } from '../../lib/format'
 import type { CategoriaGasto, Cuenta, Gasto, PlantillaGastoRecurrente } from '../../lib/types'
+import { GastosCategorias } from './GastosCategorias'
 import { GastosDetalle } from './GastosDetalle'
 import { GastosFormulario } from './GastosFormulario'
 import { GastosRecurrentes } from './GastosRecurrentes'
@@ -58,6 +59,7 @@ export function AdminGastos() {
   const [formularioAbierto, setFormularioAbierto] = useState(false)
   const [gastoEnEdicion, setGastoEnEdicion] = useState<Gasto | null>(null)
   const [gastoSeleccionado, setGastoSeleccionado] = useState<Gasto | null>(null)
+  const [categoriasAbierto, setCategoriasAbierto] = useState(false)
 
   // Periodo del indicador "Pagado en el periodo" (el resto de indicadores son a la fecha
   // actual, sin importar este selector — ver obtenerIndicadoresGastos). Memoizado: rangoPeriodo
@@ -162,6 +164,7 @@ export function AdminGastos() {
           <p className="text-sm text-carbon/60">Controla los gastos del salón y organiza tus próximos pagos.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variante="secondary" onClick={() => setCategoriasAbierto(true)}>Categorías</Button>
           <Button variante="secondary" onClick={exportarCSV} disabled={gastosFiltrados.length === 0}>Exportar</Button>
           <Button onClick={() => { setGastoEnEdicion(null); setFormularioAbierto(true) }}>Registrar gasto</Button>
         </div>
@@ -316,6 +319,10 @@ export function AdminGastos() {
           )}
         </>
       )}
+
+      <Modal abierto={categoriasAbierto} onCerrar={() => setCategoriasAbierto(false)} titulo="Categorías de gastos">
+        <GastosCategorias categorias={categorias} onCambio={cargarCatalogos} />
+      </Modal>
 
       <Drawer abierto={formularioAbierto} onCerrar={() => { setFormularioAbierto(false); setGastoEnEdicion(null) }} titulo={gastoEnEdicion ? 'Editar gasto' : 'Registrar gasto'}>
         <GastosFormulario
