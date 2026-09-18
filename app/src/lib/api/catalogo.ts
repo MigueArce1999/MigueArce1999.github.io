@@ -1,4 +1,4 @@
-import { isDemoMode, supabase } from '../supabase'
+import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
 import {
   demoCategorias,
   demoProfesionales,
@@ -56,6 +56,19 @@ export async function listarServicios(categoriaId?: string): Promise<Servicio[]>
     categoria_nombre: s.categoria?.nombre,
     profesionales: (s.servicio_profesional ?? []).map((sp: any) => sp.profesional),
   }))
+}
+
+// Cuando en Atender se escribe un servicio que no existe en el catálogo, se crea "sobre la
+// marcha" en vez de bloquear a quien atiende — nace en la categoría "Otros servicios" con
+// precio "a valorar" y sin duración confirmada (ver fn_crear_servicio_rapido en
+// supabase/migrations/0038); administración lo reclasifica después desde Admin → Servicios.
+// Idempotente por nombre: si ya existe (por otra empleada casi al mismo tiempo, o porque
+// alguien ya lo escribió antes), devuelve el mismo en vez de duplicarlo.
+export async function crearServicioRapido(nombre: string, precio?: number | null): Promise<Servicio> {
+  const client = supabaseRequerido()
+  const { data, error } = await client.rpc('fn_crear_servicio_rapido', { p_nombre: nombre, p_precio: precio ?? null })
+  if (error) throw error
+  return data as Servicio
 }
 
 // Borrado real (no "Desactivar"): la base de datos misma protege el historial real —

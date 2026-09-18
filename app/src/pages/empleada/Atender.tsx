@@ -5,7 +5,7 @@ import { CampoBase, CampoMoneda, Input, Select, Textarea } from '../../component
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { useAuth } from '../../state/AuthContext'
 import { isDemoMode, supabase } from '../../lib/supabase'
-import { listarProfesionales, listarServicios } from '../../lib/api/catalogo'
+import { crearServicioRapido, listarProfesionales, listarServicios } from '../../lib/api/catalogo'
 import { buscarClientes, completarYCobrarAtencion, listarClientesRecientes, registrarAtencion } from '../../lib/api/empleada'
 import { obtenerClienteAdmin } from '../../lib/api/clientes'
 import { obtenerReservaPorId } from '../../lib/api/reservas'
@@ -205,6 +205,16 @@ export function EmpleadaAtender({
   function agregarLinea(nueva: LineaServicioBorrador) {
     setLineas((prev) => [...prev, nueva])
   }
+  // Cuando el buscador de servicio no encuentra el nombre escrito, se crea "sobre la marcha" en
+  // vez de bloquear el registro — ver crearServicioRapido en lib/api/catalogo.ts. Se agrega al
+  // catálogo ya cargado en memoria para que otras líneas de esta misma atención también lo
+  // encuentren sin recargar la página.
+  async function crearServicio(nombre: string) {
+    const nuevo = await crearServicioRapido(nombre)
+    setServicios((prev) => (prev.some((s) => s.id === nuevo.id) ? prev : [...prev, nuevo]))
+    return nuevo
+  }
+
   function actualizarProducto(tempId: string, cambios: Partial<LineaProductoBorrador>) {
     setProductos((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, ...cambios } : p)))
   }
@@ -444,6 +454,7 @@ export function EmpleadaAtender({
                     onQuitar={() => quitarLinea(l.tempId)}
                     onAgregarColaboracion={agregarLinea}
                     onQuitarColaboracion={quitarLinea}
+                    onCrearServicio={crearServicio}
                   />
                 ))
             )}
@@ -799,6 +810,7 @@ function ServicioTarjeta({
   onQuitar,
   onAgregarColaboracion,
   onQuitarColaboracion,
+  onCrearServicio,
 }: {
   numero: number
   linea: LineaServicioBorrador
@@ -810,6 +822,7 @@ function ServicioTarjeta({
   onQuitar?: () => void
   onAgregarColaboracion: (nueva: LineaServicioBorrador) => void
   onQuitarColaboracion: (tempId: string) => void
+  onCrearServicio: (nombre: string) => Promise<Servicio>
 }) {
   // Siempre el equipo completo: restringir a quienes tiene asignado el servicio en el
   // catálogo (servicio_profesional) bloqueaba elegir a alguien que sí lo hizo en la práctica
@@ -826,6 +839,18 @@ function ServicioTarjeta({
       precio: s.precio ?? null,
       profesionalId: linea.profesionalId || opcionesProfesional[0]?.id || '',
     })
+  }
+
+  const [errorCrearServicio, setErrorCrearServicio] = useState<string | null>(null)
+
+  async function crearYElegirServicio(nombre: string) {
+    setErrorCrearServicio(null)
+    try {
+      const nuevo = await onCrearServicio(nombre)
+      elegirServicio(nuevo)
+    } catch (e: any) {
+      setErrorCrearServicio(e.message)
+    }
   }
 
   const [formAbierto, setFormAbierto] = useState(false)
@@ -879,7 +904,14 @@ function ServicioTarjeta({
           Precio cobrado recibe algo más de ancho que sus dos vecinos: el prefijo "$" y el
           sufijo "COP" fijos le restan espacio útil al número frente a un input normal. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1.05fr_1.3fr]">
-        <ServicioBuscador id={`servicio-${linea.tempId}`} servicios={servicios} valor={linea.nombre} onSeleccionar={elegirServicio} />
+        <ServicioBuscador
+          id={`servicio-${linea.tempId}`}
+          servicios={servicios}
+          valor={linea.nombre}
+          onSeleccionar={elegirServicio}
+          onCrear={crearYElegirServicio}
+          errorCrear={errorCrearServicio}
+        />
         <Select
           id={`prof-${linea.tempId}`}
           etiqueta="Profesional"
@@ -960,15 +992,34 @@ function ServicioTarjeta({
   )
 }
 
-function ServicioBuscador({ id, servicios, valor, onSeleccionar }: { id: string; servicios: Servicio[]; valor: string; onSeleccionar: (s: Servicio) => void }) {
+function ServicioBuscador({
+  id,
+  servicios,
+  valor,
+  onSeleccionar,
+  onCrear,
+  errorCrear,
+}: {
+  id: string
+  servicios: Servicio[]
+  valor: string
+  onSeleccionar: (s: Servicio) => void
+  onCrear: (nombre: string) => Promise<void>
+  errorCrear: string | null
+}) {
   const [query, setQuery] = useState(valor)
   const [abierto, setAbierto] = useState(false)
+  const [creando, setCreando] = useState(false)
   useEffect(() => setQuery(valor), [valor])
 
   const filtrados = query.trim()
     ? servicios.filter((s) => s.nombre.toLowerCase().includes(query.trim().toLowerCase()))
     : servicios
-  const { indice, setIndice, onKeyDown } = useNavegacionLista(filtrados.length)
+  // Si nadie en el catálogo tiene EXACTAMENTE ese nombre (sin distinguir mayúsculas), se ofrece
+  // crearlo — aunque haya coincidencias parciales, la empleada puede querer de verdad un
+  // servicio nuevo y distinto (ver fn_crear_servicio_rapido en 0038).
+  const mostrarCrear = query.trim().length > 0 && !servicios.some((s) => s.nombre.toLowerCase() === query.trim().toLowerCase())
+  const { indice, setIndice, onKeyDown } = useNavegacionLista(filtrados.length + (mostrarCrear ? 1 : 0))
 
   function elegir(s: Servicio) {
     onSeleccionar(s)
@@ -976,8 +1027,21 @@ function ServicioBuscador({ id, servicios, valor, onSeleccionar }: { id: string;
     setAbierto(false)
   }
 
+  async function crear() {
+    if (creando) return
+    setCreando(true)
+    await onCrear(query.trim())
+    setCreando(false)
+    setAbierto(false)
+  }
+
+  function seleccionarPorIndice(i: number) {
+    if (i < filtrados.length) elegir(filtrados[i])
+    else crear()
+  }
+
   return (
-    <CampoBase etiqueta="Servicio" id={id} alinearAltura>
+    <CampoBase etiqueta="Servicio" id={id} alinearAltura error={errorCrear ?? undefined}>
       <div className="relative">
         <input
           id={id}
@@ -985,7 +1049,7 @@ function ServicioBuscador({ id, servicios, valor, onSeleccionar }: { id: string;
           onChange={(e) => { setQuery(e.target.value); setAbierto(true) }}
           onFocus={() => setAbierto(true)}
           onBlur={() => setTimeout(() => setAbierto(false), 150)}
-          onKeyDown={(e) => onKeyDown(e, (i) => elegir(filtrados[i]), () => setAbierto(false))}
+          onKeyDown={(e) => onKeyDown(e, seleccionarPorIndice, () => setAbierto(false))}
           placeholder="Buscar servicio…"
           role="combobox"
           aria-expanded={abierto}
@@ -993,7 +1057,7 @@ function ServicioBuscador({ id, servicios, valor, onSeleccionar }: { id: string;
         />
         {abierto && (
           <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-piedra bg-blanco shadow-lg">
-            {filtrados.length === 0 && <p className="px-3 py-3 text-sm text-carbon/60">Sin resultados.</p>}
+            {filtrados.length === 0 && !mostrarCrear && <p className="px-3 py-3 text-sm text-carbon/60">Sin resultados.</p>}
             {filtrados.map((s, i) => (
               <button
                 key={s.id}
@@ -1005,6 +1069,18 @@ function ServicioBuscador({ id, servicios, valor, onSeleccionar }: { id: string;
                 {s.precio != null && <span className="text-xs text-carbon/50">{formatoMoneda(s.precio)}</span>}
               </button>
             ))}
+            {mostrarCrear && (
+              <button
+                onMouseDown={crear}
+                onMouseEnter={() => setIndice(filtrados.length)}
+                disabled={creando}
+                className={`flex w-full items-center gap-2 border-t border-piedra/60 px-3 py-2 text-left text-sm font-semibold text-oliva disabled:opacity-60 ${
+                  indice === filtrados.length ? 'bg-piedra/40' : ''
+                }`}
+              >
+                {creando ? 'Creando…' : `+ Crear "${query.trim()}" como nuevo servicio`}
+              </button>
+            )}
           </div>
         )}
       </div>
