@@ -8,10 +8,11 @@ import { buscarClientes } from '../../lib/api/empleada'
 import { listarProfesionales } from '../../lib/api/catalogo'
 import { editarVenta, eliminarVenta, listarProductosVendidos, listarVentasDetalle, obtenerNotasVenta } from '../../lib/api/admin'
 import type { ProductoVenta } from '../../lib/api/admin'
-import { formatoFecha, formatoMoneda } from '../../lib/format'
+import { formatoFecha, formatoMoneda, rangoPeriodo, type PeriodoResumen } from '../../lib/format'
 import type { Cliente, Profesional, VentaLinea } from '../../lib/types'
 
 export function AdminVentas() {
+  const [periodo, setPeriodo] = useState<PeriodoResumen>('mes')
   const [ventas, setVentas] = useState<VentaLinea[] | null>(null)
   const [productos, setProductos] = useState<ProductoVenta[] | null>(null)
   const [equipo, setEquipo] = useState<Profesional[]>([])
@@ -21,12 +22,19 @@ export function AdminVentas() {
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
 
   function cargar() {
-    listarVentasDetalle().then(setVentas).catch((e) => setError(e.message))
-    listarProductosVendidos().then(setProductos).catch((e) => setError(e.message))
+    const { desde, hasta } = rangoPeriodo(periodo)
+    setVentas(null)
+    setProductos(null)
+    listarVentasDetalle(desde, hasta).then(setVentas).catch((e) => setError(e.message))
+    listarProductosVendidos(desde, hasta).then(setProductos).catch((e) => setError(e.message))
   }
 
   useEffect(() => {
     cargar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodo])
+
+  useEffect(() => {
     listarProfesionales().then(setEquipo).catch(() => {})
   }, [])
 
@@ -55,7 +63,20 @@ export function AdminVentas() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-marca text-2xl font-semibold text-carbon">Ventas y cobros</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-marca text-2xl font-semibold text-carbon">Ventas y cobros</h1>
+        <div className="flex gap-2">
+          {(['hoy', 'semana', 'mes'] as PeriodoResumen[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriodo(p)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${periodo === p ? 'bg-oliva text-blanco' : 'bg-piedra/40 text-carbon'}`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
       <p className="text-sm text-carbon/60">
         Cada fila es un servicio cobrado. "Le quedó al negocio" descuenta la comisión ya generada para
         quien lo realizó. Una línea marcada "Colaboración" es la ganancia completa (100%) de quien ayudó,
@@ -68,7 +89,7 @@ export function AdminVentas() {
       {!ventas ? (
         <Cargando />
       ) : ventas.length === 0 ? (
-        <EmptyState titulo="No hay ventas registradas todavía" />
+        <EmptyState titulo="No hay ventas registradas en este periodo" />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-piedra">
           <table className="w-full min-w-[820px] text-sm">
@@ -143,7 +164,7 @@ export function AdminVentas() {
       {!productos ? (
         <Cargando filas={2} />
       ) : productos.length === 0 ? (
-        <EmptyState titulo="No hay productos vendidos todavía" />
+        <EmptyState titulo="No hay productos vendidos en este periodo" />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-piedra">
           <table className="w-full min-w-[560px] text-sm">
