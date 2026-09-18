@@ -240,6 +240,7 @@ export interface DatosPagoInicial {
   metodo: MetodoPago
   cuentaId: string
   referencia?: string | null
+  comprobantePath?: string | null
 }
 
 export async function crearGasto(params: {
@@ -271,6 +272,7 @@ export async function crearGasto(params: {
     p_pago_metodo: params.pago?.metodo ?? null,
     p_pago_cuenta_id: params.pago?.cuentaId ?? null,
     p_pago_referencia: params.pago?.referencia ?? null,
+    p_pago_comprobante_path: params.pago?.comprobantePath ?? null,
     p_idempotency_key: params.idempotencyKey,
   })
   if (error) throw error
@@ -320,6 +322,7 @@ export async function registrarPagoGasto(params: {
   metodo: MetodoPago
   cuentaId: string
   referencia?: string | null
+  comprobantePath?: string | null
   idempotencyKey: string
 }): Promise<GastoPago> {
   const client = supabaseRequerido()
@@ -330,6 +333,7 @@ export async function registrarPagoGasto(params: {
     p_metodo: params.metodo,
     p_cuenta_id: params.cuentaId,
     p_referencia: params.referencia ?? null,
+    p_comprobante_path: params.comprobantePath ?? null,
     p_idempotency_key: params.idempotencyKey,
   })
   if (error) throw error

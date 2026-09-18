@@ -364,6 +364,9 @@ export interface GastoPago {
   cuenta_id: string
   cuenta_nombre?: string
   referencia: string | null
+  // Soporte opcional de ESTE pago puntual (p. ej. el comprobante de esa transferencia) —
+  // distinto de gasto.comprobante_path, que es el soporte del gasto en sí.
+  comprobante_path: string | null
   registrado_por: string
   registrado_por_nombre?: string
   creado_en: string
