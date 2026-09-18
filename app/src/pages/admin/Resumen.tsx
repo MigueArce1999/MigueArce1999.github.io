@@ -1,17 +1,29 @@
 import { useEffect, useState } from 'react'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { resumenNegocio } from '../../lib/api/admin'
+import { obtenerPagadoNetoEnPeriodo } from '../../lib/api/gastos'
 import { formatoMoneda, rangoPeriodo, type PeriodoResumen } from '../../lib/format'
+import { isDemoMode } from '../../lib/supabase'
 
 export function AdminResumen() {
   const [periodo, setPeriodo] = useState<PeriodoResumen>('mes')
   const [datos, setDatos] = useState<Awaited<ReturnType<typeof resumenNegocio>> | null>(null)
+  // Pagos de gastos del mismo periodo (efectivo Y banco, netos de reversiones) — nunca se
+  // vuelve a restar aparte una comisión o una compra: ambas ya llegan aquí como un pago de
+  // gasto más (liquidación/compra), así que restarlas de nuevo sería descontarlas dos veces.
+  const [pagosGastos, setPagosGastos] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const { desde, hasta } = rangoPeriodo(periodo)
     setDatos(null)
+    setPagosGastos(null)
     resumenNegocio(desde, hasta).then(setDatos).catch((e) => setError(e.message))
+    if (isDemoMode) {
+      setPagosGastos(0)
+    } else {
+      obtenerPagadoNetoEnPeriodo(desde, hasta).then(setPagosGastos).catch((e) => setError(e.message))
+    }
   }, [periodo])
 
   return (
@@ -41,10 +53,17 @@ export function AdminResumen() {
             <Kpi etiqueta="Inasistencias" valor={String(datos.inasistencias)} />
             <Kpi etiqueta="Comisiones generadas" valor={formatoMoneda(datos.comisionesGeneradas)} />
             <Kpi etiqueta="Comisiones pendientes" valor={formatoMoneda(datos.comisionesPendientes)} nota="Aún no liquidadas" />
+            <Kpi
+              etiqueta="Flujo neto"
+              valor={pagosGastos === null ? '—' : formatoMoneda(datos.cobros - pagosGastos)}
+              nota="Cobros recibidos menos pagos de gastos del periodo (efectivo y banco, netos de reversiones)"
+            />
           </div>
           <p className="text-xs text-carbon/50">
-            No se muestra utilidad neta porque este resumen todavía no incluye gastos (módulo de Fase 2).
-            Los indicadores de clientes nuevos/recurrentes están pendientes de una consulta comparativa por periodo.
+            "Flujo neto" es cobros menos pagos de gastos — no es ganancia real: no descuenta el costo de los insumos
+            consumidos en cada servicio (ese módulo de compras/inventario todavía no existe) ni distingue retiros del
+            dueño de gastos operativos. Los indicadores de clientes nuevos/recurrentes están pendientes de una
+            consulta comparativa por periodo.
           </p>
         </>
       )}

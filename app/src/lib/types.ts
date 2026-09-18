@@ -292,3 +292,118 @@ export interface SolicitudHorario {
 export interface SlotEquipoDisponible extends SlotDisponible {
   profesionales_disponibles: string[]
 }
+
+// --- Gastos y pagos (ver supabase/migrations/0033-0035) ---------------------------------
+
+export type EstadoGasto = 'pendiente' | 'pago_parcial' | 'pagado' | 'anulado'
+export type OrigenGasto = 'manual' | 'compra' | 'liquidacion'
+export type TipoCuenta = 'efectivo' | 'bancaria' | 'billetera'
+export type FrecuenciaRecurrencia = 'semanal' | 'mensual'
+
+export interface CategoriaGasto {
+  id: string
+  nombre: string
+  activa: boolean
+}
+
+export interface Proveedor {
+  id: string
+  nombre: string
+  telefono: string | null
+  activo: boolean
+}
+
+export interface Cuenta {
+  id: string
+  nombre: string
+  tipo: TipoCuenta
+  activa: boolean
+  saldo: number
+}
+
+// Fila de vista_gasto: el saldo/estado/vencido siempre vienen calculados del servidor, nunca
+// se recalculan en el cliente (ver 0034_gastos_pagos_funciones.sql → vista_gasto).
+export interface Gasto {
+  id: string
+  concepto: string
+  categoria_id: string
+  categoria_nombre: string
+  categoria_activa: boolean
+  proveedor_id: string | null
+  proveedor_nombre: string | null
+  referencia: string | null
+  fecha: string
+  fecha_vencimiento: string | null
+  valor_total: number
+  notas: string | null
+  comprobante_path: string | null
+  origen: OrigenGasto
+  referencia_liquidacion_id: string | null
+  plantilla_id: string | null
+  anulado: boolean
+  anulado_motivo: string | null
+  anulado_por: string | null
+  anulado_en: string | null
+  creado_por: string
+  creado_por_nombre: string | null
+  creado_en: string
+  actualizado_por: string | null
+  actualizado_en: string
+  total_pagado: number
+  saldo_pendiente: number
+  estado: EstadoGasto
+  vencido: boolean
+}
+
+export interface GastoPago {
+  id: string
+  gasto_id: string
+  importe: number
+  fecha: string
+  metodo: MetodoPago
+  cuenta_id: string
+  cuenta_nombre?: string
+  referencia: string | null
+  registrado_por: string
+  registrado_por_nombre?: string
+  creado_en: string
+}
+
+export interface GastoPagoReversion {
+  id: string
+  gasto_pago_id: string
+  importe: number
+  motivo: string
+  registrado_por: string
+  registrado_por_nombre?: string
+  creado_en: string
+}
+
+export type TipoEventoGasto = 'creado' | 'editado' | 'pago_registrado' | 'pago_revertido' | 'anulado'
+
+export interface GastoEvento {
+  id: string
+  gasto_id: string
+  tipo: TipoEventoGasto
+  usuario_id: string | null
+  usuario_nombre?: string
+  valor_anterior: Record<string, unknown> | null
+  valor_nuevo: Record<string, unknown> | null
+  motivo: string | null
+  creado_en: string
+}
+
+export interface PlantillaGastoRecurrente {
+  id: string
+  concepto: string
+  categoria_id: string
+  categoria_nombre?: string
+  proveedor_id: string | null
+  proveedor_nombre?: string | null
+  valor_total: number
+  frecuencia: FrecuenciaRecurrencia
+  primera_fecha_vencimiento: string
+  fecha_fin: string | null
+  activa: boolean
+  creado_en: string
+}
