@@ -39,10 +39,19 @@ function usarSidebarColapsado() {
 }
 
 export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: string }) {
-  const { perfil, cerrarSesionLocal } = useAuth()
+  const { perfil, profesional, cerrarSesionLocal } = useAuth()
   const { colapsado, alternar } = usarSidebarColapsado()
   const location = useLocation()
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false)
+
+  // Solo aplica a un admin que ADEMÁS tiene perfil de profesional (ver RutaProtegida): le
+  // ofrece saltar al otro portal sin cerrar sesión ni tocar su rol en la base de datos.
+  const enlaceOtroPortal =
+    perfil?.rol === 'admin' && profesional
+      ? location.pathname.startsWith('/equipo-app')
+        ? { to: '/admin', texto: 'Ir a Administración' }
+        : { to: '/equipo-app', texto: 'Ir a portal de empleadas' }
+      : null
 
   async function salir() {
     await cerrarSesion()
@@ -85,6 +94,15 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
           </nav>
 
           <div className="mt-auto flex flex-col gap-1 border-t border-piedra pt-3">
+            {enlaceOtroPortal && (
+              <Link
+                to={enlaceOtroPortal.to}
+                title={enlaceOtroPortal.texto}
+                className={`rounded-lg py-2 text-sm font-medium text-oliva hover:bg-piedra/40 ${colapsado ? 'px-2 text-center' : 'px-3'}`}
+              >
+                {colapsado ? '⇄' : enlaceOtroPortal.texto}
+              </Link>
+            )}
             <button
               onClick={alternar}
               aria-label={colapsado ? 'Expandir menú' : 'Contraer menú'}
@@ -157,7 +175,14 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
         )}
       </nav>
 
-      <MenuMovilOverlay abierto={menuMovilAbierto} onCerrar={() => setMenuMovilAbierto(false)} items={items} titulo={titulo} onSalir={salir} />
+      <MenuMovilOverlay
+        abierto={menuMovilAbierto}
+        onCerrar={() => setMenuMovilAbierto(false)}
+        items={items}
+        titulo={titulo}
+        onSalir={salir}
+        enlaceOtroPortal={enlaceOtroPortal}
+      />
     </div>
   )
 }
@@ -168,12 +193,14 @@ function MenuMovilOverlay({
   items,
   titulo,
   onSalir,
+  enlaceOtroPortal,
 }: {
   abierto: boolean
   onCerrar: () => void
   items: ItemNav[]
   titulo: string
   onSalir: () => void
+  enlaceOtroPortal: { to: string; texto: string } | null
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
   useDialogAccesible(abierto, onCerrar, panelRef)
@@ -215,7 +242,12 @@ function MenuMovilOverlay({
             </NavLink>
           ))}
         </nav>
-        <button onClick={onSalir} className="mt-auto rounded-lg px-3 py-2.5 text-left text-sm font-medium text-carbon/70 hover:bg-piedra/40">
+        {enlaceOtroPortal && (
+          <Link to={enlaceOtroPortal.to} className="mt-auto rounded-lg px-3 py-2.5 text-sm font-medium text-oliva hover:bg-piedra/40">
+            {enlaceOtroPortal.texto}
+          </Link>
+        )}
+        <button onClick={onSalir} className={`rounded-lg px-3 py-2.5 text-left text-sm font-medium text-carbon/70 hover:bg-piedra/40 ${enlaceOtroPortal ? '' : 'mt-auto'}`}>
           Cerrar sesión
         </button>
       </div>

@@ -78,7 +78,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (perfilRow?.rol === 'cliente') {
         const c = await obtenerClientePorUsuario(usuarioId)
         if (activo) setCliente(c)
-      } else if (perfilRow?.rol === 'empleada') {
+      } else if (perfilRow?.rol === 'empleada' || perfilRow?.rol === 'admin') {
+        // Un admin que ADEMÁS tiene fila en `profesional` (p. ej. quien administra el salón y
+        // también atiende) puede entrar al portal de empleadas sin cambiar de rol — ver
+        // RutaProtegida. Para un admin sin esa fila, esto simplemente devuelve null.
         const { data: profRow } = await supabase!.from('vista_profesional').select('*').eq('id', usuarioId).maybeSingle()
         if (activo) setProfesional(profRow)
       }
