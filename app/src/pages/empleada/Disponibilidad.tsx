@@ -12,7 +12,6 @@ import {
   retirarSolicitudBloqueo,
   solicitarBloqueo,
   solicitarHorario,
-  tienePermisoHorarioPropio,
 } from '../../lib/api/agenda'
 import { formatoFecha, formatoHora } from '../../lib/format'
 import type { BloqueoAusencia, IntervaloHorario, Reserva, TipoBloqueoAusencia } from '../../lib/types'
@@ -61,13 +60,13 @@ function diasVacios(): DiaEditable[] {
 }
 
 // Exportados para que Admin → Agenda los reutilice al gestionar el horario/ausencias de
-// cualquier profesional (admin siempre aplica directo — fn_es_admin() lo cubre en el
-// servidor — así que el mismo componente sirve para ambas pantallas sin duplicar nada).
+// cualquier profesional (admin y la propia profesional aplican siempre directo — el servidor
+// nunca deja una solicitud nueva pendiente — así que el mismo componente sirve para ambas
+// pantallas sin duplicar nada).
 export function HorarioHabitual({ profesionalId }: { profesionalId: string }) {
   const [dias, setDias] = useState<DiaEditable[] | null>(null)
   const [vigenteDesde, setVigenteDesde] = useState(hoyISO())
   const [motivo, setMotivo] = useState('')
-  const [puedeDirecto, setPuedeDirecto] = useState(false)
   const [proximo, setProximo] = useState<{ vigenteDesde: string; intervalos: IntervaloHorario[] } | null>(null)
   const [conflictos, setConflictos] = useState<Reserva[] | null>(null)
   const [revisando, setRevisando] = useState(false)
@@ -79,8 +78,8 @@ export function HorarioHabitual({ profesionalId }: { profesionalId: string }) {
     setDias(null)
     setConflictos(null)
     setExito(null)
-    Promise.all([obtenerHorarioVigente(profesionalId), obtenerProximoHorario(profesionalId), tienePermisoHorarioPropio(profesionalId)])
-      .then(([vigente, prox, permiso]) => {
+    Promise.all([obtenerHorarioVigente(profesionalId), obtenerProximoHorario(profesionalId)])
+      .then(([vigente, prox]) => {
         const base = diasVacios()
         for (const fila of vigente) {
           base[fila.dia_semana].activo = true
@@ -88,7 +87,6 @@ export function HorarioHabitual({ profesionalId }: { profesionalId: string }) {
         }
         setDias(base)
         setProximo(prox)
-        setPuedeDirecto(permiso)
       })
       .catch((e) => setError(e.message))
   }
@@ -159,12 +157,8 @@ export function HorarioHabitual({ profesionalId }: { profesionalId: string }) {
     setGuardando(true)
     setError(null)
     try {
-      const solicitud = await solicitarHorario({ profesionalId, intervalos: construirIntervalos(), vigenteDesde, motivo: motivo.trim() || null })
-      setExito(
-        solicitud.estado === 'aprobada'
-          ? `Listo: tu horario queda actualizado a partir del ${formatoFecha(vigenteDesde)}.`
-          : 'Tu solicitud quedó pendiente de aprobación. Tu horario actual sigue vigente hasta que administración la revise.',
-      )
+      await solicitarHorario({ profesionalId, intervalos: construirIntervalos(), vigenteDesde, motivo: motivo.trim() || null })
+      setExito(`Listo: tu horario queda actualizado a partir del ${formatoFecha(vigenteDesde)}.`)
       setConflictos(null)
       cargar()
     } catch (e: any) {
@@ -177,7 +171,7 @@ export function HorarioHabitual({ profesionalId }: { profesionalId: string }) {
   if (!dias) return <Cargando filas={4} />
 
   const hayConflictos = (conflictos?.length ?? 0) > 0
-  const puedeGuardar = conflictos !== null && (!puedeDirecto || !hayConflictos)
+  const puedeGuardar = conflictos !== null && !hayConflictos
 
   return (
     <div className="flex flex-col gap-4">
@@ -191,11 +185,7 @@ export function HorarioHabitual({ profesionalId }: { profesionalId: string }) {
         </Card>
       )}
 
-      <p className="text-xs text-carbon/60">
-        {puedeDirecto
-          ? 'Tienes permiso para editar tu horario directamente: el cambio aplica de inmediato desde la fecha que elijas.'
-          : 'Tus cambios de horario quedan pendientes de aprobación de administración antes de aplicarse — tu horario actual sigue vigente mientras tanto.'}
-      </p>
+      <p className="text-xs text-carbon/60">Administras tu horario directamente: el cambio aplica de inmediato desde la fecha que elijas.</p>
 
       <div className="flex flex-col gap-2">
         {dias.map((d, i) => (
@@ -251,9 +241,7 @@ export function HorarioHabitual({ profesionalId }: { profesionalId: string }) {
                   ))}
                 </ul>
                 <p className="mt-2 text-xs text-carbon/60">
-                  {puedeDirecto
-                    ? 'Reprograma, reasigna o cancela estas citas antes de guardar — un cambio directo nunca las mueve solo.'
-                    : 'Puedes enviar la solicitud igual: administración deberá resolver estas citas antes de aprobarla.'}
+                  Reprograma, reasigna o cancela estas citas antes de guardar — un cambio directo nunca las mueve solo.
                 </p>
               </div>
             ) : (
@@ -261,7 +249,7 @@ export function HorarioHabitual({ profesionalId }: { profesionalId: string }) {
             )}
             <div className="flex gap-2">
               <Button type="button" onClick={guardar} cargando={guardando} disabled={!puedeGuardar}>
-                {puedeDirecto ? 'Guardar cambios' : 'Solicitar cambio'}
+                Guardar cambios
               </Button>
               <Button type="button" variante="ghost" onClick={() => setConflictos(null)}>Volver a editar</Button>
             </div>
@@ -366,15 +354,10 @@ function FormularioAusencia({ profesionalId, onCancelar, onCreado }: { profesion
   const [horaInicio, setHoraInicio] = useState('08:00')
   const [horaFin, setHoraFin] = useState('09:00')
   const [motivo, setMotivo] = useState('')
-  const [puedeDirecto, setPuedeDirecto] = useState(false)
   const [conflictos, setConflictos] = useState<Reserva[] | null>(null)
   const [revisando, setRevisando] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    tienePermisoHorarioPropio(profesionalId).then(setPuedeDirecto)
-  }, [profesionalId])
 
   function calcularRango(): { desdeISO: string; hastaISO: string; todoElDia: boolean } {
     if (tipo === 'bloqueo') {
@@ -417,7 +400,7 @@ function FormularioAusencia({ profesionalId, onCancelar, onCreado }: { profesion
   }
 
   const hayConflictos = (conflictos?.length ?? 0) > 0
-  const puedeConfirmar = conflictos !== null && (!puedeDirecto || !hayConflictos)
+  const puedeConfirmar = conflictos !== null && !hayConflictos
 
   return (
     <Card className="flex flex-col gap-3">
@@ -446,11 +429,7 @@ function FormularioAusencia({ profesionalId, onCancelar, onCreado }: { profesion
 
       <Textarea id="motivoAusencia" etiqueta="Motivo (opcional, solo lo ve el salón)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
 
-      <p className="text-xs text-carbon/60">
-        {puedeDirecto
-          ? 'Tienes permiso para bloquear tu agenda directamente: se aplica de inmediato.'
-          : 'Esto quedará como solicitud pendiente: tu disponibilidad no cambia hasta que administración la apruebe.'}
-      </p>
+      <p className="text-xs text-carbon/60">Administras tu disponibilidad directamente: se aplica de inmediato.</p>
 
       {conflictos === null ? (
         <div className="flex gap-2">
@@ -467,18 +446,14 @@ function FormularioAusencia({ profesionalId, onCancelar, onCreado }: { profesion
                   <li key={c.id}>{formatoFecha(c.rango_inicio)} · {formatoHora(c.rango_inicio)} — {c.cliente_nombre} ({c.servicio_nombre})</li>
                 ))}
               </ul>
-              <p className="mt-2 text-xs text-carbon/60">
-                {puedeDirecto
-                  ? 'Reprograma, reasigna o cancela estas citas antes de continuar.'
-                  : 'Puedes enviar la solicitud igual: administración deberá resolver estas citas antes de aprobarla.'}
-              </p>
+              <p className="mt-2 text-xs text-carbon/60">Reprograma, reasigna o cancela estas citas antes de continuar.</p>
             </div>
           ) : (
             <p className="text-sm text-exito">Sin conflictos: ninguna cita vigente se ve afectada.</p>
           )}
           <div className="flex gap-2">
             <Button type="button" onClick={confirmar} cargando={guardando} disabled={!puedeConfirmar}>
-              {puedeDirecto ? 'Aplicar bloqueo' : 'Enviar solicitud'}
+              Aplicar bloqueo
             </Button>
             <Button type="button" variante="ghost" onClick={() => setConflictos(null)}>Volver a editar</Button>
           </div>
