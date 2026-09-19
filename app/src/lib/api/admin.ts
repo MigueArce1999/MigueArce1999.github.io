@@ -150,40 +150,42 @@ export async function listarClientes(busqueda?: string): Promise<Cliente[]> {
 // panel admin cuánto se cobró por cada servicio y cuánto quedó para el negocio después de
 // pagar la comisión (precio - descuento - comisión_total). Ver vista_atencion_servicio en
 // supabase/migrations/0017_vista_atencion_servicio_detalle.sql.
-export async function listarVentasDetalle(desdeISO: string, hastaISO: string, limite = 500): Promise<VentaLinea[]> {
+export async function listarVentasDetalle(desdeISO: string, hastaISO: string, profesionalId?: string | null, limite = 500): Promise<VentaLinea[]> {
   if (isDemoMode) {
     return demoHistorialAtenciones
       .filter((a) => a.creado_en >= desdeISO && a.creado_en < hastaISO)
       .flatMap((a) =>
-        a.lineas.map((l) => ({
-          id: l.id,
-          atencion_id: a.id,
-          servicio_id: l.servicio_id,
-          nombre_snapshot: l.nombre_snapshot,
-          precio_snapshot: l.precio_snapshot,
-          descuento: l.descuento,
-          cantidad: l.cantidad,
-          profesional_id: l.profesional_id,
-          profesional_nombre: l.profesional_nombre,
-          reserva_id: a.reserva_id,
-          atencion_estado: a.estado,
-          atencion_creado_en: a.creado_en,
-          atencion_completado_en: a.completado_en,
-          cliente_id: a.cliente_id,
-          cliente_nombre: a.cliente_nombre ?? '',
-          comision_total: Math.round(l.precio_snapshot * 0.4),
-          es_colaboracion: false,
-        })),
+        a.lineas
+          .filter((l) => !profesionalId || l.profesional_id === profesionalId)
+          .map((l) => ({
+            id: l.id,
+            atencion_id: a.id,
+            servicio_id: l.servicio_id,
+            nombre_snapshot: l.nombre_snapshot,
+            precio_snapshot: l.precio_snapshot,
+            descuento: l.descuento,
+            cantidad: l.cantidad,
+            profesional_id: l.profesional_id,
+            profesional_nombre: l.profesional_nombre,
+            reserva_id: a.reserva_id,
+            atencion_estado: a.estado,
+            atencion_creado_en: a.creado_en,
+            atencion_completado_en: a.completado_en,
+            cliente_id: a.cliente_id,
+            cliente_nombre: a.cliente_nombre ?? '',
+            comision_total: Math.round(l.precio_snapshot * 0.4),
+            es_colaboracion: false,
+          })),
       )
   }
   const client = supabaseRequerido()
-  const { data, error } = await client
+  let query = client
     .from('vista_atencion_servicio')
     .select('*')
     .gte('atencion_creado_en', desdeISO)
     .lt('atencion_creado_en', hastaISO)
-    .order('atencion_creado_en', { ascending: false })
-    .limit(limite)
+  if (profesionalId) query = query.eq('profesional_id', profesionalId)
+  const { data, error } = await query.order('atencion_creado_en', { ascending: false }).limit(limite)
   if (error) throw error
   return data
 }

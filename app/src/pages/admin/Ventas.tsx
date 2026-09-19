@@ -11,8 +11,11 @@ import type { ProductoVenta } from '../../lib/api/admin'
 import { formatoFecha, formatoMoneda, rangoPeriodo, type PeriodoResumen } from '../../lib/format'
 import type { Cliente, Profesional, VentaLinea } from '../../lib/types'
 
+const TODAS = 'todas'
+
 export function AdminVentas() {
   const [periodo, setPeriodo] = useState<PeriodoResumen>('mes')
+  const [profesionalFiltro, setProfesionalFiltro] = useState(TODAS)
   const [ventas, setVentas] = useState<VentaLinea[] | null>(null)
   const [productos, setProductos] = useState<ProductoVenta[] | null>(null)
   const [equipo, setEquipo] = useState<Profesional[]>([])
@@ -23,16 +26,17 @@ export function AdminVentas() {
 
   function cargar() {
     const { desde, hasta } = rangoPeriodo(periodo)
+    const filtroProfesional = profesionalFiltro === TODAS ? null : profesionalFiltro
     setVentas(null)
     setProductos(null)
-    listarVentasDetalle(desde, hasta).then(setVentas).catch((e) => setError(e.message))
+    listarVentasDetalle(desde, hasta, filtroProfesional).then(setVentas).catch((e) => setError(e.message))
     listarProductosVendidos(desde, hasta).then(setProductos).catch((e) => setError(e.message))
   }
 
   useEffect(() => {
     cargar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodo])
+  }, [periodo, profesionalFiltro])
 
   useEffect(() => {
     listarProfesionales().then(setEquipo).catch(() => {})
@@ -65,7 +69,18 @@ export function AdminVentas() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-marca text-2xl font-semibold text-carbon">Ventas y cobros</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={profesionalFiltro}
+            onChange={(e) => setProfesionalFiltro(e.target.value)}
+            className="rounded-full border border-piedra bg-blanco px-3 py-1 text-xs font-semibold text-carbon"
+            aria-label="Filtrar por empleada"
+          >
+            <option value={TODAS}>Todas las empleadas</option>
+            {equipo.map((p) => (
+              <option key={p.id} value={p.id}>{p.nombre}</option>
+            ))}
+          </select>
           {(['hoy', 'semana', 'mes'] as PeriodoResumen[]).map((p) => (
             <button
               key={p}
