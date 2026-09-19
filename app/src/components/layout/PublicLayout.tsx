@@ -3,18 +3,23 @@ import { useState } from 'react'
 import { isDemoMode } from '../../lib/supabase'
 import { DemoBanner } from '../ui/Estados'
 import { Button } from '../ui/Button'
+import { useAuth } from '../../state/AuthContext'
+import type { Rol } from '../../lib/types'
 
 const enlaces = [
   { to: '/', label: 'Inicio' },
   { to: '/servicios', label: 'Servicios' },
+  { to: '/equipo', label: 'Nuestro equipo' },
   { to: '/promociones', label: 'Promociones' },
-  { to: '/equipo', label: 'Equipo' },
-  { to: '/nosotros', label: 'Nosotros' },
-  { to: '/ubicacion', label: 'Ubicación' },
 ]
+
+const rutaPorRol: Record<Rol, string> = { cliente: '/cliente', empleada: '/equipo-app', admin: '/admin' }
 
 export function PublicLayout() {
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const { perfil } = useAuth()
+  const rutaCuenta = perfil ? rutaPorRol[perfil.rol] : '/ingresar'
+  const etiquetaCuenta = perfil ? 'Mi cuenta' : 'Ingresar'
 
   return (
     <div className="min-h-screen bg-marfil">
@@ -24,7 +29,7 @@ export function PublicLayout() {
           <Link to="/" className="font-marca text-2xl font-semibold text-carbon">
             Claudia Patricia
           </Link>
-          <nav className="hidden items-center gap-6 md:flex">
+          <nav className="hidden items-center gap-6 md:flex lg:gap-12">
             {enlaces.map((e) => (
               <NavLink
                 key={e.to}
@@ -39,11 +44,14 @@ export function PublicLayout() {
             ))}
           </nav>
           <div className="hidden items-center gap-3 md:flex">
-            <Link to="/ingresar" className="text-sm font-medium text-carbon/70 hover:text-carbon">
-              Ingresar
+            <Link
+              to={rutaCuenta}
+              className="flex h-12 items-center justify-center rounded-lg px-4 text-base font-medium text-oliva hover:bg-piedra/40"
+            >
+              {etiquetaCuenta}
             </Link>
             <Link to="/reservar">
-              <Button tamano="sm">Reservar cita</Button>
+              <Button tamano="lg" className="!rounded-lg">Agendar cita</Button>
             </Link>
           </div>
           <button
@@ -67,11 +75,11 @@ export function PublicLayout() {
                 {e.label}
               </NavLink>
             ))}
-            <Link to="/ingresar" onClick={() => setMenuAbierto(false)} className="rounded-lg px-2 py-2 text-sm font-medium text-carbon/80 hover:bg-piedra/40">
-              Ingresar
+            <Link to={rutaCuenta} onClick={() => setMenuAbierto(false)} className="rounded-lg px-2 py-2 text-sm font-medium text-carbon/80 hover:bg-piedra/40">
+              {etiquetaCuenta}
             </Link>
             <Link to="/reservar" onClick={() => setMenuAbierto(false)} className="mt-1">
-              <Button className="w-full">Reservar cita</Button>
+              <Button className="w-full !rounded-lg">Agendar cita</Button>
             </Link>
           </nav>
         )}
@@ -81,20 +89,42 @@ export function PublicLayout() {
         <Outlet />
       </main>
 
-      <footer className="mt-16 border-t border-piedra bg-blanco px-4 py-10 text-sm text-carbon/70 sm:px-6">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="font-marca text-lg font-semibold text-carbon">Claudia Patricia</p>
-            <p>Salón de belleza · Cartagena, Colombia</p>
+      <footer className="border-t border-piedra bg-marfil px-4 py-12 sm:px-6 lg:px-16">
+        <div className="mx-auto flex max-w-6xl flex-col gap-10 sm:flex-row sm:flex-wrap sm:gap-16">
+          <div className="flex max-w-md flex-col gap-2">
+            <p className="font-marca text-3xl text-carbon">Claudia Patricia</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-carbon/60">Hair · Makeup · Store</p>
+            <p className="text-sm text-carbon/60">Un espacio para tu belleza y bienestar.</p>
           </div>
-          <div className="flex flex-col gap-1">
-            <Link to="/ubicacion" className="hover:text-carbon">Ubicación y horarios</Link>
-            <Link to="/servicios" className="hover:text-carbon">Servicios</Link>
-            <Link to="/ingresar" className="hover:text-carbon">Acceso equipo</Link>
+          <div className="flex flex-col gap-3">
+            <p className="text-base text-carbon">Conoce el salón</p>
+            <Link to="/nosotros" className="text-sm text-carbon/60 hover:text-carbon">Nuestra historia</Link>
+            <Link to="/equipo" className="text-sm text-carbon/60 hover:text-carbon">Nuestro equipo</Link>
+            <Link to="/ubicacion" className="text-sm text-carbon/60 hover:text-carbon">Dónde estamos</Link>
+          </div>
+          <div className="flex flex-col gap-3">
+            <p className="text-base text-carbon">Tu próximo ritual</p>
+            <Link to="/servicios" className="text-sm text-carbon/60 hover:text-carbon">Servicios y promociones</Link>
+            <Link to={rutaCuenta} className="text-sm text-carbon/60 hover:text-carbon">Mi cuenta</Link>
+            <Link to="/cliente/reservas" className="text-sm text-carbon/60 hover:text-carbon">Mis reservas</Link>
           </div>
         </div>
-        <p className="mx-auto mt-8 max-w-6xl text-xs text-carbon/50">© {new Date().getFullYear()} Claudia Patricia Salón de Belleza.</p>
+        <p className="mx-auto mt-10 max-w-6xl text-sm text-carbon/60">© {new Date().getFullYear()} Claudia Patricia · Privacidad · Términos y condiciones</p>
       </footer>
+
+      <div className="bg-oliva px-4 py-16 sm:px-6 lg:px-16">
+        <div className="mx-auto flex max-w-6xl flex-col items-start gap-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-marfil">Tu bienestar nos inspira</p>
+          <p className="font-marca text-4xl leading-tight text-marfil sm:text-5xl">
+            Tu próxima visita<br />empieza aquí.
+          </p>
+          <Link to="/reservar">
+            <span className="mt-2 flex h-12 items-center justify-center rounded-lg border border-marfil bg-blanco px-6 text-base font-medium text-oliva">
+              Agendar cita
+            </span>
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }
