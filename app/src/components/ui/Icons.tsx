@@ -214,3 +214,15 @@ export function IconoConfiguracion(props: SVGProps<SVGSVGElement>) {
     </Svg>
   )
 }
+
+// Página web / layout: ventana de navegador con una franja de encabezado y un bloque de
+// contenido — usado por "Configuración de la homepage".
+export function IconoHomepage(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 8h18" />
+      <path d="M7 12h4M7 15h7" />
+    </Svg>
+  )
+}

@@ -43,6 +43,7 @@ import { AdminComisiones } from './pages/admin/Comisiones'
 import { AdminGastos } from './pages/admin/Gastos'
 import { AdminFidelizacion } from './pages/admin/Fidelizacion'
 import { AdminPromociones } from './pages/admin/Promociones'
+import { AdminHomepage } from './pages/admin/Homepage'
 import { AdminContenido } from './pages/admin/Contenido'
 import { AdminReportes } from './pages/admin/Reportes'
 import { AdminConfiguracion } from './pages/admin/Configuracion'
@@ -58,6 +59,7 @@ import {
   IconoEquipo,
   IconoGastos,
   IconoHistorial,
+  IconoHomepage,
   IconoInicio,
   IconoPerfil,
   IconoPromociones,
@@ -99,6 +101,7 @@ const navAdmin: ItemNav[] = [
   { to: '/admin/gastos', label: 'Gastos', icono: IconoGastos },
   { to: '/admin/fidelizacion', label: 'Fidelización', icono: IconoPuntos },
   { to: '/admin/promociones', label: 'Promociones', icono: IconoPromociones },
+  { to: '/admin/homepage', label: 'Homepage', icono: IconoHomepage },
   { to: '/admin/contenido', label: 'Contenido', icono: IconoContenido },
   { to: '/admin/reportes', label: 'Reportes', icono: IconoReportes },
   { to: '/admin/configuracion', label: 'Configuración', icono: IconoConfiguracion },
@@ -160,6 +163,7 @@ function App() {
             <Route path="/admin/gastos" element={<AdminGastos />} />
             <Route path="/admin/fidelizacion" element={<AdminFidelizacion />} />
             <Route path="/admin/promociones" element={<AdminPromociones />} />
+            <Route path="/admin/homepage" element={<AdminHomepage />} />
             <Route path="/admin/contenido" element={<AdminContenido />} />
             <Route path="/admin/reportes" element={<AdminReportes />} />
             <Route path="/admin/configuracion" element={<AdminConfiguracion />} />

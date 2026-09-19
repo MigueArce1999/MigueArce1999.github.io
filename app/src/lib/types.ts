@@ -81,13 +81,22 @@ export interface Profesional {
   bio: string | null
   foto_url: string | null
   activo: boolean
+  orden_visualizacion: number
+  // Distinto de `activo` (que controla si opera en el salón/puede recibir reservas): decide si
+  // aparece en la vitrina de "Conoce al equipo" de la home pública.
+  mostrar_en_home: boolean
 }
 
 export interface CategoriaServicio {
   id: string
   nombre: string
   orden_visualizacion: number
+  // También hace de interruptor "visible en la homepage" — no hay un campo aparte para eso.
   activa: boolean
+  descripcion_corta: string | null
+  imagen_url: string | null
+  texto_boton: string
+  enlace_boton: string | null
 }
 
 export interface Servicio {
@@ -113,11 +122,27 @@ export interface Promocion {
   nombre: string
   descripcion: string
   condiciones: string | null
-  vigente_desde: string
-  vigente_hasta: string
+  // Ambas opcionales: sin fechas, la visibilidad pública depende solo de `activa` (el
+  // interruptor "Mostrar en la homepage").
+  vigente_desde: string | null
+  vigente_hasta: string | null
   tipo_descuento: 'porcentaje' | 'fijo' | 'precio_especial'
   valor: number
+  activa: boolean
+  imagen_url: string | null
+  orden_visualizacion: number
+  texto_boton: string
+  enlace_boton: string | null
   servicios?: string[]
+}
+
+// Estado mostrado en el admin — calculado a partir de `activa` + fechas, nunca almacenado, para
+// no tener dos fuentes de verdad sobre si una promoción está vigente.
+export type EstadoPromocion = 'inactiva' | 'programada' | 'activa' | 'finalizada'
+
+export interface ConfiguracionHomepage {
+  hero_imagen_url: string | null
+  hero_editable: boolean
 }
 
 export interface SlotDisponible {
