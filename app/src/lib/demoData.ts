@@ -27,10 +27,10 @@ function enHoras(h: number) {
 }
 
 export const demoCategorias: CategoriaServicio[] = [
-  { id: 'demo-cat-cabello', nombre: 'Cabello', orden_visualizacion: 1, activa: true },
-  { id: 'demo-cat-estetica', nombre: 'Estética', orden_visualizacion: 2, activa: true },
-  { id: 'demo-cat-cejas', nombre: 'Cejas y maquillaje', orden_visualizacion: 3, activa: true },
-  { id: 'demo-cat-unas', nombre: 'Manicura y pedicura', orden_visualizacion: 4, activa: true },
+  { id: 'demo-cat-cabello', nombre: 'Cabello', orden_visualizacion: 1, activa: true, descripcion_corta: '[DEMO] Cortes, color y tratamientos.', imagen_url: null, texto_boton: 'Ver servicio', enlace_boton: null },
+  { id: 'demo-cat-estetica', nombre: 'Estética', orden_visualizacion: 2, activa: true, descripcion_corta: '[DEMO] Cuidado facial y corporal.', imagen_url: null, texto_boton: 'Ver servicio', enlace_boton: null },
+  { id: 'demo-cat-cejas', nombre: 'Cejas y maquillaje', orden_visualizacion: 3, activa: true, descripcion_corta: '[DEMO] Diseño de cejas y maquillaje.', imagen_url: null, texto_boton: 'Ver servicio', enlace_boton: null },
+  { id: 'demo-cat-unas', nombre: 'Manicura y pedicura', orden_visualizacion: 4, activa: true, descripcion_corta: '[DEMO] Manicura y pedicura spa.', imagen_url: null, texto_boton: 'Ver servicio', enlace_boton: null },
 ]
 
 export const demoProfesionales: Profesional[] = [
@@ -42,6 +42,8 @@ export const demoProfesionales: Profesional[] = [
     bio: '[DEMO] Fundadora del salón, más de 15 años de experiencia en color y cortes.',
     foto_url: null,
     activo: true,
+    orden_visualizacion: 1,
+    mostrar_en_home: true,
   },
   {
     id: 'demo-prof-naldi',
@@ -51,6 +53,8 @@ export const demoProfesionales: Profesional[] = [
     bio: '[DEMO] Especialista en tratamientos de recuperación capilar.',
     foto_url: null,
     activo: true,
+    orden_visualizacion: 2,
+    mostrar_en_home: true,
   },
   {
     id: 'demo-prof-ana',
@@ -60,6 +64,8 @@ export const demoProfesionales: Profesional[] = [
     bio: '[DEMO] Diseño de cejas y maquillaje social y de novias.',
     foto_url: null,
     activo: true,
+    orden_visualizacion: 3,
+    mostrar_en_home: true,
   },
   {
     id: 'demo-prof-valery',
@@ -69,6 +75,8 @@ export const demoProfesionales: Profesional[] = [
     bio: '[DEMO] Manicura y pedicura spa.',
     foto_url: null,
     activo: true,
+    orden_visualizacion: 4,
+    mostrar_en_home: true,
   },
 ]
 
@@ -150,6 +158,11 @@ export const demoPromociones: Promocion[] = [
     vigente_hasta: enHoras(24 * 30),
     tipo_descuento: 'porcentaje',
     valor: 20,
+    activa: true,
+    imagen_url: null,
+    orden_visualizacion: 1,
+    texto_boton: 'Ver promoción',
+    enlace_boton: null,
     servicios: ['demo-serv-cejas'],
   },
 ]

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { ErrorState } from '../../components/ui/Estados'
-import { listarCategorias, listarProfesionales, listarPromocionesVigentes } from '../../lib/api/catalogo'
+import { listarCategorias, listarProfesionalesHomepage, listarPromocionesVigentes } from '../../lib/api/catalogo'
 import { isDemoMode } from '../../lib/supabase'
 import { useAuth } from '../../state/AuthContext'
 import type { CategoriaServicio, Profesional, Promocion, Rol } from '../../lib/types'
@@ -27,7 +27,7 @@ export function Home() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([listarCategorias(), listarPromocionesVigentes(), listarProfesionales()])
+    Promise.all([listarCategorias(), listarPromocionesVigentes(), listarProfesionalesHomepage()])
       .then(([c, p, e]) => {
         setCategorias(c.slice(0, 4))
         setPromos(p.slice(0, 3))
@@ -104,15 +104,20 @@ export function Home() {
                   return (
                     <Link
                       key={c.id}
-                      to="/servicios"
+                      to={c.enlace_boton || '/servicios'}
                       className={`group relative flex h-[300px] items-end overflow-hidden rounded-lg p-6 lg:h-[456px] ${angosta ? 'sm:flex-[3]' : 'sm:flex-[4]'}`}
                     >
-                      <FotoPlaceholder className="absolute inset-0" />
+                      {c.imagen_url ? (
+                        <img src={c.imagen_url} alt={c.nombre} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                      ) : (
+                        <FotoPlaceholder className="absolute inset-0" />
+                      )}
                       <div className="absolute inset-0 bg-black/44" />
-                      <div className="relative flex flex-col items-start gap-4">
+                      <div className="relative flex flex-col items-start gap-2">
                         <p className="font-marca text-4xl text-marfil">{c.nombre}</p>
-                        <span className="flex items-center gap-2 text-sm text-marfil">
-                          Ver servicio <span aria-hidden>→</span>
+                        {c.descripcion_corta && <p className="text-sm text-marfil/90">{c.descripcion_corta}</p>}
+                        <span className="mt-2 flex items-center gap-2 text-sm text-marfil">
+                          {c.texto_boton} <span aria-hidden>→</span>
                         </span>
                       </div>
                     </Link>
@@ -132,7 +137,11 @@ export function Home() {
             {promos.map((p) => (
               <div key={p.id} className="flex flex-col">
                 <div className="relative flex h-[220px] items-start overflow-hidden rounded-t-lg p-5">
-                  <FotoPlaceholder className="absolute inset-0" />
+                  {p.imagen_url ? (
+                    <img src={p.imagen_url} alt={p.nombre} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  ) : (
+                    <FotoPlaceholder className="absolute inset-0" />
+                  )}
                   <div className="absolute inset-0 bg-black/44" />
                   <span className="relative rounded-full bg-blanco px-5 py-1 text-sm text-carbon">Promoción del mes</span>
                 </div>
@@ -141,8 +150,8 @@ export function Home() {
                     <p className="font-marca text-4xl text-carbon">{p.nombre}</p>
                     <p className="text-base text-carbon/60">{p.descripcion}</p>
                   </div>
-                  <Link to="/promociones" className="flex items-center gap-2 text-sm text-carbon">
-                    Ver servicio <span aria-hidden>→</span>
+                  <Link to={p.enlace_boton || '/promociones'} className="flex items-center gap-2 text-sm text-carbon">
+                    {p.texto_boton} <span aria-hidden>→</span>
                   </Link>
                 </div>
               </div>
@@ -171,18 +180,20 @@ export function Home() {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[290px] animate-pulse rounded-lg bg-piedra/50" />)}
           </div>
+        ) : equipo.length === 0 ? (
+          <p className="text-carbon/60">Todavía no hay profesionales destacadas en la portada.</p>
         ) : (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {equipo.map((p) => (
               <Link to={`/equipo/${p.slug}`} key={p.id} className="flex flex-col items-start gap-4">
                 {p.foto_url ? (
-                  <img src={p.foto_url} alt={p.nombre} className="h-[290px] w-full rounded-lg object-cover" />
+                  <img src={p.foto_url} alt={p.nombre} className="h-[290px] w-full rounded-lg object-cover" loading="lazy" />
                 ) : (
                   <FotoPlaceholder className="h-[290px] w-full rounded-lg" />
                 )}
                 <div className="flex flex-col gap-2">
                   <p className="font-marca text-2xl text-carbon">{p.nombre}</p>
-                  <p className="text-sm text-carbon/60">Conoce a tu profesional</p>
+                  <p className="text-sm text-carbon/60">{p.especialidades[0] || 'Conoce a tu profesional'}</p>
                 </div>
               </Link>
             ))}

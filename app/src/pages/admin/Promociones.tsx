@@ -81,7 +81,7 @@ export function AdminPromociones() {
           {promos.map((p) => (
             <Card key={p.id} className="py-3">
               <p className="font-medium text-carbon">{p.nombre}</p>
-              <p className="text-xs text-carbon/60">Hasta {formatoFecha(p.vigente_hasta)}</p>
+              <p className="text-xs text-carbon/60">{p.vigente_hasta ? `Hasta ${formatoFecha(p.vigente_hasta)}` : 'Sin fecha de fin'}</p>
             </Card>
           ))}
         </div>

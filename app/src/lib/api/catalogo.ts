@@ -143,6 +143,20 @@ export async function listarProfesionales(): Promise<Profesional[]> {
   return data as Profesional[]
 }
 
+// Subconjunto de listarProfesionales para la vitrina de la home pública: además de activo,
+// exige mostrar_en_home (un profesional puede seguir operando sin estar en la portada).
+export async function listarProfesionalesHomepage(): Promise<Profesional[]> {
+  if (isDemoMode) return demoProfesionales.filter((p) => p.mostrar_en_home)
+  const { data, error } = await supabase!
+    .from('vista_profesional')
+    .select('*')
+    .eq('activo', true)
+    .eq('mostrar_en_home', true)
+    .order('orden_visualizacion')
+  if (error) throw error
+  return data as Profesional[]
+}
+
 export async function obtenerProfesional(slug: string): Promise<Profesional | null> {
   if (isDemoMode) return demoProfesionales.find((p) => p.slug === slug) ?? null
   const { data, error } = await supabase!.from('vista_profesional').select('*').eq('slug', slug).maybeSingle()
@@ -160,20 +174,26 @@ export async function listarServiciosDeProfesional(profesionalId: string): Promi
   return (data ?? []).map((row: any) => ({ ...row.servicio, categoria_nombre: row.servicio?.categoria?.nombre }))
 }
 
+// Las fechas son opcionales (0041): una promoción sin fechas depende solo de `activa` para
+// decidir si se muestra. No se puede filtrar esto con .lte()/.gte() en la consulta (NULL nunca
+// pasa esas comparaciones), así que se trae todo lo activo y se filtra la vigencia en JS.
 export async function listarPromocionesVigentes(): Promise<Promocion[]> {
-  const ahora = new Date().toISOString()
+  const ahora = new Date()
   if (isDemoMode) {
-    return demoPromociones.filter((p) => p.vigente_desde <= ahora && p.vigente_hasta >= ahora)
+    return demoPromociones.filter(
+      (p) => (!p.vigente_desde || new Date(p.vigente_desde) <= ahora) && (!p.vigente_hasta || new Date(p.vigente_hasta) >= ahora),
+    )
   }
   const { data, error } = await supabase!
     .from('promocion')
     .select('*, promocion_servicio(servicio_id)')
     .eq('activa', true)
-    .lte('vigente_desde', ahora)
-    .gte('vigente_hasta', ahora)
+    .order('orden_visualizacion')
   if (error) throw error
-  return (data ?? []).map((p: any) => ({
-    ...p,
-    servicios: (p.promocion_servicio ?? []).map((ps: any) => ps.servicio_id),
-  }))
+  return (data ?? [])
+    .filter((p: any) => (!p.vigente_desde || new Date(p.vigente_desde) <= ahora) && (!p.vigente_hasta || new Date(p.vigente_hasta) >= ahora))
+    .map((p: any) => ({
+      ...p,
+      servicios: (p.promocion_servicio ?? []).map((ps: any) => ps.servicio_id),
+    }))
 }
