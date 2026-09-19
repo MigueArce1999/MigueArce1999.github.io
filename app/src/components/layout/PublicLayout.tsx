@@ -25,7 +25,7 @@ export function PublicLayout() {
     <div className="min-h-screen bg-marfil">
       {isDemoMode && <DemoBanner />}
       <header className="sticky top-0 z-40 border-b border-piedra bg-marfil/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-[40px] py-3">
           <Link to="/" className="font-marca text-2xl font-semibold text-carbon">
             Claudia Patricia
           </Link>
@@ -63,7 +63,7 @@ export function PublicLayout() {
           </button>
         </div>
         {menuAbierto && (
-          <nav className="flex flex-col gap-1 border-t border-piedra px-4 py-3 md:hidden">
+          <nav className="flex flex-col gap-1 border-t border-piedra px-[40px] py-3 md:hidden">
             {enlaces.map((e) => (
               <NavLink
                 key={e.to}
@@ -89,8 +89,8 @@ export function PublicLayout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-piedra bg-marfil px-4 py-12 sm:px-6 lg:px-16">
-        <div className="mx-auto flex max-w-6xl flex-col gap-10 sm:flex-row sm:flex-wrap sm:gap-16">
+      <footer className="border-t border-piedra bg-marfil px-[40px] py-12">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-10 sm:flex-row sm:flex-wrap sm:gap-16">
           <div className="flex max-w-md flex-col gap-2">
             <p className="font-marca text-3xl text-carbon">Claudia Patricia</p>
             <p className="text-xs font-semibold uppercase tracking-wide text-carbon/60">Hair · Makeup · Store</p>
@@ -109,11 +109,11 @@ export function PublicLayout() {
             <Link to="/cliente/reservas" className="text-sm text-carbon/60 hover:text-carbon">Mis reservas</Link>
           </div>
         </div>
-        <p className="mx-auto mt-10 max-w-6xl text-sm text-carbon/60">© {new Date().getFullYear()} Claudia Patricia · Privacidad · Términos y condiciones</p>
+        <p className="mx-auto mt-10 max-w-[1440px] text-sm text-carbon/60">© {new Date().getFullYear()} Claudia Patricia · Privacidad · Términos y condiciones</p>
       </footer>
 
-      <div className="bg-oliva px-4 py-16 sm:px-6 lg:px-16">
-        <div className="mx-auto flex max-w-6xl flex-col items-start gap-4">
+      <div className="bg-oliva px-[40px] py-16">
+        <div className="mx-auto flex max-w-[1440px] flex-col items-start gap-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-marfil">Tu bienestar nos inspira</p>
           <p className="font-marca text-4xl leading-tight text-marfil sm:text-5xl">
             Tu próxima visita<br />empieza aquí.
