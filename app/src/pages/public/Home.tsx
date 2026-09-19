@@ -47,14 +47,15 @@ export function Home() {
   return (
     <div>
       {error && (
-        <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
+        <div className="mx-auto max-w-[1440px] px-[40px] pt-6">
           <ErrorState mensaje={error} />
         </div>
       )}
 
-      {/* Hero */}
-      <section className="flex flex-col items-center gap-10 bg-piedra/30 px-4 py-12 sm:px-6 lg:flex-row lg:gap-16 lg:px-16 lg:py-0">
-        <div className="flex w-full max-w-xl flex-col items-start gap-8 lg:py-16">
+      {/* Hero: el diseño hace sangrar la foto hasta el borde derecho de la pantalla — solo el
+          texto lleva el margen de 40px, la imagen no lleva relleno a la derecha. */}
+      <section className="flex flex-col items-center gap-10 bg-piedra/30 px-[40px] py-12 lg:flex-row lg:gap-[60px] lg:px-0 lg:py-0">
+        <div className="flex w-full max-w-xl flex-col items-start gap-8 lg:py-16 lg:pl-[40px]">
           <div className="flex flex-col items-start gap-4">
             <h1 className="font-marca text-5xl font-semibold leading-tight text-carbon sm:text-6xl lg:text-[80px] lg:leading-[72px]">
               Tu esencia en buenas manos
@@ -78,31 +79,46 @@ export function Home() {
             ))}
           </div>
         </div>
-        <FotoPlaceholder className="h-[280px] w-full sm:h-[400px] lg:h-[570px] lg:w-[835px]" />
+        <FotoPlaceholder className="h-[280px] w-full sm:h-[400px] lg:h-[570px] lg:w-auto lg:flex-1" />
       </section>
 
       {/* Servicios */}
-      <section className="flex flex-col gap-10 bg-marfil px-4 py-16 sm:px-6 lg:px-16">
+      <section className="mx-auto flex max-w-[1440px] flex-col gap-10 bg-marfil px-[40px] py-16">
         <SeccionTitulo eyebrow="Nuestros servicios" titulo="Encuentra tu próximo ritual." />
         {!categorias ? (
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[300px] animate-pulse rounded-lg bg-piedra/50 lg:h-[456px]" />)}
+          <div className="flex flex-col gap-3.5">
+            {[0, 1].map((fila) => <div key={fila} className="h-[300px] animate-pulse rounded-lg bg-piedra/50 lg:h-[456px]" />)}
           </div>
         ) : categorias.length === 0 ? (
           <p className="text-carbon/60">Todavía no hay categorías de servicios configuradas.</p>
         ) : (
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            {categorias.map((c) => (
-              <Link key={c.id} to="/servicios" className="group relative flex h-[300px] items-end overflow-hidden rounded-lg p-6 lg:h-[456px]">
-                <FotoPlaceholder className="absolute inset-0" />
-                <div className="absolute inset-0 bg-black/44" />
-                <div className="relative flex flex-col items-start gap-4">
-                  <p className="font-marca text-4xl text-marfil">{c.nombre}</p>
-                  <span className="flex items-center gap-2 text-sm text-marfil">
-                    Ver servicio <span aria-hidden>→</span>
-                  </span>
-                </div>
-              </Link>
+          // El diseño alterna, fila por fila, cuál de las dos tarjetas es más ancha (nunca un
+          // grid parejo de columnas iguales) — se reproduce con proporciones de flex-grow en
+          // vez de anchos fijos en píxeles, para que funcione con cualquier cantidad real de
+          // categorías, no solo con las 4 que trae el diseño de Figma.
+          <div className="flex flex-col gap-3.5">
+            {agruparEnFilas(categorias, 2).map((fila, i) => (
+              <div key={i} className="flex flex-col gap-3.5 sm:flex-row">
+                {fila.map((c, j) => {
+                  const angosta = i % 2 === 0 ? j === 0 : j === 1
+                  return (
+                    <Link
+                      key={c.id}
+                      to="/servicios"
+                      className={`group relative flex h-[300px] items-end overflow-hidden rounded-lg p-6 lg:h-[456px] ${angosta ? 'sm:flex-[3]' : 'sm:flex-[4]'}`}
+                    >
+                      <FotoPlaceholder className="absolute inset-0" />
+                      <div className="absolute inset-0 bg-black/44" />
+                      <div className="relative flex flex-col items-start gap-4">
+                        <p className="font-marca text-4xl text-marfil">{c.nombre}</p>
+                        <span className="flex items-center gap-2 text-sm text-marfil">
+                          Ver servicio <span aria-hidden>→</span>
+                        </span>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
             ))}
           </div>
         )}
@@ -110,7 +126,7 @@ export function Home() {
 
       {/* Promociones */}
       {promos && promos.length > 0 && (
-        <section className="flex flex-col gap-10 bg-marfil px-4 py-16 sm:px-6 lg:px-16">
+        <section className="mx-auto flex max-w-[1440px] flex-col gap-10 bg-marfil px-[40px] py-16">
           <SeccionTitulo eyebrow="Promociones del mes" titulo="Este mes, un detalle para ti." />
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
             {promos.map((p) => (
@@ -136,8 +152,8 @@ export function Home() {
       )}
 
       {/* Un momento para consentirte */}
-      <section className="bg-piedra px-4 py-16 sm:px-6 lg:px-16">
-        <div className="mx-auto flex max-w-xl flex-col items-start gap-6">
+      <section className="bg-piedra px-[40px] py-16">
+        <div className="flex max-w-xl flex-col items-start gap-6">
           <p className="font-marca text-4xl leading-tight text-carbon sm:text-5xl">
             Un momento<br />para consentirte.
           </p>
@@ -149,7 +165,7 @@ export function Home() {
       </section>
 
       {/* Equipo */}
-      <section className="flex flex-col gap-6 bg-marfil px-4 py-16 sm:px-6 lg:px-16">
+      <section className="mx-auto flex max-w-[1440px] flex-col gap-6 bg-marfil px-[40px] py-16">
         <p className="font-marca text-4xl text-carbon sm:text-5xl">Conoce las manos detrás de tu belleza.</p>
         {!equipo ? (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -175,6 +191,12 @@ export function Home() {
       </section>
     </div>
   )
+}
+
+function agruparEnFilas<T>(items: T[], porFila: number): T[][] {
+  const filas: T[][] = []
+  for (let i = 0; i < items.length; i += porFila) filas.push(items.slice(i, i + porFila))
+  return filas
 }
 
 function SeccionTitulo({ eyebrow, titulo }: { eyebrow: string; titulo: string }) {
