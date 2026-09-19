@@ -90,7 +90,7 @@ export function PublicLayout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-piedra bg-marfil px-[40px] py-12">
+      <footer className="border-t border-piedra bg-blanco px-[40px] py-12">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-10 sm:flex-row sm:flex-wrap sm:gap-16">
           <div className="flex max-w-md flex-col gap-3">
             <img src={logo} alt="Claudia Patricia" className="h-16 w-auto" />
