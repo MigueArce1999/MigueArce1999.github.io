@@ -1,29 +1,37 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
-import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
-import { listarProfesionales, listarPromocionesVigentes, listarServicios } from '../../lib/api/catalogo'
-import { formatoFecha, formatoPrecioServicio } from '../../lib/format'
+import { ErrorState } from '../../components/ui/Estados'
+import { listarCategorias, listarProfesionales, listarPromocionesVigentes } from '../../lib/api/catalogo'
 import { isDemoMode } from '../../lib/supabase'
 import { useAuth } from '../../state/AuthContext'
-import type { Profesional, Promocion, Rol, Servicio } from '../../lib/types'
+import type { CategoriaServicio, Profesional, Promocion, Rol } from '../../lib/types'
 
 const rutaPorRol: Record<Rol, string> = { cliente: '/cliente', empleada: '/equipo-app', admin: '/admin' }
+
+// El diseño de Figma usa fotografía de campaña en el hero y en cada tarjeta (servicios,
+// promociones, equipo). No hay todavía esas fotos reales en el proyecto, así que se muestra
+// un bloque de marca (degradado oliva/piedra) del mismo tamaño y posición — trivial de
+// reemplazar por una imagen real cuando esté disponible (o por profesional.foto_url, que ya
+// se usa cuando existe).
+function FotoPlaceholder({ className = '' }: { className?: string }) {
+  return <div className={`bg-gradient-to-br from-oliva/25 via-piedra to-champan/30 ${className}`} />
+}
 
 export function Home() {
   const navigate = useNavigate()
   const { perfil } = useAuth()
-  const [servicios, setServicios] = useState<Servicio[] | null>(null)
+  const [categorias, setCategorias] = useState<CategoriaServicio[] | null>(null)
   const [promos, setPromos] = useState<Promocion[] | null>(null)
   const [equipo, setEquipo] = useState<Profesional[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([listarServicios(), listarPromocionesVigentes(), listarProfesionales()])
-      .then(([s, p, e]) => {
-        setServicios(s.slice(0, 4))
-        setPromos(p)
-        setEquipo(e)
+    Promise.all([listarCategorias(), listarPromocionesVigentes(), listarProfesionales()])
+      .then(([c, p, e]) => {
+        setCategorias(c.slice(0, 4))
+        setPromos(p.slice(0, 3))
+        setEquipo(e.slice(0, 4))
       })
       .catch((err) => setError(err.message))
   }, [])
@@ -38,92 +46,145 @@ export function Home() {
 
   return (
     <div>
-      <section className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-16 sm:px-6 sm:py-24">
-        <h1 className="font-marca text-4xl font-semibold leading-tight text-carbon sm:text-6xl">
-          Tu esencia, <br /> en buenas manos.
-        </h1>
-        <p className="max-w-xl text-lg text-carbon/70">
-          Más que un salón, un espacio para sentirte bien. Cuidado, experiencia y belleza que realza lo mejor de ti.
-        </p>
-        <Link to="/reservar">
-          <Button tamano="lg">Reservar cita →</Button>
-        </Link>
-      </section>
-
       {error && (
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
           <ErrorState mensaje={error} />
         </div>
       )}
 
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <h2 className="mb-6 font-marca text-2xl font-semibold text-carbon">Servicios destacados</h2>
-        {!servicios ? (
-          <Cargando />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {servicios.map((s) => (
-              <Card key={s.id} className="flex flex-col gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-champan">{s.categoria_nombre}</p>
-                <p className="font-semibold text-carbon">{s.nombre}</p>
-                {s.duracion_minutos != null && <p className="text-sm text-carbon/60">{s.duracion_minutos} min</p>}
-                <p className="font-semibold text-oliva">{formatoPrecioServicio(s, 'Valoración en salón')}</p>
-                <Link to={`/servicios/${s.id}`} className="mt-1 text-sm font-semibold text-oliva underline underline-offset-2">
-                  Ver y reservar
-                </Link>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {promos && promos.length > 0 && (
-        <section className="bg-piedra/30 px-4 py-10 sm:px-6">
-          <div className="mx-auto max-w-6xl">
-            <h2 className="mb-6 font-marca text-2xl font-semibold text-carbon">Promociones vigentes</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {promos.map((p) => (
-                <Card key={p.id}>
-                  <p className="font-semibold text-carbon">{p.nombre}</p>
-                  <p className="text-sm text-carbon/70">{p.descripcion}</p>
-                  <p className="mt-2 text-xs text-carbon/50">Vigente hasta {formatoFecha(p.vigente_hasta)}</p>
-                </Card>
-              ))}
+      {/* Hero */}
+      <section className="flex flex-col items-center gap-10 bg-piedra/30 px-4 py-12 sm:px-6 lg:flex-row lg:gap-16 lg:px-16 lg:py-0">
+        <div className="flex w-full max-w-xl flex-col items-start gap-8 lg:py-16">
+          <div className="flex flex-col items-start gap-4">
+            <h1 className="font-marca text-5xl font-semibold leading-tight text-carbon sm:text-6xl lg:text-[80px] lg:leading-[72px]">
+              Tu esencia en buenas manos
+            </h1>
+            <p className="text-base text-carbon">Un espacio para cuidar de ti, realzar tu belleza y sentirte bien</p>
+            <div className="flex flex-wrap items-center gap-5">
+              <Link to="/reservar">
+                <Button tamano="lg" className="!rounded-lg">Agendar cita →</Button>
+              </Link>
+              <Link to="/servicios" className="flex h-12 items-center justify-center rounded-lg px-3 text-base font-medium text-oliva hover:bg-piedra/40">
+                Explorar servicios
+              </Link>
             </div>
           </div>
-        </section>
-      )}
+          <div className="flex flex-wrap items-center gap-[18px]">
+            {['Cabello', 'Estética', 'Maquillaje', 'Manicuristas'].map((tag, i) => (
+              <div key={tag} className="flex items-center gap-[18px]">
+                {i > 0 && <span className="h-4 w-px bg-carbon/30" aria-hidden />}
+                <span className="text-xs uppercase tracking-wide text-carbon/60">{tag}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <FotoPlaceholder className="h-[280px] w-full sm:h-[400px] lg:h-[570px] lg:w-[835px]" />
+      </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <h2 className="mb-6 font-marca text-2xl font-semibold text-carbon">Nuestro equipo</h2>
-        {!equipo ? (
-          <Cargando />
+      {/* Servicios */}
+      <section className="flex flex-col gap-10 bg-marfil px-4 py-16 sm:px-6 lg:px-16">
+        <SeccionTitulo eyebrow="Nuestros servicios" titulo="Encuentra tu próximo ritual." />
+        {!categorias ? (
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[300px] animate-pulse rounded-lg bg-piedra/50 lg:h-[456px]" />)}
+          </div>
+        ) : categorias.length === 0 ? (
+          <p className="text-carbon/60">Todavía no hay categorías de servicios configuradas.</p>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {equipo.map((p) => (
-              <Link to={`/equipo/${p.slug}`} key={p.id} className="flex flex-col items-center gap-2 text-center">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-piedra font-marca text-2xl text-oliva">
-                  {p.nombre.charAt(0)}
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            {categorias.map((c) => (
+              <Link key={c.id} to="/servicios" className="group relative flex h-[300px] items-end overflow-hidden rounded-lg p-6 lg:h-[456px]">
+                <FotoPlaceholder className="absolute inset-0" />
+                <div className="absolute inset-0 bg-black/44" />
+                <div className="relative flex flex-col items-start gap-4">
+                  <p className="font-marca text-4xl text-marfil">{c.nombre}</p>
+                  <span className="flex items-center gap-2 text-sm text-marfil">
+                    Ver servicio <span aria-hidden>→</span>
+                  </span>
                 </div>
-                <p className="text-sm font-semibold text-carbon">{p.nombre}</p>
-                <p className="text-xs text-carbon/60">{p.especialidades.join(', ')}</p>
               </Link>
             ))}
           </div>
         )}
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <Card className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-semibold text-carbon">Cartagena, Colombia</p>
-            <p className="text-sm text-carbon/60">Consulta horarios, ubicación y cómo llegar.</p>
+      {/* Promociones */}
+      {promos && promos.length > 0 && (
+        <section className="flex flex-col gap-10 bg-marfil px-4 py-16 sm:px-6 lg:px-16">
+          <SeccionTitulo eyebrow="Promociones del mes" titulo="Este mes, un detalle para ti." />
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+            {promos.map((p) => (
+              <div key={p.id} className="flex flex-col">
+                <div className="relative flex h-[220px] items-start overflow-hidden rounded-t-lg p-5">
+                  <FotoPlaceholder className="absolute inset-0" />
+                  <div className="absolute inset-0 bg-black/44" />
+                  <span className="relative rounded-full bg-blanco px-5 py-1 text-sm text-carbon">Promoción del mes</span>
+                </div>
+                <div className="flex flex-col gap-4 rounded-b-lg border border-piedra px-6 py-4">
+                  <div className="flex flex-col gap-3">
+                    <p className="font-marca text-4xl text-carbon">{p.nombre}</p>
+                    <p className="text-base text-carbon/60">{p.descripcion}</p>
+                  </div>
+                  <Link to="/promociones" className="flex items-center gap-2 text-sm text-carbon">
+                    Ver servicio <span aria-hidden>→</span>
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
-          <Link to="/ubicacion">
-            <Button variante="secondary">Ver ubicación y horarios</Button>
+        </section>
+      )}
+
+      {/* Un momento para consentirte */}
+      <section className="bg-piedra px-4 py-16 sm:px-6 lg:px-16">
+        <div className="mx-auto flex max-w-xl flex-col items-start gap-6">
+          <p className="font-marca text-4xl leading-tight text-carbon sm:text-5xl">
+            Un momento<br />para consentirte.
+          </p>
+          <p className="text-lg text-carbon">Descubre las promociones del salón.</p>
+          <Link to="/promociones">
+            <Button tamano="lg" className="!rounded-lg">Ver promociones</Button>
           </Link>
-        </Card>
+        </div>
       </section>
+
+      {/* Equipo */}
+      <section className="flex flex-col gap-6 bg-marfil px-4 py-16 sm:px-6 lg:px-16">
+        <p className="font-marca text-4xl text-carbon sm:text-5xl">Conoce las manos detrás de tu belleza.</p>
+        {!equipo ? (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[290px] animate-pulse rounded-lg bg-piedra/50" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {equipo.map((p) => (
+              <Link to={`/equipo/${p.slug}`} key={p.id} className="flex flex-col items-start gap-4">
+                {p.foto_url ? (
+                  <img src={p.foto_url} alt={p.nombre} className="h-[290px] w-full rounded-lg object-cover" />
+                ) : (
+                  <FotoPlaceholder className="h-[290px] w-full rounded-lg" />
+                )}
+                <div className="flex flex-col gap-2">
+                  <p className="font-marca text-2xl text-carbon">{p.nombre}</p>
+                  <p className="text-sm text-carbon/60">Conoce a tu profesional</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}
+
+function SeccionTitulo({ eyebrow, titulo }: { eyebrow: string; titulo: string }) {
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-carbon/60">{eyebrow}</p>
+        <span className="h-px w-12 bg-carbon/30" aria-hidden />
+      </div>
+      <p className="font-marca text-4xl text-carbon sm:text-5xl">{titulo}</p>
     </div>
   )
 }
