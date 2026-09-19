@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { ErrorState } from '../../components/ui/Estados'
 import { listarCategorias, listarProfesionalesHomepage, listarPromocionesVigentes } from '../../lib/api/catalogo'
+import { obtenerConfiguracionHomepage } from '../../lib/api/homepage'
 import { isDemoMode } from '../../lib/supabase'
 import { useAuth } from '../../state/AuthContext'
-import type { CategoriaServicio, Profesional, Promocion, Rol } from '../../lib/types'
+import type { CategoriaServicio, ConfiguracionHomepage, Profesional, Promocion, Rol } from '../../lib/types'
 
 const rutaPorRol: Record<Rol, string> = { cliente: '/cliente', empleada: '/equipo-app', admin: '/admin' }
 
@@ -24,14 +25,16 @@ export function Home() {
   const [categorias, setCategorias] = useState<CategoriaServicio[] | null>(null)
   const [promos, setPromos] = useState<Promocion[] | null>(null)
   const [equipo, setEquipo] = useState<Profesional[] | null>(null)
+  const [configuracion, setConfiguracion] = useState<ConfiguracionHomepage | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([listarCategorias(), listarPromocionesVigentes(), listarProfesionalesHomepage()])
-      .then(([c, p, e]) => {
+    Promise.all([listarCategorias(), listarPromocionesVigentes(), listarProfesionalesHomepage(), obtenerConfiguracionHomepage()])
+      .then(([c, p, e, cfg]) => {
         setCategorias(c.slice(0, 4))
         setPromos(p.slice(0, 3))
         setEquipo(e.slice(0, 4))
+        setConfiguracion(cfg)
       })
       .catch((err) => setError(err.message))
   }, [])
@@ -47,14 +50,14 @@ export function Home() {
   return (
     <div>
       {error && (
-        <div className="mx-auto max-w-[1440px] px-[40px] pt-6">
+        <div className="mx-auto max-w-[1440px] px-5 pt-6 sm:px-[40px]">
           <ErrorState mensaje={error} />
         </div>
       )}
 
       {/* Hero: el diseño hace sangrar la foto hasta el borde derecho de la pantalla — solo el
-          texto lleva el margen de 40px, la imagen no lleva relleno a la derecha. */}
-      <section className="flex flex-col items-center gap-10 bg-piedra/30 px-[40px] py-12 lg:flex-row lg:gap-[60px] lg:px-0 lg:py-0">
+          texto lleva el margen lateral, la imagen no lleva relleno a la derecha. */}
+      <section className="flex flex-col items-center gap-10 bg-piedra/30 px-5 py-12 sm:px-[40px] lg:flex-row lg:gap-[60px] lg:px-0 lg:py-0">
         <div className="flex w-full max-w-xl flex-col items-start gap-8 lg:py-16 lg:pl-[40px]">
           <div className="flex flex-col items-start gap-4">
             <h1 className="font-marca text-5xl font-semibold leading-tight text-carbon sm:text-6xl lg:text-[80px] lg:leading-[72px]">
@@ -79,11 +82,19 @@ export function Home() {
             ))}
           </div>
         </div>
-        <FotoPlaceholder className="h-[280px] w-full sm:h-[400px] lg:h-[570px] lg:w-auto lg:flex-1" />
+        {configuracion?.hero_imagen_url ? (
+          <img
+            src={configuracion.hero_imagen_url}
+            alt="Claudia Patricia"
+            className="h-[280px] w-full object-cover sm:h-[400px] lg:h-[570px] lg:w-auto lg:flex-1"
+          />
+        ) : (
+          <FotoPlaceholder className="h-[280px] w-full sm:h-[400px] lg:h-[570px] lg:w-auto lg:flex-1" />
+        )}
       </section>
 
       {/* Servicios */}
-      <section className="mx-auto flex max-w-[1440px] flex-col gap-10 bg-marfil px-[40px] py-16">
+      <section className="mx-auto flex max-w-[1440px] flex-col gap-10 bg-marfil px-5 sm:px-[40px] py-16">
         <SeccionTitulo eyebrow="Nuestros servicios" titulo="Encuentra tu próximo ritual." />
         {!categorias ? (
           <div className="flex flex-col gap-3.5">
@@ -131,7 +142,7 @@ export function Home() {
 
       {/* Promociones */}
       {promos && promos.length > 0 && (
-        <section className="mx-auto flex max-w-[1440px] flex-col gap-10 bg-marfil px-[40px] py-16">
+        <section className="mx-auto flex max-w-[1440px] flex-col gap-10 bg-marfil px-5 sm:px-[40px] py-16">
           <SeccionTitulo eyebrow="Promociones del mes" titulo="Este mes, un detalle para ti." />
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
             {promos.map((p) => (
@@ -161,7 +172,7 @@ export function Home() {
       )}
 
       {/* Un momento para consentirte */}
-      <section className="bg-piedra px-[40px] py-16">
+      <section className="bg-piedra px-5 sm:px-[40px] py-16">
         <div className="flex max-w-xl flex-col items-start gap-6">
           <p className="font-marca text-4xl leading-tight text-carbon sm:text-5xl">
             Un momento<br />para consentirte.
@@ -174,7 +185,7 @@ export function Home() {
       </section>
 
       {/* Equipo */}
-      <section className="mx-auto flex max-w-[1440px] flex-col gap-6 bg-marfil px-[40px] py-16">
+      <section className="mx-auto flex max-w-[1440px] flex-col gap-6 bg-marfil px-5 sm:px-[40px] py-16">
         <p className="font-marca text-4xl text-carbon sm:text-5xl">Conoce las manos detrás de tu belleza.</p>
         {!equipo ? (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

@@ -6,6 +6,7 @@ import { Drawer, Modal } from '../../components/ui/Modal'
 import { actualizarNombreProfesional } from '../../lib/api/admin'
 import { listarProfesionales } from '../../lib/api/catalogo'
 import {
+  actualizarHeroHomepage,
   actualizarOrdenCategorias,
   actualizarOrdenEquipoHomepage,
   actualizarOrdenPromociones,
@@ -145,7 +146,7 @@ export function AdminHomepage() {
         <Cargando filas={6} />
       ) : (
         <div className="flex flex-col gap-8">
-          <SeccionPortada configuracion={configuracion} />
+          <SeccionPortada configuracion={configuracion} onGuardada={setConfiguracion} />
           <SeccionCategorias
             categorias={categorias}
             onCambiarOrden={(nuevas) => { setCategorias(nuevas); setSucio(true) }}
@@ -245,20 +246,40 @@ function Interruptor({ activo, onCambiar, etiqueta }: { activo: boolean; onCambi
 
 // --- 1. Portada (bloqueada) ----------------------------------------------------------------
 
-function SeccionPortada({ configuracion }: { configuracion: ConfiguracionHomepage }) {
+function SeccionPortada({ configuracion, onGuardada }: { configuracion: ConfiguracionHomepage; onGuardada: (cfg: ConfiguracionHomepage) => void }) {
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [guardadoOk, setGuardadoOk] = useState(false)
+
+  async function cambiarImagen(url: string | null) {
+    setError(null)
+    setGuardadoOk(false)
+    setGuardando(true)
+    try {
+      await actualizarHeroHomepage(url)
+      onGuardada({ ...configuracion, hero_imagen_url: url })
+      setGuardadoOk(true)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   return (
     <section className="flex flex-col gap-3">
       <h2 className="font-marca text-lg font-semibold text-carbon">Portada principal</h2>
-      <div className="flex flex-col items-start gap-4 rounded-xl border border-piedra bg-blanco p-5 sm:flex-row sm:items-center">
-        {configuracion.hero_imagen_url ? (
-          <img src={configuracion.hero_imagen_url} alt="Imagen principal actual" className="h-24 w-40 rounded-lg object-cover" />
-        ) : (
-          <div className="h-24 w-40 shrink-0 rounded-lg bg-gradient-to-br from-oliva/25 via-piedra to-champan/30" />
-        )}
-        <div className="flex flex-col gap-1.5">
-          <span className="w-fit rounded-full bg-piedra/60 px-3 py-1 text-xs font-semibold text-carbon/70">Edición bloqueada</span>
-          <p className="text-sm text-carbon/70">La imagen principal todavía no está disponible para edición.</p>
-        </div>
+      <div className="flex flex-col gap-3 rounded-xl border border-piedra bg-blanco p-5">
+        <CampoImagenPublica
+          etiqueta="Imagen principal (hero)"
+          valor={configuracion.hero_imagen_url}
+          carpeta="hero"
+          onCambiar={cambiarImagen}
+          ancha
+        />
+        {guardando && <p className="text-xs text-carbon/50">Guardando…</p>}
+        {guardadoOk && !guardando && <p className="text-xs font-medium text-exito">Imagen principal actualizada.</p>}
+        {error && <p className="text-xs font-medium text-error">{error}</p>}
       </div>
     </section>
   )
@@ -700,12 +721,14 @@ function CampoImagenPublica({
   carpeta,
   onCambiar,
   avatarRedondo,
+  ancha,
 }: {
   etiqueta: string
   valor: string | null
-  carpeta: 'categorias' | 'promociones' | 'equipo'
+  carpeta: 'categorias' | 'promociones' | 'equipo' | 'hero'
   onCambiar: (url: string | null) => void
   avatarRedondo?: boolean
+  ancha?: boolean
 }) {
   const [subiendo, setSubiendo] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -736,11 +759,19 @@ function CampoImagenPublica({
   return (
     <div className="flex flex-col gap-1.5">
       <p className="text-sm font-semibold text-carbon">{etiqueta}</p>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
         {valor ? (
-          <img src={valor} alt="Vista previa" className={avatarRedondo ? 'h-16 w-16 rounded-full object-cover' : 'h-16 w-24 rounded-lg object-cover'} />
+          <img
+            src={valor}
+            alt="Vista previa"
+            className={avatarRedondo ? 'h-16 w-16 rounded-full object-cover' : ancha ? 'h-32 w-full max-w-md rounded-lg object-cover' : 'h-16 w-24 rounded-lg object-cover'}
+          />
         ) : (
-          <div className={`flex items-center justify-center bg-gradient-to-br from-oliva/25 via-piedra to-champan/30 text-xs text-carbon/50 ${avatarRedondo ? 'h-16 w-16 rounded-full' : 'h-16 w-24 rounded-lg'}`}>
+          <div
+            className={`flex items-center justify-center bg-gradient-to-br from-oliva/25 via-piedra to-champan/30 text-xs text-carbon/50 ${
+              avatarRedondo ? 'h-16 w-16 rounded-full' : ancha ? 'h-32 w-full max-w-md rounded-lg' : 'h-16 w-24 rounded-lg'
+            }`}
+          >
             Sin imagen
           </div>
         )}
