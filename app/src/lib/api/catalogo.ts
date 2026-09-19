@@ -40,6 +40,25 @@ export async function listarCategorias(): Promise<CategoriaServicio[]> {
   return data
 }
 
+// `profesional` (la tabla) no tiene columna `nombre` — vive en `perfil`, y PostgREST no puede
+// embeber profesional->perfil de forma anidada dentro de servicio_profesional->profesional.
+// Por eso cada consulta que trae profesionales de un servicio debe resolver el nombre aparte
+// contra `vista_profesional` (mismo patrón que nombresDeProfesionales en lib/api/agenda.ts).
+async function adjuntarNombresProfesionales(filas: any[]): Promise<any[]> {
+  const ids = [...new Set(filas.flatMap((s) => (s.servicio_profesional ?? []).map((sp: any) => sp.profesional?.id).filter(Boolean)))]
+  let nombres = new Map<string, string>()
+  if (ids.length > 0) {
+    const { data, error } = await supabase!.from('vista_profesional').select('id, nombre').in('id', ids)
+    if (error) throw error
+    nombres = new Map((data ?? []).map((p: any) => [p.id, p.nombre]))
+  }
+  return filas.map((s) => ({
+    ...s,
+    categoria_nombre: s.categoria?.nombre,
+    profesionales: (s.servicio_profesional ?? []).map((sp: any) => ({ ...sp.profesional, nombre: nombres.get(sp.profesional?.id) ?? '' })),
+  }))
+}
+
 export async function listarServicios(categoriaId?: string): Promise<Servicio[]> {
   if (isDemoMode) {
     return categoriaId ? demoServicios.filter((s) => s.categoria_id === categoriaId) : demoServicios
@@ -51,11 +70,7 @@ export async function listarServicios(categoriaId?: string): Promise<Servicio[]>
   if (categoriaId) query = query.eq('categoria_id', categoriaId)
   const { data, error } = await query
   if (error) throw error
-  return (data ?? []).map((s: any) => ({
-    ...s,
-    categoria_nombre: s.categoria?.nombre,
-    profesionales: (s.servicio_profesional ?? []).map((sp: any) => sp.profesional),
-  }))
+  return adjuntarNombresProfesionales(data ?? [])
 }
 
 // Cuando en Atender se escribe un servicio que no existe en el catálogo, se crea "sobre la
@@ -101,11 +116,7 @@ export async function listarServiciosAdmin(categoriaId?: string): Promise<Servic
   if (categoriaId) query = query.eq('categoria_id', categoriaId)
   const { data, error } = await query
   if (error) throw error
-  return (data ?? []).map((s: any) => ({
-    ...s,
-    categoria_nombre: s.categoria?.nombre,
-    profesionales: (s.servicio_profesional ?? []).map((sp: any) => sp.profesional),
-  }))
+  return adjuntarNombresProfesionales(data ?? [])
 }
 
 export async function obtenerServicio(id: string): Promise<Servicio | null> {
@@ -117,11 +128,8 @@ export async function obtenerServicio(id: string): Promise<Servicio | null> {
     .maybeSingle()
   if (error) throw error
   if (!data) return null
-  return {
-    ...data,
-    categoria_nombre: (data as any).categoria?.nombre,
-    profesionales: ((data as any).servicio_profesional ?? []).map((sp: any) => sp.profesional),
-  }
+  const [conNombres] = await adjuntarNombresProfesionales([data])
+  return conNombres
 }
 
 export async function listarProfesionales(): Promise<Profesional[]> {

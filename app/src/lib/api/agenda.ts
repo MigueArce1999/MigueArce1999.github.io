@@ -244,24 +244,3 @@ export async function retirarSolicitudBloqueo(id: string): Promise<void> {
   const { error } = await client.rpc('fn_retirar_solicitud_bloqueo', { p_id: id })
   if (error) throw error
 }
-
-// --- Permiso para editar horario propio sin aprobación --------------------------------------
-
-export async function tienePermisoHorarioPropio(profesionalId: string): Promise<boolean> {
-  if (isDemoMode) return false
-  const client = supabaseRequerido()
-  const { data, error } = await client.from('permiso').select('puede_editar_horario_propio').eq('perfil_id', profesionalId).maybeSingle()
-  if (error) throw error
-  return data?.puede_editar_horario_propio ?? false
-}
-
-// Usado desde Admin → Equipo: activa/desactiva que una profesional pueda guardar su propio
-// horario/ausencias directamente, sin pasar por aprobación (ver 0031 y 0032).
-export async function fijarPermisoHorarioPropio(profesionalId: string, valor: boolean): Promise<void> {
-  if (isDemoMode) return
-  const client = supabaseRequerido()
-  const { error } = await client
-    .from('permiso')
-    .upsert({ perfil_id: profesionalId, puede_editar_horario_propio: valor }, { onConflict: 'perfil_id' })
-  if (error) throw error
-}

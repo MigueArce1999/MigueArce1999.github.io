@@ -5,20 +5,10 @@ import { Card, Cargando, EmptyState, ErrorState } from '../../components/ui/Esta
 import { Input, Select, Textarea } from '../../components/ui/Campos'
 import { Modal } from '../../components/ui/Modal'
 import { EstadoPagoBadge, EstadoReservaBadge } from '../../components/ui/StatusBadge'
-import { EstadoSolicitudBadge, HorarioHabitual, AusenciasBloqueos } from '../empleada/Disponibilidad'
+import { HorarioHabitual, AusenciasBloqueos } from '../empleada/Disponibilidad'
 import { listarProfesionales, listarServicios } from '../../lib/api/catalogo'
 import { buscarClientes, listarClientesRecientes } from '../../lib/api/empleada'
 import { crearClienteAdmin } from '../../lib/api/clientes'
-import {
-  aprobarSolicitudBloqueo,
-  aprobarSolicitudHorario,
-  listarBloqueosAusencias,
-  listarSolicitudesHorario,
-  rechazarSolicitudBloqueo,
-  rechazarSolicitudHorario,
-  reservasAfectadasPorBloqueo,
-  reservasAfectadasPorHorario,
-} from '../../lib/api/agenda'
 import {
   cancelarReserva,
   confirmarReservaPendiente,
@@ -31,10 +21,9 @@ import {
   reprogramarReserva,
 } from '../../lib/api/reservas'
 import { fechaBogotaISO, formatoFecha, formatoHora, minutosDesdeMedianocheBogota } from '../../lib/format'
-import type { BloqueoAusencia, Cliente, EstadoReserva, Profesional, Reserva, Servicio, SlotDisponible, SolicitudHorario } from '../../lib/types'
+import type { Cliente, EstadoReserva, Profesional, Reserva, Servicio, SlotDisponible } from '../../lib/types'
 
 type Vista = 'dia' | 'semana'
-type Tab = 'agenda' | 'solicitudes'
 const ESTADOS: EstadoReserva[] = ['pendiente', 'confirmada', 'en_atencion', 'completada', 'cancelada', 'no_asistio']
 
 function inicioSemana(fecha: Date) {
@@ -45,7 +34,6 @@ function inicioSemana(fecha: Date) {
 }
 
 export function AdminAgenda() {
-  const [tab, setTab] = useState<Tab>('agenda')
   const [equipo, setEquipo] = useState<Profesional[]>([])
   const [servicios, setServicios] = useState<Servicio[]>([])
 
@@ -56,18 +44,8 @@ export function AdminAgenda() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="font-marca text-2xl font-semibold text-carbon">Agenda</h1>
-        <div className="flex gap-2">
-          <button onClick={() => setTab('agenda')} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${tab === 'agenda' ? 'bg-oliva text-blanco' : 'bg-piedra/40 text-carbon'}`}>
-            Agenda
-          </button>
-          <button onClick={() => setTab('solicitudes')} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${tab === 'solicitudes' ? 'bg-oliva text-blanco' : 'bg-piedra/40 text-carbon'}`}>
-            Solicitudes
-          </button>
-        </div>
-      </div>
-      {tab === 'agenda' ? <PanelAgenda equipo={equipo} servicios={servicios} /> : <PanelSolicitudes />}
+      <h1 className="font-marca text-2xl font-semibold text-carbon">Agenda</h1>
+      <PanelAgenda equipo={equipo} servicios={servicios} />
     </div>
   )
 }
@@ -575,238 +553,3 @@ function FormularioNuevaCita({ servicios, equipo, onCreada }: { servicios: Servi
   )
 }
 
-// --- Solicitudes -----------------------------------------------------------------------------
-
-type SolicitudUnificada =
-  | { clase: 'horario'; data: SolicitudHorario }
-  | { clase: 'bloqueo'; data: BloqueoAusencia }
-
-function PanelSolicitudes() {
-  const [solicitudes, setSolicitudes] = useState<SolicitudUnificada[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [filtroEstado, setFiltroEstado] = useState<'pendiente' | 'todas'>('pendiente')
-
-  function cargar() {
-    setSolicitudes(null)
-    Promise.all([
-      listarSolicitudesHorario(undefined, filtroEstado === 'pendiente' ? 'pendiente' : undefined),
-      listarBloqueosAusencias(undefined, filtroEstado === 'pendiente' ? 'pendiente' : undefined),
-    ])
-      .then(([horarios, bloqueos]) => {
-        const combinadas: SolicitudUnificada[] = [
-          ...horarios.map((h): SolicitudUnificada => ({ clase: 'horario', data: h })),
-          ...bloqueos.map((b): SolicitudUnificada => ({ clase: 'bloqueo', data: b })),
-        ].sort((a, b) => b.data.creado_en.localeCompare(a.data.creado_en))
-        setSolicitudes(combinadas)
-      })
-      .catch((e) => setError(e.message))
-  }
-  useEffect(cargar, [filtroEstado])
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex gap-2">
-        <button onClick={() => setFiltroEstado('pendiente')} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${filtroEstado === 'pendiente' ? 'bg-oliva text-blanco' : 'bg-piedra/40 text-carbon'}`}>
-          Pendientes
-        </button>
-        <button onClick={() => setFiltroEstado('todas')} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${filtroEstado === 'todas' ? 'bg-oliva text-blanco' : 'bg-piedra/40 text-carbon'}`}>
-          Todas
-        </button>
-      </div>
-      {error && <ErrorState mensaje={error} />}
-      {!solicitudes ? (
-        <Cargando filas={3} />
-      ) : solicitudes.length === 0 ? (
-        <EmptyState titulo="No hay solicitudes" descripcion={filtroEstado === 'pendiente' ? 'Ninguna solicitud pendiente de revisión.' : undefined} />
-      ) : (
-        <div className="flex flex-col gap-2">
-          {solicitudes.map((s) =>
-            s.clase === 'horario' ? (
-              <SolicitudHorarioCard key={`h-${s.data.id}`} solicitud={s.data} onCambio={cargar} />
-            ) : (
-              <SolicitudBloqueoCard key={`b-${s.data.id}`} solicitud={s.data} onCambio={cargar} />
-            ),
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-const ETIQUETA_TIPO_BLOQUEO: Record<BloqueoAusencia['tipo'], string> = {
-  bloqueo: 'Bloqueo de horas',
-  ausencia_dia: 'Día libre',
-  ausencia_rango: 'Rango de fechas',
-}
-
-function SolicitudHorarioCard({ solicitud, onCambio }: { solicitud: SolicitudHorario; onCambio: () => void }) {
-  const [conflictos, setConflictos] = useState<Reserva[] | null>(null)
-  const [revisando, setRevisando] = useState(false)
-  const [procesando, setProcesando] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [motivoRechazo, setMotivoRechazo] = useState('')
-  const [rechazando, setRechazando] = useState(false)
-
-  async function revisar() {
-    setRevisando(true)
-    setError(null)
-    try {
-      setConflictos(await reservasAfectadasPorHorario(solicitud.profesional_id, solicitud.intervalos, solicitud.vigente_desde))
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setRevisando(false)
-    }
-  }
-
-  async function aprobar() {
-    setProcesando(true)
-    setError(null)
-    try {
-      await aprobarSolicitudHorario(solicitud.id)
-      onCambio()
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setProcesando(false)
-    }
-  }
-
-  async function rechazar() {
-    setProcesando(true)
-    setError(null)
-    try {
-      await rechazarSolicitudHorario(solicitud.id, motivoRechazo)
-      onCambio()
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setProcesando(false)
-    }
-  }
-
-  return (
-    <Card className="flex flex-col gap-2">
-      {error && <ErrorState mensaje={error} />}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-carbon">{solicitud.profesional_nombre} · Cambio de horario</p>
-          <p className="text-xs text-carbon/60">A partir del {formatoFecha(solicitud.vigente_desde)} · {solicitud.intervalos.length} intervalo(s)</p>
-          {solicitud.motivo && <p className="text-xs text-carbon/50">{solicitud.motivo}</p>}
-        </div>
-        <EstadoSolicitudBadge estado={solicitud.estado} />
-      </div>
-      {solicitud.estado === 'pendiente' && (
-        <>
-          {conflictos === null ? (
-            <Button tamano="sm" variante="secondary" onClick={revisar} cargando={revisando} className="self-start">Revisar conflictos</Button>
-          ) : conflictos.length > 0 ? (
-            <div className="rounded-lg border border-advertencia/40 bg-advertencia/10 p-3">
-              <p className="text-sm font-semibold text-carbon">Afecta {conflictos.length} cita(s) — resuélvelas en la agenda antes de aprobar:</p>
-              <ul className="mt-1 flex flex-col gap-1 text-xs text-carbon/70">
-                {conflictos.map((c) => <li key={c.id}>{formatoFecha(c.rango_inicio)} · {formatoHora(c.rango_inicio)} — {c.cliente_nombre}</li>)}
-              </ul>
-              <Button tamano="sm" variante="ghost" className="mt-2" onClick={() => setConflictos(null)}>Volver a revisar</Button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm text-exito">Sin conflictos.</p>
-              <Button tamano="sm" cargando={procesando} onClick={aprobar}>Aprobar</Button>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <input value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} placeholder="Motivo de rechazo (opcional)" className="flex-1 rounded-lg border border-piedra px-2 py-1 text-xs" />
-            <Button tamano="sm" variante="danger" cargando={rechazando} onClick={() => { setRechazando(true); rechazar().finally(() => setRechazando(false)) }}>Rechazar</Button>
-          </div>
-        </>
-      )}
-    </Card>
-  )
-}
-
-function SolicitudBloqueoCard({ solicitud, onCambio }: { solicitud: BloqueoAusencia; onCambio: () => void }) {
-  const [conflictos, setConflictos] = useState<Reserva[] | null>(null)
-  const [revisando, setRevisando] = useState(false)
-  const [procesando, setProcesando] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [motivoRechazo, setMotivoRechazo] = useState('')
-
-  async function revisar() {
-    setRevisando(true)
-    setError(null)
-    try {
-      setConflictos(await reservasAfectadasPorBloqueo(solicitud.profesional_id, solicitud.rango_inicio, solicitud.rango_fin))
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setRevisando(false)
-    }
-  }
-
-  async function aprobar() {
-    setProcesando(true)
-    setError(null)
-    try {
-      await aprobarSolicitudBloqueo(solicitud.id)
-      onCambio()
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setProcesando(false)
-    }
-  }
-
-  async function rechazar() {
-    setProcesando(true)
-    setError(null)
-    try {
-      await rechazarSolicitudBloqueo(solicitud.id, motivoRechazo)
-      onCambio()
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setProcesando(false)
-    }
-  }
-
-  return (
-    <Card className="flex flex-col gap-2">
-      {error && <ErrorState mensaje={error} />}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-carbon">{solicitud.profesional_nombre} · {ETIQUETA_TIPO_BLOQUEO[solicitud.tipo]}</p>
-          <p className="text-xs text-carbon/60">
-            {formatoFecha(solicitud.rango_inicio)}
-            {!solicitud.todo_el_dia && ` · ${formatoHora(solicitud.rango_inicio)}–${formatoHora(solicitud.rango_fin)}`}
-          </p>
-          {solicitud.motivo && <p className="text-xs text-carbon/50">{solicitud.motivo}</p>}
-        </div>
-        <EstadoSolicitudBadge estado={solicitud.estado} />
-      </div>
-      {solicitud.estado === 'pendiente' && (
-        <>
-          {conflictos === null ? (
-            <Button tamano="sm" variante="secondary" onClick={revisar} cargando={revisando} className="self-start">Revisar conflictos</Button>
-          ) : conflictos.length > 0 ? (
-            <div className="rounded-lg border border-advertencia/40 bg-advertencia/10 p-3">
-              <p className="text-sm font-semibold text-carbon">Afecta {conflictos.length} cita(s) — resuélvelas en la agenda antes de aprobar:</p>
-              <ul className="mt-1 flex flex-col gap-1 text-xs text-carbon/70">
-                {conflictos.map((c) => <li key={c.id}>{formatoFecha(c.rango_inicio)} · {formatoHora(c.rango_inicio)} — {c.cliente_nombre}</li>)}
-              </ul>
-              <Button tamano="sm" variante="ghost" className="mt-2" onClick={() => setConflictos(null)}>Volver a revisar</Button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm text-exito">Sin conflictos.</p>
-              <Button tamano="sm" cargando={procesando} onClick={aprobar}>Aprobar</Button>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <input value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} placeholder="Motivo de rechazo (opcional)" className="flex-1 rounded-lg border border-piedra px-2 py-1 text-xs" />
-            <Button tamano="sm" variante="danger" cargando={procesando} onClick={rechazar}>Rechazar</Button>
-          </div>
-        </>
-      )}
-    </Card>
-  )
-}
