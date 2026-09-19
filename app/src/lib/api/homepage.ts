@@ -4,13 +4,23 @@ import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
 import { demoCategorias, demoPromociones } from '../demoData'
 import type { CategoriaServicio, ConfiguracionHomepage, EstadoPromocion, Promocion } from '../types'
 
-// --- Portada (bloqueada por ahora; ver Home Homepage.tsx) ------------------------------------
+// --- Portada -----------------------------------------------------------------------------------
 
 export async function obtenerConfiguracionHomepage(): Promise<ConfiguracionHomepage> {
-  if (isDemoMode) return { hero_imagen_url: null, hero_editable: false }
+  if (isDemoMode) return { hero_imagen_url: null, hero_editable: true }
   const { data, error } = await supabase!.from('configuracion_homepage').select('hero_imagen_url, hero_editable').maybeSingle()
   if (error) throw error
-  return data ?? { hero_imagen_url: null, hero_editable: false }
+  return data ?? { hero_imagen_url: null, hero_editable: true }
+}
+
+export async function actualizarHeroHomepage(heroImagenUrl: string | null): Promise<void> {
+  const client = supabaseRequerido()
+  const { data: perfil } = await client.auth.getUser()
+  const { error } = await client
+    .from('configuracion_homepage')
+    .update({ hero_imagen_url: heroImagenUrl, actualizado_en: new Date().toISOString(), actualizado_por: perfil.user?.id ?? null })
+    .eq('id', true)
+  if (error) throw error
 }
 
 // --- Categorías -------------------------------------------------------------------------------
@@ -231,7 +241,7 @@ const BUCKET_IMAGENES_PUBLICO = 'imagenes-publico'
 export const TIPOS_IMAGEN_PERMITIDOS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 export const TAMANO_MAXIMO_IMAGEN = 5 * 1024 * 1024 // 5 MB
 
-export async function subirImagenPublica(archivo: File, carpeta: 'categorias' | 'promociones' | 'equipo'): Promise<string> {
+export async function subirImagenPublica(archivo: File, carpeta: 'categorias' | 'promociones' | 'equipo' | 'hero'): Promise<string> {
   if (!TIPOS_IMAGEN_PERMITIDOS.includes(archivo.type)) {
     throw new Error('Formato no admitido: sube una imagen JPG, PNG o WEBP.')
   }

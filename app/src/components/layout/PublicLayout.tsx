@@ -26,7 +26,7 @@ export function PublicLayout() {
     <div className="min-h-screen bg-marfil">
       {isDemoMode && <DemoBanner />}
       <header className="sticky top-0 z-40 border-b border-piedra bg-blanco/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-[40px] py-3">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 sm:px-[40px] py-3">
           <Link to="/" className="flex items-center">
             <img src={logo} alt="Claudia Patricia" className="h-12 w-auto" />
           </Link>
@@ -64,7 +64,7 @@ export function PublicLayout() {
           </button>
         </div>
         {menuAbierto && (
-          <nav className="flex flex-col gap-1 border-t border-piedra px-[40px] py-3 md:hidden">
+          <nav className="flex flex-col gap-1 border-t border-piedra px-5 sm:px-[40px] py-3 md:hidden">
             {enlaces.map((e) => (
               <NavLink
                 key={e.to}
@@ -90,7 +90,7 @@ export function PublicLayout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-piedra bg-blanco px-[40px] py-12">
+      <footer className="border-t border-piedra bg-blanco px-5 sm:px-[40px] py-12">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-10 sm:flex-row sm:flex-wrap sm:gap-16">
           <div className="flex max-w-md flex-col gap-3">
             <img src={logo} alt="Claudia Patricia" className="h-16 w-auto" />
@@ -112,7 +112,7 @@ export function PublicLayout() {
         <p className="mx-auto mt-10 max-w-[1440px] text-sm text-carbon/60">© {new Date().getFullYear()} Claudia Patricia · Privacidad · Términos y condiciones</p>
       </footer>
 
-      <div className="bg-oliva px-[40px] py-16">
+      <div className="bg-oliva px-5 sm:px-[40px] py-16">
         <div className="mx-auto flex max-w-[1440px] flex-col items-start gap-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-marfil">Tu bienestar nos inspira</p>
           <p className="font-marca text-4xl leading-tight text-marfil sm:text-5xl">
