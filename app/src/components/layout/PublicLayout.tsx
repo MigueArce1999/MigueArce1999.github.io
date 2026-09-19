@@ -25,10 +25,10 @@ export function PublicLayout() {
   return (
     <div className="min-h-screen bg-marfil">
       {isDemoMode && <DemoBanner />}
-      <header className="sticky top-0 z-40 border-b border-piedra bg-marfil/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-piedra bg-blanco/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1440px] items-center justify-between px-[40px] py-3">
-          <Link to="/" className="flex items-center py-1">
-            <img src={logo} alt="Claudia Patricia" className="h-20 w-auto" />
+          <Link to="/" className="flex items-center">
+            <img src={logo} alt="Claudia Patricia" className="h-12 w-auto" />
           </Link>
           <nav className="hidden items-center gap-6 md:flex lg:gap-12">
             {enlaces.map((e) => (
@@ -93,7 +93,7 @@ export function PublicLayout() {
       <footer className="border-t border-piedra bg-marfil px-[40px] py-12">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-10 sm:flex-row sm:flex-wrap sm:gap-16">
           <div className="flex max-w-md flex-col gap-3">
-            <img src={logo} alt="Claudia Patricia" className="h-24 w-auto" />
+            <img src={logo} alt="Claudia Patricia" className="h-16 w-auto" />
             <p className="text-sm text-carbon/60">Un espacio para tu belleza y bienestar.</p>
           </div>
           <div className="flex flex-col gap-3">
