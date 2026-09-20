@@ -715,7 +715,7 @@ async function aplicarRespuestaClarificacion(pregunta: PendingClarification, val
         const nombre = sesion.draft.client.pendingName!
         const telefono = sesion.draft.client.pendingPhone ?? null
         const nuevo = await deps.crearClienteRapido({ nombre, telefono })
-        sesion.draft = setClienteResuelto(sesion.draft, { id: nuevo.id, nombre: nuevo.nombre, telefono: nuevo.telefono }, true)
+        sesion.draft = setClienteResuelto(sesion.draft, nuevo, true)
       }
       return
     }

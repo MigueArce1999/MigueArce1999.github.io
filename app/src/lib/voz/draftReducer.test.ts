@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Cliente } from '../types'
 import { crearDraftVacio } from './VoiceSessionContext'
 import {
   agregarColaborador,
@@ -9,6 +10,14 @@ import {
   setClienteResuelto,
   totalDraft,
 } from './draftReducer'
+
+function cliente(id: string, nombre: string, telefono: string | null = null): Cliente {
+  return {
+    id, usuario_id: null, nombre, telefono, email: null, consentimiento_marketing: false,
+    visitas_completadas: 0, gasto_acumulado: 0, activo: true, origen_registro: 'admin', notas: null,
+    resena_google_confirmada: false, creado_en: new Date().toISOString(),
+  }
+}
 
 describe('draftReducer', () => {
   it('agregarServicio reutiliza la única línea vacía en vez de duplicar', () => {
@@ -51,7 +60,7 @@ describe('draftReducer', () => {
   it('draftEstaCompleto exige clienta resuelta y todos los servicios con precio+profesional', () => {
     let draft = crearDraftVacio()
     expect(draftEstaCompleto(draft)).toBe(false)
-    draft = setClienteResuelto(draft, { id: 'c1', nombre: 'Verónica', telefono: null })
+    draft = setClienteResuelto(draft, cliente('c1', 'Verónica'))
     const r1 = agregarServicio(draft, { servicioId: 's1', displayName: 'Blower', price: 45000, priceStatus: 'confirmed', professionalId: 'p1' })
     draft = r1.draft
     expect(draftEstaCompleto(draft)).toBe(true)

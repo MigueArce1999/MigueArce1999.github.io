@@ -4,6 +4,7 @@
 // Supabase — eso ya pasó (resolución) o pasará (ejecución), nunca aquí.
 
 import type { AttentionDraft, DraftClient, DraftCollaborator, DraftPriceStatus, DraftProductLine, DraftServiceLine } from './schema'
+import type { Cliente } from '../types'
 
 function idTemporal(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -13,7 +14,7 @@ function tocar(): Pick<AttentionDraft, 'updatedAt'> {
   return { updatedAt: new Date().toISOString() }
 }
 
-export function setClienteResuelto(draft: AttentionDraft, cliente: { id: string; nombre: string; telefono: string | null }, esNuevo = false): AttentionDraft {
+export function setClienteResuelto(draft: AttentionDraft, cliente: Cliente, esNuevo = false): AttentionDraft {
   const resuelto: DraftClient = { status: 'resolved', resolved: { ...cliente, isNew: esNuevo } }
   return { ...draft, client: resuelto, ...tocar() }
 }

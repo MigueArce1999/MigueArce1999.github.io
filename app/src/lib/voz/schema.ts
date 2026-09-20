@@ -3,6 +3,8 @@
 // código — solo estos tipos. Si en el futuro se conecta un proveedor de IA con structured
 // output, debe devolver exactamente esta forma (ver CommandInterpreter.ts).
 
+import type { Cliente } from '../types'
+
 /** Fila del catálogo real de productos (migración 0044) — no existía antes del asistente de
  * voz; ver docs de entrega para por qué se creó. */
 export interface Producto {
@@ -153,12 +155,9 @@ export interface DraftClient {
   query?: string
   pendingName?: string
   pendingPhone?: string
-  resolved?: {
-    id: string
-    nombre: string
-    telefono: string | null
-    isNew: boolean
-  }
+  // El registro COMPLETO (no un subconjunto): quien confirme el draft vierte esto directo
+  // sobre el `cliente` del formulario manual, así que debe ser un Cliente utilizable tal cual.
+  resolved?: Cliente & { isNew: boolean }
 }
 
 export interface DraftCollaborator {
