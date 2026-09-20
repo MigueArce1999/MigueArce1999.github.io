@@ -92,6 +92,15 @@ export async function procesarUtterance(
   let shouldCancel = false
   let error: string | null = null
 
+  // Idempotencia (sección 2 del pedido): la Web Speech API puede reentregar el mismo resultado
+  // final ante ciertos reinicios del motor de reconocimiento. useReconocimientoVoz ya filtra la
+  // mayoría de esos casos por índice+texto, pero esta es la última barrera antes de mutar el
+  // draft — nunca se procesa dos veces el mismo utteranceId.
+  if (sesion.idsProcesados.has(utteranceId)) {
+    return construirResultado(sesion, draftAntes, false, false, null)
+  }
+  sesion.idsProcesados.add(utteranceId)
+
   try {
     // 1) Si hay una aclaración visible, se intenta resolver contra ELLA primero — nunca se
     // reinterpreta como instrucción nueva mientras algo sigue pendiente de responder.
