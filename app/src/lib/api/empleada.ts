@@ -31,6 +31,27 @@ export async function buscarClientes(texto: string, limite = 6): Promise<Cliente
   return data
 }
 
+// Misma forma de alta que el "+ Crear cliente" inline de Atender.tsx (ClienteSeccion): el
+// asistente de voz reutiliza esta lógica en vez de duplicarla, para que ambos caminos (a mano o
+// por voz) sigan exactamente las mismas reglas (RLS cliente_insert: admin/empleada/dueña).
+export async function crearClienteRapido(datos: { nombre: string; telefono: string | null }): Promise<Cliente> {
+  if (isDemoMode) {
+    return {
+      id: 'demo-cliente-' + Date.now(), usuario_id: null, nombre: datos.nombre, telefono: datos.telefono, email: null,
+      consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0, activo: true, origen_registro: 'admin',
+      notas: null, resena_google_confirmada: false, creado_en: new Date().toISOString(),
+    }
+  }
+  const client = supabaseRequerido()
+  const { data, error } = await client
+    .from('cliente')
+    .insert({ nombre: datos.nombre, telefono: datos.telefono, consentimiento_marketing: false })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function registrarAtencion(params: {
   clienteId: string
   reservaId: string | null

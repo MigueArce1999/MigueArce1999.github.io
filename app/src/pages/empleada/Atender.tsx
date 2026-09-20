@@ -12,6 +12,8 @@ import { obtenerReservaPorId } from '../../lib/api/reservas'
 import { estimarComision, type EstimacionComision } from '../../lib/api/comisiones'
 import { formatoFecha, formatoHora, formatoMoneda } from '../../lib/format'
 import type { Cliente, MetodoPago, Profesional, Servicio } from '../../lib/types'
+import { useAsistenteRegistro } from '../../lib/voz/useAsistenteRegistro'
+import { PanelAsistenteVoz } from '../../components/voz/PanelAsistenteVoz'
 
 // --- Tipos del borrador (solo viven en el navegador hasta el clic final en "Confirmar
 // cobro"; ver fn_registrar_atencion en supabase/migrations/0020_colaborador_como_servicio.sql
@@ -117,7 +119,7 @@ export function EmpleadaAtender({
   etiquetaFinalizar?: string
 } = {}) {
   const navigate = useNavigate()
-  const { profesional } = useAuth()
+  const { profesional, perfil } = useAuth()
   const [searchParams] = useSearchParams()
   // Llegar aquí desde "Iniciar atención" en Mi agenda (?reservaId=...) precarga cliente y
   // servicio de esa cita, reutilizando el mismo flujo de registrar/cobrar — nunca uno paralelo.
@@ -195,6 +197,29 @@ export function EmpleadaAtender({
   const subtotalServicios = lineas.reduce((acc, l) => acc + (l.precio ?? 0), 0)
   const subtotalProductos = productos.reduce((acc, p) => acc + p.cantidad * (p.precioUnitario ?? 0), 0)
   const total = subtotalServicios + subtotalProductos
+
+  // El asistente de voz opera sobre EXACTAMENTE el mismo estado y los mismos setters de este
+  // formulario (cliente/lineas/productos/notas) — nunca un borrador paralelo. Se llama siempre
+  // (nunca condicionado a `paso`), como exigen las reglas de hooks de React; el botón y el
+  // panel solo se muestran mientras `paso === 'registrar'`.
+  const asistenteVoz = useAsistenteRegistro({
+    cliente,
+    setCliente,
+    lineas,
+    setLineas,
+    productos,
+    setProductos,
+    notas,
+    setNotas,
+    servicios,
+    equipo,
+    crearServicio,
+    // Mismo permiso que ya exige fn_crear_servicio_rapido en el servidor (0038): admin o
+    // empleada. El servidor vuelve a validarlo — esto solo evita ofrecer una opción que el
+    // backend rechazaría igual.
+    puedeCrearServicio: perfil?.rol === 'admin' || perfil?.rol === 'empleada',
+    onListo: irACobrar,
+  })
 
   function actualizarLinea(tempId: string, cambios: Partial<LineaServicioBorrador>) {
     setLineas((prev) => prev.map((l) => (l.tempId === tempId ? { ...l, ...cambios } : l)))
@@ -404,8 +429,21 @@ export function EmpleadaAtender({
               : 'Añade los servicios y productos de esta visita.'}
           </p>
         </div>
-        <Stepper paso="registrar" />
+        <div className="flex flex-wrap items-center gap-3">
+          {!asistenteVoz.abierto && (
+            <Button type="button" variante="secondary" tamano="sm" onClick={asistenteVoz.abrir}>
+              <span aria-hidden>🎙️</span> Registrar con voz
+            </Button>
+          )}
+          <Stepper paso="registrar" />
+        </div>
       </div>
+
+      {asistenteVoz.abierto && (
+        <div className="mb-4">
+          <PanelAsistenteVoz asistente={asistenteVoz} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-4">
