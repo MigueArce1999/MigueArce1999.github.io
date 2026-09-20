@@ -189,7 +189,7 @@ export function Home() {
         <p className="font-marca text-4xl text-carbon sm:text-5xl">Conoce las manos detrás de tu belleza.</p>
         {!equipo ? (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[290px] animate-pulse rounded-lg bg-piedra/50" />)}
+            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-square animate-pulse rounded-lg bg-piedra/50 sm:aspect-auto sm:h-[290px]" />)}
           </div>
         ) : equipo.length === 0 ? (
           <p className="text-carbon/60">Todavía no hay profesionales destacadas en la portada.</p>
@@ -198,9 +198,14 @@ export function Home() {
             {equipo.map((p) => (
               <Link to={`/equipo/${p.slug}`} key={p.id} className="flex flex-col items-start gap-4">
                 {p.foto_url ? (
-                  <img src={p.foto_url} alt={p.nombre} className="h-[290px] w-full rounded-lg object-cover" loading="lazy" />
+                  <img
+                    src={p.foto_url}
+                    alt={p.nombre}
+                    className="aspect-square w-full rounded-lg object-cover sm:aspect-auto sm:h-[290px]"
+                    loading="lazy"
+                  />
                 ) : (
-                  <FotoPlaceholder className="h-[290px] w-full rounded-lg" />
+                  <FotoPlaceholder className="aspect-square w-full rounded-lg sm:aspect-auto sm:h-[290px]" />
                 )}
                 <div className="flex flex-col gap-2">
                   <p className="font-marca text-2xl text-carbon">{p.nombre}</p>
