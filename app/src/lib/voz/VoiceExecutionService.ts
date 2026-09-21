@@ -48,7 +48,7 @@ import type {
 } from './schema'
 import type { Cliente, Profesional, Servicio } from '../types'
 import type { Producto } from './schema'
-import { ORDINALES, extraerMonto } from './MoneyNormalizer'
+import { ORDINALES, extraerMonto, pareceTelefono } from './MoneyNormalizer'
 import { buscarCoincidencias, normalizar } from './texto'
 
 export interface VoiceExecutionDeps {
@@ -103,6 +103,22 @@ export async function procesarUtterance(
   sesion.idsProcesados.add(utteranceId)
 
   try {
+    // 0) Un teléfono dicho SOLO ("teléfono 3001234567", o solo los dígitos) mientras hay una
+    // clienta nueva pendiente de crear: el reconocimiento de voz del navegador puede partir
+    // "Crea a Verónica, teléfono 3001234567" en dos resultados finales si la persona hace una
+    // pausa natural en la coma — esa segunda frase, sola, no significa nada para el intérprete
+    // (no calza ningún patrón). Se intercepta aquí, antes de la interpretación normal, y se
+    // engancha directo al alta pendiente en vez de perderse en silencio.
+    if (sesion.draft.client.status === 'pending_creation' && (!sesion.pendingClarification || sesion.pendingClarification.field === 'create_client_confirm')) {
+      const telefonoSuelto = extraerTelefonoSuelto(texto)
+      if (telefonoSuelto) {
+        sesion.draft = setClientePendienteCreacion(sesion.draft, undefined, telefonoSuelto)
+        preguntarConfirmarCreacionCliente(sesion, deps)
+        logTurnoVoz({ utteranceId, rawTranscript: texto, normalizedTranscript: texto.toLowerCase(), executionResult: 'telefono_enganchado_a_alta_pendiente', processingTime: performance.now() - inicio })
+        return construirResultado(sesion, draftAntes, false, false, null)
+      }
+    }
+
     // 1) Si hay una aclaración visible, se intenta resolver contra ELLA primero — nunca se
     // reinterpreta como instrucción nueva mientras algo sigue pendiente de responder.
     if (sesion.pendingClarification) {
@@ -314,6 +330,18 @@ function preguntarConfirmarCreacionCliente(sesion: VoiceSessionState, deps: Voic
     question: `¿Creo a "${datos.pendingName}"${datos.pendingPhone ? ` con teléfono ${datos.pendingPhone}` : ' sin teléfono'}?`,
     options: [opcion('Sí, crear', 'si'), opcion('Editar', 'no')],
   }
+}
+
+// "teléfono 3001234567" o simplemente "3001234567" — nunca confunde un número que en realidad
+// es un precio dicho a secas (ver pareceTelefono en MoneyNormalizer.ts: exige mayoría de dígitos
+// y largo mínimo, cosas que un precio corto como "45000" también cumpliría, pero ese caso nunca
+// llega aquí porque este intercepto solo corre con una clienta pendiente de crear).
+function extraerTelefonoSuelto(texto: string): string | undefined {
+  const t = texto.trim()
+  const conPalabra = t.match(/^tel[ée]fono[:\s]+([\d\s]+)$/i)
+  if (conPalabra) return conPalabra[1].replace(/\s+/g, '')
+  if (pareceTelefono(t)) return t.replace(/\D/g, '')
+  return undefined
 }
 
 function ocultarTelefono(telefono: string | null): string {
