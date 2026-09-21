@@ -1,8 +1,12 @@
-// Conversión de números dictados en español a valores enteros, y resolución de montos en pesos
-// colombianos. Determinista: un diccionario fijo de palabras numéricas + las reglas de
-// composición estándar del español (centena + decena[-y-unidad] + multiplicador) — sin ningún
-// modelo de lenguaje de por medio. Ver docs de entrega para dónde encaja esta capa dentro de
-// "captura → normalización → interpretación → resolución → validación → aplicación".
+// Normalizador de dinero para pesos colombianos (COP). Reconoce cifras ("45.000", "45000",
+// "$45.000") y números dictados en palabras ("cuarenta y cinco mil"), sin asumir NUNCA en
+// silencio que un número pelado ("45") significa "45.000" — eso siempre se marca ambiguo para
+// que quien resuelve la entidad decida si pide confirmación.
+//
+// El mismo parser numérico sirve para tres contextos distintos (precio de servicio, precio de
+// producto, compensación de colaborador): la ambigüedad se resuelve igual en los tres. El
+// contexto de TELÉFONO es deliberadamente distinto — un teléfono nunca pasa por este parser de
+// dinero, así que un número de 10 dígitos jamás se interpreta como "45 mil millones".
 
 const UNIDADES: Record<string, number> = {
   cero: 0, un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5,
@@ -36,6 +40,7 @@ export const ORDINALES: Record<string, number> = {
   tercero: 3, tercer: 3, tercera: 3,
   cuarto: 4, cuarta: 4,
   quinto: 5, quinta: 5,
+  ultimo: -1, ultima: -1, // -1 = marcador especial "el último", resuelto por quien llama
 }
 
 export function sinTildes(s: string): string {
@@ -107,8 +112,8 @@ export function parseNumeroPalabras(tokens: string[], startIdx: number): { valor
 
 export interface MontoInterpretado {
   valor: number
-  // true si lo dictado no traía "mil"/"millón" ni separador de miles: p. ej. "ponle treinta y
-  // cinco" — nunca se asume en silencio que son $35.000, se debe confirmar con la persona.
+  /** true si lo dictado no traía "mil"/"millón" ni separador de miles: p. ej. "ponle treinta y
+   * cinco" — nunca se asume en silencio que son $35.000, se debe confirmar con la persona. */
   ambiguo: boolean
   valorSugerido?: number
 }
@@ -122,13 +127,25 @@ function leerCifra(texto: string): { valor: number; longitud: number } | null {
   return { valor, longitud: m[0].length }
 }
 
-// Intenta leer un monto en COP al inicio de `texto`: primero cifras ("35.000", "35000",
-// "$45000"), luego números en palabras. Nunca multiplica un número "pelado" por mil en
-// silencio — ver sección de importes ambiguos del pedido.
+function multiplicadorTrasCifra(resto: string): { factor: number; longitud: number } | null {
+  const m = resto.match(/^\s*(mil|millones|millón|millon)\b/i)
+  if (!m) return null
+  const palabra = sinTildes(m[1].toLowerCase())
+  return { factor: palabra === 'mil' ? 1000 : 1_000_000, longitud: m[0].length }
+}
+
+/** Intenta leer un monto en COP al inicio de `texto`. Usado para precios de servicio/producto y
+ * compensación de colaborador — nunca para teléfonos (ver `pareceTelefono`). Una cifra puede ir
+ * seguida de "mil"/"millones" ("45 mil" = 45.000, no 45): siempre se comprueba antes de aceptar
+ * la cifra como valor final. */
 export function extraerMonto(texto: string): MontoInterpretado | null {
   const limpio = texto.trim()
   const cifra = leerCifra(limpio)
-  if (cifra) return { valor: cifra.valor, ambiguo: false }
+  if (cifra) {
+    const multiplicador = multiplicadorTrasCifra(limpio.slice(cifra.longitud))
+    if (multiplicador) return { valor: cifra.valor * multiplicador.factor, ambiguo: false }
+    return { valor: cifra.valor, ambiguo: false }
+  }
 
   const tokens = sinTildes(limpio.toLowerCase()).replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(Boolean)
   const resultado = parseNumeroPalabras(tokens, 0)
@@ -140,22 +157,40 @@ export function extraerMonto(texto: string): MontoInterpretado | null {
   return { valor: resultado.valor, ambiguo: false }
 }
 
-// Variante usada por el intérprete de comandos compuestos: lee un monto a partir de un arreglo
-// de tokens ya normalizados (para poder saber cuántos tokens ocupó y seguir leyendo lo que
-// venga después, p. ej. "con Claudia").
+/** Variante para el intérprete de comandos: lee un monto desde un arreglo de tokens ya
+ * normalizados, devolviendo cuántos tokens ocupó para poder seguir leyendo lo que sigue. Igual
+ * que extraerMonto, una cifra ("45") seguida del token "mil"/"millones" se multiplica — nunca
+ * se detiene en la cifra sola. */
 export function leerMontoDesdeTokens(tokens: string[], startIdx: number): { monto: MontoInterpretado; consumidos: number } | null {
   const cifra = leerCifra(tokens[startIdx] ?? '')
   if (cifra && cifra.longitud >= (tokens[startIdx] ?? '').length) {
-    return { monto: { valor: cifra.valor, ambiguo: false }, consumidos: 1 }
+    let valor = cifra.valor
+    let consumidos = 1
+    const siguiente = tokens[startIdx + 1]
+    if (siguiente === 'mil') { valor *= 1000; consumidos = 2 }
+    else if (siguiente === 'millon' || siguiente === 'millones') { valor *= 1_000_000; consumidos = 2 }
+    if (tokens[startIdx + consumidos] === 'pesos') consumidos++
+    return { monto: { valor, ambiguo: false }, consumidos }
   }
   const resultado = parseNumeroPalabras(tokens, startIdx)
   if (!resultado || resultado.valor === 0) return null
   let consumidos = resultado.consumidos
-  // "pesos" al final es puramente decorativo, se descarta.
   if (tokens[startIdx + consumidos] === 'pesos') consumidos++
   const incluyeMultiplicador = tokens.slice(startIdx, startIdx + resultado.consumidos).some((t) => t === 'mil' || t === 'millon' || t === 'millones')
   const monto: MontoInterpretado = !incluyeMultiplicador && resultado.valor < 1000
     ? { valor: resultado.valor, ambiguo: true, valorSugerido: resultado.valor * 1000 }
     : { valor: resultado.valor, ambiguo: false }
   return { monto, consumidos }
+}
+
+/** Un teléfono dictado ("300 123 4567", "3001234567") NUNCA debe pasar por extraerMonto: 10
+ * dígitos corridos se leerían como "tres mil millones...". Se detecta por longitud/densidad de
+ * dígitos, y el resultado son dígitos crudos, no un valor monetario. */
+export function pareceTelefono(texto: string): boolean {
+  const digitos = texto.replace(/\D/g, '')
+  return digitos.length >= 6 && digitos.length >= texto.replace(/\s/g, '').length * 0.6
+}
+
+export function extraerDigitosTelefono(texto: string): string {
+  return texto.replace(/\D/g, '')
 }

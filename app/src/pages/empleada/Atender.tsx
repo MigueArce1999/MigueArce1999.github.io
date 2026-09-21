@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { CampoBase, CampoMoneda, Input, Select, Textarea } from '../../components/ui/Campos'
@@ -6,14 +6,16 @@ import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { useAuth } from '../../state/AuthContext'
 import { isDemoMode, supabase } from '../../lib/supabase'
 import { crearServicioRapido, listarProfesionales, listarServicios } from '../../lib/api/catalogo'
-import { buscarClientes, completarYCobrarAtencion, listarClientesRecientes, registrarAtencion } from '../../lib/api/empleada'
+import { buscarClientes, completarYCobrarAtencion, crearClienteRapido, listarClientesRecientes, registrarAtencion } from '../../lib/api/empleada'
 import { obtenerClienteAdmin } from '../../lib/api/clientes'
 import { obtenerReservaPorId } from '../../lib/api/reservas'
 import { estimarComision, type EstimacionComision } from '../../lib/api/comisiones'
 import { formatoFecha, formatoHora, formatoMoneda } from '../../lib/format'
 import type { Cliente, MetodoPago, Profesional, Servicio } from '../../lib/types'
-import { useAsistenteRegistro } from '../../lib/voz/useAsistenteRegistro'
-import { PanelAsistenteVoz } from '../../components/voz/PanelAsistenteVoz'
+import type { VoiceExecutionDeps } from '../../lib/voz/VoiceExecutionService'
+import type { AttentionDraft, Producto } from '../../lib/voz/schema'
+import { crearProductoRapido as crearProductoRapidoVoz, listarProductos } from '../../lib/voz/voiceApi'
+import { VoiceRegistrationPanel } from '../../components/voz/VoiceRegistrationPanel'
 
 // --- Tipos del borrador (solo viven en el navegador hasta el clic final en "Confirmar
 // cobro"; ver fn_registrar_atencion en supabase/migrations/0020_colaborador_como_servicio.sql
@@ -63,6 +65,51 @@ function lineaIncompleta(l: LineaServicioBorrador) {
 // La marca es opcional: la categoría (tinte, champú…) ya identifica el producto igual.
 function productoIncompleto(p: LineaProductoBorrador) {
   return !p.categoria.trim() || p.cantidad <= 0 || p.precioUnitario == null || p.precioUnitario < 0
+}
+
+// Vuelca un AttentionDraft ya confirmado sobre EXACTAMENTE el mismo estado que llena el
+// formulario manual (cliente/lineas/productos/notas) — nunca un camino de escritura paralelo.
+// Un colaborador no es un campo anidado aquí: se aplana en su PROPIA línea de servicio
+// (esColaboracion = true), igual que ya lo exige este formulario (ver comentario junto a
+// LineaServicioBorrador). El "categoria" del producto manual es en realidad el TIPO de
+// producto (Champú, Tinte…) — lo mismo que guarda `producto.nombre` en el catálogo nuevo del
+// asistente de voz — así que la "marca" (nombre libre del formulario) queda vacía: la voz
+// nunca dicta una marca específica.
+function draftAFormulario(draft: AttentionDraft): { cliente: Cliente | null; lineas: LineaServicioBorrador[]; productos: LineaProductoBorrador[]; notas: string } {
+  const cliente = draft.client.status === 'resolved' ? draft.client.resolved! : null
+
+  const lineas: LineaServicioBorrador[] = []
+  for (const s of draft.services) {
+    lineas.push({
+      tempId: s.tempId,
+      servicioId: s.serviceId ?? '',
+      nombre: s.displayName,
+      profesionalId: s.professionalId ?? '',
+      precio: s.price ?? null,
+      esColaboracion: false,
+    })
+    for (const c of s.collaborators) {
+      lineas.push({
+        tempId: c.tempId,
+        servicioId: s.serviceId ?? '',
+        nombre: s.displayName,
+        profesionalId: c.employeeId ?? '',
+        precio: c.compensation ?? null,
+        esColaboracion: true,
+        colaboracionDe: s.tempId,
+      })
+    }
+  }
+
+  const productos: LineaProductoBorrador[] = draft.products.map((p) => ({
+    tempId: p.tempId,
+    categoria: p.displayName,
+    nombre: '',
+    cantidad: p.quantity,
+    precioUnitario: p.price ?? null,
+  }))
+
+  return { cliente, lineas, productos, notas: draft.notes }
 }
 
 // Navegación con teclado compartida por los dos buscadores (cliente y servicio).
@@ -127,7 +174,9 @@ export function EmpleadaAtender({
 
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [equipo, setEquipo] = useState<Profesional[]>([])
+  const [productosCatalogo, setProductosCatalogo] = useState<Producto[]>([])
   const [cargandoCatalogo, setCargandoCatalogo] = useState(true)
+  const [panelVozAbierto, setPanelVozAbierto] = useState(false)
   const [cargandoReserva, setCargandoReserva] = useState(!!reservaIdParam)
   const [citaOrigen, setCitaOrigen] = useState<{ inicio: string; servicioNombre?: string } | null>(null)
 
@@ -156,9 +205,10 @@ export function EmpleadaAtender({
   const enviandoRef = useRef(false)
 
   useEffect(() => {
-    Promise.all([listarServicios(), listarProfesionales()]).then(([s, p]) => {
+    Promise.all([listarServicios(), listarProfesionales(), listarProductos()]).then(([s, p, pr]) => {
       setServicios(s)
       setEquipo(p)
+      setProductosCatalogo(pr)
       setCargandoCatalogo(false)
     })
   }, [])
@@ -198,28 +248,47 @@ export function EmpleadaAtender({
   const subtotalProductos = productos.reduce((acc, p) => acc + p.cantidad * (p.precioUnitario ?? 0), 0)
   const total = subtotalServicios + subtotalProductos
 
-  // El asistente de voz opera sobre EXACTAMENTE el mismo estado y los mismos setters de este
-  // formulario (cliente/lineas/productos/notas) — nunca un borrador paralelo. Se llama siempre
-  // (nunca condicionado a `paso`), como exigen las reglas de hooks de React; el botón y el
-  // panel solo se muestran mientras `paso === 'registrar'`.
-  const asistenteVoz = useAsistenteRegistro({
-    cliente,
-    setCliente,
-    lineas,
-    setLineas,
-    productos,
-    setProductos,
-    notas,
-    setNotas,
-    servicios,
-    equipo,
-    crearServicio,
-    // Mismo permiso que ya exige fn_crear_servicio_rapido en el servidor (0038): admin o
-    // empleada. El servidor vuelve a validarlo — esto solo evita ofrecer una opción que el
-    // backend rechazaría igual.
-    puedeCrearServicio: perfil?.rol === 'admin' || perfil?.rol === 'empleada',
-    onListo: irACobrar,
-  })
+  // El asistente de voz resuelve contra EXACTAMENTE el mismo catálogo (servicios/equipo/
+  // productos) que ya usa este formulario, y solo entrega un AttentionDraft completo al
+  // confirmar — nunca escribe directo sobre cliente/lineas/productos/notas mientras interpreta.
+  // Ver onConfirmarDraft: eso es lo único que los vuelca sobre este mismo estado, después de lo
+  // cual el flujo es idéntico al manual (irACobrar → confirmarCobro → fn_registrar_atencion).
+  const puedeCrearEnCatalogo = perfil?.rol === 'admin' || perfil?.rol === 'empleada'
+  const vozDeps: VoiceExecutionDeps = useMemo(
+    () => ({
+      obtenerServicios: () => servicios,
+      obtenerEquipo: () => equipo,
+      obtenerProductos: () => productosCatalogo,
+      // Mismo permiso que ya exigen fn_crear_servicio_rapido (0038) y fn_crear_producto_rapido
+      // (0044) en el servidor — esto solo evita ofrecer una opción que el backend rechazaría igual.
+      puedeCrearServicio: puedeCrearEnCatalogo,
+      puedeCrearProducto: puedeCrearEnCatalogo,
+      crearServicioRapido: (nombre) => crearServicio(nombre),
+      crearProductoRapido: (nombre, categoria, precio) => crearProductoCatalogo(nombre, categoria, precio),
+      crearClienteRapido,
+    }),
+    [servicios, equipo, productosCatalogo, puedeCrearEnCatalogo],
+  )
+
+  function onConfirmarDraft(draft: AttentionDraft) {
+    const { cliente: clienteDraft, lineas: lineasDraft, productos: productosDraft, notas: notasDraft } = draftAFormulario(draft)
+    const lineasFinales = lineasDraft.length > 0 ? lineasDraft : [lineaVacia(profesional?.id ?? '')]
+    if (clienteDraft) setCliente(clienteDraft)
+    setLineas(lineasFinales)
+    setProductos(productosDraft)
+    if (notasDraft) setNotas(notasDraft)
+    setPanelVozAbierto(false)
+    setIntentoContinuar(true)
+    // Valida contra los valores del draft directamente (no contra `cliente`/`lineas`/
+    // `productos`): esos setState de arriba todavía no se habrán aplicado en este punto.
+    const nuevosErrores = erroresParaCobrar(clienteDraft, lineasFinales, productosDraft)
+    if (nuevosErrores.length > 0) {
+      setErrores(nuevosErrores)
+      return
+    }
+    setErrores([])
+    setPaso('cobrar')
+  }
 
   function actualizarLinea(tempId: string, cambios: Partial<LineaServicioBorrador>) {
     setLineas((prev) => prev.map((l) => (l.tempId === tempId ? { ...l, ...cambios } : l)))
@@ -240,6 +309,15 @@ export function EmpleadaAtender({
     return nuevo
   }
 
+  // Igual que crearServicio, pero para el catálogo de productos (migración 0044) que solo
+  // usa el asistente de voz para resolver entidades — el formulario manual sigue sin
+  // depender de él, ver draftAFormulario.
+  async function crearProductoCatalogo(nombre: string, categoria?: string | null, precio?: number | null) {
+    const nuevo = await crearProductoRapidoVoz(nombre, categoria, precio)
+    setProductosCatalogo((prev) => (prev.some((p) => p.id === nuevo.id) ? prev : [...prev, nuevo]))
+    return nuevo
+  }
+
   function actualizarProducto(tempId: string, cambios: Partial<LineaProductoBorrador>) {
     setProductos((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, ...cambios } : p)))
   }
@@ -247,19 +325,28 @@ export function EmpleadaAtender({
     setProductos((prev) => prev.filter((p) => p.tempId !== tempId))
   }
 
-  function irACobrar() {
-    setIntentoContinuar(true)
+  // Separado de irACobrar() para que onConfirmarDraft pueda validar los valores RECIÉN
+  // vertidos del draft de voz sin depender de que cliente/lineas/productos (el estado de
+  // React) ya se hayan actualizado — setState es asíncrono, así que leerlos justo después de
+  // llamar a sus setters vería los valores viejos, no los del draft que se acaba de confirmar.
+  function erroresParaCobrar(c: Cliente | null, ls: LineaServicioBorrador[], ps: LineaProductoBorrador[]): string[] {
     const nuevosErrores: string[] = []
-    if (!cliente) nuevosErrores.push('Selecciona un cliente para continuar.')
-    const completas = lineas.filter((l) => !lineaIncompleta(l))
+    if (!c) nuevosErrores.push('Selecciona un cliente para continuar.')
+    const completas = ls.filter((l) => !lineaIncompleta(l))
     if (completas.length === 0) {
       nuevosErrores.push('Añade al menos un servicio con profesional y precio.')
-    } else if (lineas.length > completas.length) {
+    } else if (ls.length > completas.length) {
       nuevosErrores.push('Hay un servicio sin terminar: elige servicio, profesional y precio, o quítalo con la ✕.')
     }
-    if (productos.some(productoIncompleto)) {
+    if (ps.some(productoIncompleto)) {
       nuevosErrores.push('Hay un producto sin categoría, nombre o precio: complétalo o quítalo.')
     }
+    return nuevosErrores
+  }
+
+  function irACobrar() {
+    setIntentoContinuar(true)
+    const nuevosErrores = erroresParaCobrar(cliente, lineas, productos)
     if (nuevosErrores.length > 0) {
       setErrores(nuevosErrores)
       return
@@ -430,8 +517,8 @@ export function EmpleadaAtender({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {!asistenteVoz.abierto && (
-            <Button type="button" variante="secondary" tamano="sm" onClick={asistenteVoz.abrir}>
+          {!panelVozAbierto && (
+            <Button type="button" variante="secondary" tamano="sm" onClick={() => setPanelVozAbierto(true)} disabled={cargandoCatalogo}>
               <span aria-hidden>🎙️</span> Registrar con voz
             </Button>
           )}
@@ -439,9 +526,9 @@ export function EmpleadaAtender({
         </div>
       </div>
 
-      {asistenteVoz.abierto && (
+      {panelVozAbierto && (
         <div className="mb-4">
-          <PanelAsistenteVoz asistente={asistenteVoz} />
+          <VoiceRegistrationPanel deps={vozDeps} onConfirmar={onConfirmarDraft} onCerrar={() => setPanelVozAbierto(false)} />
         </div>
       )}
 
