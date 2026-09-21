@@ -1,9 +1,11 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
-import { useState } from 'react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
 import { isDemoMode } from '../../lib/supabase'
 import { DemoBanner } from '../ui/Estados'
 import { Button } from '../ui/Button'
 import { useAuth } from '../../state/AuthContext'
+import { useDialogAccesible } from '../ui/Modal'
+import { IconoChevronDerecha, IconoMenu, IconoPerfil, IconoX } from '../ui/Icons'
 import type { Rol } from '../../lib/types'
 import logo from '../../assets/logo-claudia-patricia.png'
 
@@ -56,35 +58,21 @@ export function PublicLayout() {
             </Link>
           </div>
           <button
-            className="text-2xl md:hidden"
+            className="rounded-lg p-2 text-carbon md:hidden"
             aria-label="Abrir menú"
-            onClick={() => setMenuAbierto((v) => !v)}
+            onClick={() => setMenuAbierto(true)}
           >
-            ☰
+            <IconoMenu className="h-7 w-7" />
           </button>
         </div>
-        {menuAbierto && (
-          <nav className="flex flex-col gap-1 border-t border-piedra px-5 sm:px-[40px] py-3 md:hidden">
-            {enlaces.map((e) => (
-              <NavLink
-                key={e.to}
-                to={e.to}
-                end={e.to === '/'}
-                onClick={() => setMenuAbierto(false)}
-                className="rounded-lg px-2 py-2 text-sm font-medium text-carbon/80 hover:bg-piedra/40"
-              >
-                {e.label}
-              </NavLink>
-            ))}
-            <Link to={rutaCuenta} onClick={() => setMenuAbierto(false)} className="rounded-lg px-2 py-2 text-sm font-medium text-carbon/80 hover:bg-piedra/40">
-              {etiquetaCuenta}
-            </Link>
-            <Link to="/reservar" onClick={() => setMenuAbierto(false)} className="mt-1">
-              <Button className="w-full !rounded-lg">Agendar cita</Button>
-            </Link>
-          </nav>
-        )}
       </header>
+
+      <MenuMovil
+        abierto={menuAbierto}
+        onCerrar={() => setMenuAbierto(false)}
+        rutaCuenta={rutaCuenta}
+        etiquetaCuenta={etiquetaCuenta}
+      />
 
       <main>
         <Outlet />
@@ -124,6 +112,85 @@ export function PublicLayout() {
             </span>
           </Link>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Antes era una lista angosta que se desplegaba debajo del header, con "Ingresar" (la puerta al
+// portal de empleadas — y de clientas/admin, todos comparten el mismo login) mezclado ahí sin
+// distinguirse del resto. En un celular eso lo hacía fácil de pasar por alto. Este panel le da
+// su propio bloque grande y con jerarquía propia, separado de la navegación, como en
+// PortalLayout.tsx → MenuMovilOverlay.
+function MenuMovil({
+  abierto,
+  onCerrar,
+  rutaCuenta,
+  etiquetaCuenta,
+}: {
+  abierto: boolean
+  onCerrar: () => void
+  rutaCuenta: string
+  etiquetaCuenta: string
+}) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  useDialogAccesible(abierto, onCerrar, panelRef)
+  const location = useLocation()
+  useEffect(() => { if (abierto) onCerrar() }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!abierto) return null
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end md:hidden" onClick={onCerrar}>
+      <div className="absolute inset-0 bg-carbon/40" />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menú"
+        onClick={(e) => e.stopPropagation()}
+        className="relative flex h-full w-full max-w-xs flex-col gap-6 overflow-y-auto bg-blanco p-5 shadow-xl"
+      >
+        <div className="flex items-center justify-between">
+          <img src={logo} alt="Claudia Patricia" className="h-10 w-auto" />
+          <button onClick={onCerrar} aria-label="Cerrar menú" className="rounded-lg p-1.5 text-carbon/60 hover:bg-piedra/40 hover:text-carbon">
+            <IconoX className="h-6 w-6" />
+          </button>
+        </div>
+
+        <Link
+          to={rutaCuenta}
+          onClick={onCerrar}
+          className="flex items-center gap-3 rounded-2xl border-2 border-oliva bg-oliva/5 px-4 py-4"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-oliva text-blanco">
+            <IconoPerfil className="h-5 w-5" />
+          </span>
+          <span className="flex-1">
+            <span className="block text-base font-semibold text-carbon">{etiquetaCuenta}</span>
+            <span className="block text-xs text-carbon/60">Empleadas, clientas y administración entran por aquí</span>
+          </span>
+          <IconoChevronDerecha className="h-5 w-5 shrink-0 text-oliva" />
+        </Link>
+
+        <nav className="flex flex-col gap-1">
+          {enlaces.map((e) => (
+            <NavLink
+              key={e.to}
+              to={e.to}
+              end={e.to === '/'}
+              onClick={onCerrar}
+              className={({ isActive }) =>
+                `rounded-lg px-3 py-3 text-base font-medium ${isActive ? 'bg-piedra text-oliva' : 'text-carbon/80 hover:bg-piedra/40'}`
+              }
+            >
+              {e.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <Link to="/reservar" onClick={onCerrar} className="mt-auto">
+          <Button className="w-full !rounded-lg" tamano="lg">Agendar cita</Button>
+        </Link>
       </div>
     </div>
   )
