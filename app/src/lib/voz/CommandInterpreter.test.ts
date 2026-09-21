@@ -128,6 +128,21 @@ describe('CommandInterpreter — quitar y control', () => {
   })
 })
 
+describe('CommandInterpreter — crear clienta nueva', () => {
+  it('BUG: "Crea a Verónica, teléfono 3001234567" separaba mal el nombre del teléfono', () => {
+    const r = u('Crea a Verónica, teléfono 3001234567')
+    expect(r.intent).toBe('CREATE_CLIENT')
+    expect(r.client?.createName).toBe('Verónica')
+    expect(r.client?.createPhone).toBe('3001234567')
+  })
+
+  it('"Crea a Verónica" sin teléfono', () => {
+    const r = u('Crea a Verónica')
+    expect(r.client?.createName).toBe('Verónica')
+    expect(r.client?.createPhone).toBeUndefined()
+  })
+})
+
 describe('CommandInterpreter — contexto entre turnos y slot filling (sección 42)', () => {
   it('BUG: "con NOMBRE de MONTO" (profesional ANTES del precio) no debe tragarse el resto de la frase', () => {
     const r = u('Se hizo un blower con Claudia Patricia de 45 mil y agregó un champú de 85 mil')
