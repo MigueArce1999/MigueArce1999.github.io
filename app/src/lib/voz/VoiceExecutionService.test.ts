@@ -338,4 +338,20 @@ describe('VoiceExecutionService — contexto entre turnos y slot filling (secci�
     expect(r.draft.client.resolved?.nombre).toBe('Xiomara')
     expect(r.draft.client.resolved?.isNew).toBe(true)
   })
+
+  it('BUG: si el reconocimiento de voz parte "Crea a X, teléfono N" en dos frases, la segunda (solo el teléfono) se engancha igual', async () => {
+    const deps = depsDemo()
+    let r = await procesarUtterance('Crea a Xiomara', siguienteId(), sesion, deps)
+    expect(r.clarification?.question).toContain('sin teléfono')
+    expect(r.draft.client.pendingPhone).toBeUndefined()
+
+    // Segunda frase, llegada aparte por una pausa al hablar: antes se perdía en silencio.
+    r = await procesarUtterance('teléfono 3009998888', siguienteId(), sesion, deps)
+    expect(r.draft.client.pendingPhone).toBe('3009998888')
+    expect(r.clarification?.question).toContain('3009998888')
+
+    r = await procesarUtterance('Sí', siguienteId(), sesion, deps)
+    expect(deps.crearClienteRapido).toHaveBeenCalledWith({ nombre: 'Xiomara', telefono: '3009998888' })
+    expect(r.draft.client.resolved?.nombre).toBe('Xiomara')
+  })
 })
