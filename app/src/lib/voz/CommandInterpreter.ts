@@ -395,8 +395,13 @@ export function interpretarUtterance(rawText: string, utteranceId: string): Pars
         break
 
       case 'CLIENTE_CREAR': {
-        const nombre = limpiarNombrePropio(datosTexto)
-        cliente = { createName: nombre || undefined }
+        // El propio tramo puede traer "teléfono NNN" pegado al nombre en la MISMA cláusula
+        // ("Crea a Verónica, teléfono 3001234567") — nunca dispara una segunda ancla CLIENTE
+        // aparte, así que el teléfono se separa aquí mismo (mismo patrón que CLIENTE más abajo).
+        const matchTelefono = datosTexto.match(/tel[ée]fono\s+([\d\s]+)/i)
+        const nombre = limpiarNombrePropio((matchTelefono ? datosTexto.slice(0, matchTelefono.index) : datosTexto).trim().replace(/[,.]+$/, '').trim())
+        const telefono = matchTelefono ? matchTelefono[1].replace(/\s+/g, '') : undefined
+        cliente = { createName: nombre || undefined, createPhone: telefono }
         if (intentPrincipal === 'UNKNOWN') intentPrincipal = 'CREATE_CLIENT'
         break
       }
@@ -409,7 +414,7 @@ export function interpretarUtterance(rawText: string, utteranceId: string): Pars
         let telefono: string | undefined
         if (matchTelefono) {
           telefono = matchTelefono[1].replace(/\s+/g, '')
-          nombre = datosTexto.slice(0, matchTelefono.index).trim()
+          nombre = datosTexto.slice(0, matchTelefono.index).trim().replace(/[,.]+$/, '').trim()
         } else if (pareceTelefono(datosTexto)) {
           telefono = datosTexto.replace(/\D/g, '')
           nombre = ''

@@ -324,4 +324,18 @@ describe('VoiceExecutionService — contexto entre turnos y slot filling (secci�
     const r = await procesarUtterance('Se hizo un blower de 45 mil con Claudia y Patricia', siguienteId(), sesion, depsDemo())
     expect(r.draft.services[0].professionalName).toBe('Claudia Patricia')
   })
+
+  it('crear una clienta nueva con nombre y teléfono en una sola frase, pidiendo confirmación', async () => {
+    const deps = depsDemo()
+    let r = await procesarUtterance('Crea a Xiomara, teléfono 3009998888', siguienteId(), sesion, deps)
+    expect(r.clarification?.field).toBe('create_client_confirm')
+    expect(r.draft.client.pendingName).toBe('Xiomara')
+    expect(r.draft.client.pendingPhone).toBe('3009998888')
+
+    r = await procesarUtterance('Sí', siguienteId(), sesion, deps)
+    expect(deps.crearClienteRapido).toHaveBeenCalledWith({ nombre: 'Xiomara', telefono: '3009998888' })
+    expect(r.draft.client.status).toBe('resolved')
+    expect(r.draft.client.resolved?.nombre).toBe('Xiomara')
+    expect(r.draft.client.resolved?.isNew).toBe(true)
+  })
 })
