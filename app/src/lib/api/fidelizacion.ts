@@ -69,8 +69,15 @@ export async function listarMovimientosPuntosPagina(
   return { movimientos: data, total: count ?? data.length }
 }
 
+// Solo en modo demo: recuerda qué notificaciones demo ya se "reconocieron" durante esta sesión
+// del navegador. marcarNotificacionVista no puede persistir de verdad (no hay servidor), pero sin
+// este mínimo estado en memoria una celebración demo reaparecería en cada pantalla que vuelva a
+// pedir notificaciones (cada página llama a useMiFidelizacion por su cuenta) — justo lo que la
+// sección 3 del pedido pide evitar ("no reproducirla cada vez que visita el perfil").
+const demoNotificacionesReconocidas = new Set<string>()
+
 export async function listarNotificacionesNoVistas(clienteId: string): Promise<NotificacionFidelizacion[]> {
-  if (isDemoMode) return demoNotificacionesFidelizacion
+  if (isDemoMode) return demoNotificacionesFidelizacion.filter((n) => !demoNotificacionesReconocidas.has(n.id))
   const { data, error } = await supabase!
     .from('notificacion_fidelizacion')
     .select('*')
@@ -82,7 +89,7 @@ export async function listarNotificacionesNoVistas(clienteId: string): Promise<N
 }
 
 export async function marcarNotificacionVista(notificacionId: string): Promise<void> {
-  if (isDemoMode) return
+  if (isDemoMode) { demoNotificacionesReconocidas.add(notificacionId); return }
   const client = supabaseRequerido()
   const { error } = await client.rpc('fn_marcar_notificacion_vista', { p_notificacion_id: notificacionId })
   if (error) throw error

@@ -5,7 +5,9 @@ import { Card, Cargando, EmptyState } from '../../components/ui/Estados'
 import { EstadoReservaBadge } from '../../components/ui/StatusBadge'
 import { TarjetaFidelizacion } from '../../components/fidelizacion/TarjetaFidelizacion'
 import { CelebracionFidelizacion } from '../../components/fidelizacion/CelebracionFidelizacion'
+import { CanjeCelebracion } from '../../components/fidelizacion/CanjeCelebracion'
 import { useMiFidelizacion } from '../../lib/fidelizacion/useMiFidelizacion'
+import { useCelebracionCanje } from '../../lib/fidelizacion/useCelebracionCanje'
 import { useAuth } from '../../state/AuthContext'
 import { marcarMiResenaGoogle } from '../../lib/api/cliente'
 import { listarPromocionesVigentes } from '../../lib/api/catalogo'
@@ -20,6 +22,7 @@ export function ClienteInicio() {
   const [promos, setPromos] = useState<Promocion[] | null>(null)
   const { fidelizacion, cargando: cargandoFidelizacion, error: errorFidelizacion, celebraciones, recargar, reconocerCelebracion } =
     useMiFidelizacion(cliente?.id)
+  const { celebracionActiva } = useCelebracionCanje(celebraciones, fidelizacion, reconocerCelebracion)
   // Estado local para poder ocultar la tarjeta apenas la clienta confirma, sin depender de que
   // AuthContext vuelva a leer su fila de `cliente` (solo lo hace al iniciar sesión).
   const [resenaConfirmada, setResenaConfirmada] = useState(cliente?.resena_google_confirmada ?? false)
@@ -56,8 +59,10 @@ export function ClienteInicio() {
         <p className="text-sm text-carbon/60">Aquí tienes un resumen de tu cuenta.</p>
       </div>
 
-      {celebraciones.length > 0 && (
-        <CelebracionFidelizacion celebraciones={celebraciones} onReconocer={reconocerCelebracion} />
+      {/* La celebración de canje (recompensa canjeada) es un evento aparte y se muestra en su
+          propia superposición animada más abajo — se excluye aquí para no duplicar el aviso. */}
+      {celebraciones.filter((c) => c.tipo !== 'canje_confirmado').length > 0 && (
+        <CelebracionFidelizacion celebraciones={celebraciones.filter((c) => c.tipo !== 'canje_confirmado')} onReconocer={reconocerCelebracion} />
       )}
 
       <TarjetaFidelizacion
@@ -67,6 +72,14 @@ export function ClienteInicio() {
         error={errorFidelizacion}
         onReintentar={recargar}
       />
+
+      {celebracionActiva && (
+        <CanjeCelebracion
+          datos={celebracionActiva.datos}
+          fidelizacion={fidelizacion}
+          onCerrar={() => reconocerCelebracion(celebracionActiva.id)}
+        />
+      )}
 
       <Card>
         <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">Próxima cita</p>

@@ -3,15 +3,18 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { Card, Cargando, EmptyState, ErrorState } from '../../components/ui/Estados'
 import { TarjetaFidelizacion } from '../../components/fidelizacion/TarjetaFidelizacion'
+import { CanjeCelebracion } from '../../components/fidelizacion/CanjeCelebracion'
 import { useAuth } from '../../state/AuthContext'
 import { useMiFidelizacion } from '../../lib/fidelizacion/useMiFidelizacion'
+import { useCelebracionCanje } from '../../lib/fidelizacion/useCelebracionCanje'
 import {
   elegirMetaRecompensa,
+  listarMisCanjes,
   listarMovimientosPuntosPagina,
   listarRecompensasActivas,
 } from '../../lib/api/fidelizacion'
 import { formatoEnteroCOP, formatoFecha } from '../../lib/format'
-import type { MovimientoPuntos, Recompensa } from '../../lib/types'
+import type { CanjeRecompensa, MovimientoPuntos, Recompensa } from '../../lib/types'
 
 const etiquetasMovimiento: Record<string, string> = {
   abono: 'Ganaste puntos',
@@ -23,11 +26,21 @@ const etiquetasMovimiento: Record<string, string> = {
 
 export function ClientePuntos() {
   const { cliente, perfil } = useAuth()
-  const { fidelizacion, cargando: cargandoFidelizacion, error: errorFidelizacion, recargar } = useMiFidelizacion(cliente?.id)
+  const { fidelizacion, cargando: cargandoFidelizacion, error: errorFidelizacion, celebraciones, recargar, reconocerCelebracion } =
+    useMiFidelizacion(cliente?.id)
+  const { celebracionActiva } = useCelebracionCanje(celebraciones, fidelizacion, reconocerCelebracion)
   const [recompensas, setRecompensas] = useState<Recompensa[] | null>(null)
   const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null)
   const [detalle, setDetalle] = useState<Recompensa | null>(null)
   const [guardandoMeta, setGuardandoMeta] = useState<string | null>(null)
+  const [ultimoCanje, setUltimoCanje] = useState<CanjeRecompensa | null | undefined>(undefined)
+
+  useEffect(() => {
+    if (!cliente) return
+    listarMisCanjes(cliente.id)
+      .then((canjes) => setUltimoCanje(canjes.find((c) => c.estado === 'confirmado') ?? null))
+      .catch(() => setUltimoCanje(null))
+  }, [cliente])
 
   function cargarCatalogo() {
     setErrorCatalogo(null)
@@ -63,7 +76,17 @@ export function ClientePuntos() {
         onReintentar={recargar}
       />
 
-      <div>
+      {ultimoCanje && <TarjetaUltimoCanje canje={ultimoCanje} saldoActual={fidelizacion?.saldo ?? null} />}
+
+      {celebracionActiva && (
+        <CanjeCelebracion
+          datos={celebracionActiva.datos}
+          fidelizacion={fidelizacion}
+          onCerrar={() => reconocerCelebracion(celebracionActiva.id)}
+        />
+      )}
+
+      <div id="catalogo">
         <p className="mb-3 font-semibold text-carbon">Catálogo de recompensas</p>
         {!fidelizacion?.canjes_activo && fidelizacion && (
           <p className="mb-3 rounded-lg bg-champan/15 px-3 py-2 text-sm text-carbon/70">
@@ -101,6 +124,55 @@ export function ClientePuntos() {
 
       <DetalleRecompensaModal recompensa={detalle} onCerrar={() => setDetalle(null)} />
     </div>
+  )
+}
+
+// Resumen persistente del último canje (sección 8 del pedido de mejora visual): queda
+// disponible SIEMPRE, sin depender de la animación ni de si ya se reconoció la notificación —
+// lee directo de canje_recompensa, la fuente de verdad que el servidor congeló en ese instante.
+function TarjetaUltimoCanje({ canje, saldoActual }: { canje: CanjeRecompensa; saldoActual: number | null }) {
+  const saldoDistinto = canje.saldo_posterior != null && saldoActual != null && canje.saldo_posterior !== saldoActual
+  return (
+    <Card className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">Recompensa canjeada</p>
+        {canje.entregado && (
+          <span className="rounded-full bg-exito/15 px-2 py-0.5 text-xs font-semibold text-exito">Entregada</span>
+        )}
+      </div>
+      <p className="font-semibold text-carbon">{canje.condiciones_snapshot.nombre}</p>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-carbon/70 sm:grid-cols-4">
+        {canje.saldo_anterior != null && (
+          <div>
+            <p className="text-xs text-carbon/50">Saldo anterior</p>
+            <p className="font-medium text-carbon">{formatoEnteroCOP(canje.saldo_anterior)}</p>
+          </div>
+        )}
+        <div>
+          <p className="text-xs text-carbon/50">Puntos utilizados</p>
+          <p className="font-medium text-error">−{formatoEnteroCOP(canje.costo_puntos_snapshot)}</p>
+        </div>
+        {canje.saldo_posterior != null && (
+          <div>
+            <p className="text-xs text-carbon/50">Saldo al finalizar</p>
+            <p className="font-medium text-carbon">{formatoEnteroCOP(canje.saldo_posterior)}</p>
+          </div>
+        )}
+        <div>
+          <p className="text-xs text-carbon/50">Fecha</p>
+          <p className="font-medium text-carbon">{formatoFecha(canje.creado_en)}</p>
+        </div>
+      </div>
+      {saldoDistinto && (
+        <p className="text-xs text-carbon/50">
+          Tu saldo disponible ahora es {formatoEnteroCOP(saldoActual!)} puntos — cambió por movimientos posteriores a este canje.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2 pt-1">
+        <a href="#catalogo"><Button tamano="sm" variante="secondary">Ver recompensas</Button></a>
+        <a href="#historial"><Button tamano="sm" variante="ghost">Ver movimiento</Button></a>
+      </div>
+    </Card>
   )
 }
 

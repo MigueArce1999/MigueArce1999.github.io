@@ -492,14 +492,23 @@ export function EmpleadaAtender({
           <p className="text-sm text-carbon/60">El historial del cliente, tus ventas y tu comisión ya se actualizaron.</p>
           {huboMovimientoFidelizacion && resultadoCobro && (
             <div className="w-full rounded-xl bg-oliva/10 p-3 text-left text-sm">
-              <p className="mb-1 font-semibold text-carbon">🌸 Fidelización</p>
-              {resultadoCobro.recompensa_aplicada && (
-                <p className="text-carbon/80">Canjeó <span className="font-medium">{resultadoCobro.recompensa_aplicada.nombre}</span> por {formatoEnteroCOP(resultadoCobro.puntos_utilizados)} puntos.</p>
+              {resultadoCobro.recompensa_aplicada ? (
+                <>
+                  <p className="mb-1 font-semibold text-carbon">🌸 Recompensa aplicada</p>
+                  <p className="text-carbon/80">{resultadoCobro.recompensa_aplicada.nombre}</p>
+                  <p className="mt-1 text-carbon/80">
+                    {formatoEnteroCOP(resultadoCobro.puntos_utilizados)} puntos utilizados
+                    {resultadoCobro.puntos_ganados > 0 && ` · ${formatoEnteroCOP(resultadoCobro.puntos_ganados)} puntos ganados`}
+                    {' · '}{formatoEnteroCOP(resultadoCobro.saldo_nuevo)} puntos restantes
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mb-1 font-semibold text-carbon">🌸 Fidelización</p>
+                  <p className="text-carbon/80">Ganó {formatoEnteroCOP(resultadoCobro.puntos_ganados)} puntos.</p>
+                  <p className="mt-1 font-semibold text-oliva">Saldo actual: {formatoEnteroCOP(resultadoCobro.saldo_nuevo)} puntos</p>
+                </>
               )}
-              {resultadoCobro.puntos_ganados > 0 && (
-                <p className="text-carbon/80">Ganó {formatoEnteroCOP(resultadoCobro.puntos_ganados)} puntos.</p>
-              )}
-              <p className="mt-1 font-semibold text-oliva">Saldo actual: {formatoEnteroCOP(resultadoCobro.saldo_nuevo)} puntos</p>
             </div>
           )}
           <Button onClick={() => navigate(rutaFinalizar)}>{etiquetaFinalizar}</Button>

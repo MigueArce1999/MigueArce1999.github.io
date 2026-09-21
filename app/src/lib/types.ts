@@ -500,6 +500,11 @@ export interface CanjeRecompensa {
   empleada_id: string | null
   creado_en: string
   revertido_en: string | null
+  // Saldo justo antes y después del cobro completo que incluyó este canje (canje + cualquier
+  // abono de la misma atención) — un snapshot inmutable, nunca recalculado (ver
+  // 0048_celebracion_canje.sql). null en canjes anteriores a esa migración.
+  saldo_anterior: number | null
+  saldo_posterior: number | null
 }
 
 // Snapshot devuelto por fn_mi_fidelizacion: todo lo que necesita la tarjeta de la clienta en una
@@ -514,16 +519,32 @@ export interface MiFidelizacion {
   puntos_faltantes: number | null
 }
 
+// Todo lo que necesita la celebración de canje (0048_celebracion_canje.sql) en una sola lectura,
+// congelado en el momento del canje — nunca se recalcula (saldo_posterior puede ya no coincidir
+// con el saldo actual si hubo movimientos después, y eso es intencional: describe ese instante).
+export interface CanjeConfirmadoDatos {
+  canje_id: string
+  recompensa_nombre: string
+  recompensa_imagen_url: string | null
+  recompensa_tipo: TipoRecompensa
+  costo_puntos: number
+  saldo_anterior: number
+  saldo_posterior: number
+  puntos_ganados_en_esta_atencion: number
+}
+
 export interface NotificacionFidelizacion {
   id: string
   cliente_id: string
-  tipo: 'puntos_ganados' | 'meta_alcanzada'
+  tipo: 'puntos_ganados' | 'meta_alcanzada' | 'canje_confirmado'
   titulo: string
   mensaje: string
   origen_tipo: string
   origen_id: string
   leida_en: string | null
   creado_en: string
+  // Solo poblado cuando tipo = 'canje_confirmado'.
+  datos?: CanjeConfirmadoDatos | null
 }
 
 // Valor definitivo que devuelve fn_completar_y_cobrar_atencion — nunca una estimación: es lo
