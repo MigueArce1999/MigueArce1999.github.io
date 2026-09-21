@@ -75,10 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: perfilRow } = await supabase!.from('perfil').select('*').eq('id', usuarioId).maybeSingle()
       if (!activo) return
       setPerfil(perfilRow)
-      if (perfilRow?.rol === 'cliente') {
-        const c = await obtenerClientePorUsuario(usuarioId)
-        if (activo) setCliente(c)
-      } else if (perfilRow?.rol === 'empleada' || perfilRow?.rol === 'admin') {
+      // Toda cuenta nace con su propia fila `cliente` (ver 0002_identidad.sql → fn_manejar_
+      // usuario_nuevo) y esa fila NUNCA se borra al ascender a empleada/admin — así que se busca
+      // siempre, sin importar el rol actual, para que quien además es clienta pueda entrar
+      // también a su portal de clienta (ver RutaProtegida) sin perder su rol principal.
+      const c = await obtenerClientePorUsuario(usuarioId)
+      if (activo) setCliente(c)
+      if (perfilRow?.rol === 'empleada' || perfilRow?.rol === 'admin') {
         // Un admin que ADEMÁS tiene fila en `profesional` (p. ej. quien administra el salón y
         // también atiende) puede entrar al portal de empleadas sin cambiar de rol — ver
         // RutaProtegida. Para un admin sin esa fila, esto simplemente devuelve null.

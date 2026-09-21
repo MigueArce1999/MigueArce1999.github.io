@@ -40,19 +40,27 @@ function usarSidebarColapsado() {
 }
 
 export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: string }) {
-  const { perfil, profesional, cerrarSesionLocal } = useAuth()
+  const { perfil, cliente, profesional, cerrarSesionLocal } = useAuth()
   const { colapsado, alternar } = usarSidebarColapsado()
   const location = useLocation()
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false)
 
-  // Solo aplica a un admin que ADEMÁS tiene perfil de profesional (ver RutaProtegida): le
-  // ofrece saltar al otro portal sin cerrar sesión ni tocar su rol en la base de datos.
-  const enlaceOtroPortal =
-    perfil?.rol === 'admin' && profesional
-      ? location.pathname.startsWith('/equipo-app')
+  // Puede haber más de un portal alcanzable sin cerrar sesión ni cambiar de rol: un admin que
+  // ADEMÁS tiene perfil de profesional (ver RutaProtegida), y cualquier cuenta que además tiene
+  // su propia fila `cliente` (toda cuenta nace con una — ver 0002_identidad.sql). Ninguno de los
+  // dos abre una capacidad nueva en el backend, solo destraba en el frontend una navegación que
+  // las políticas RLS ya permitían.
+  const enlacesOtrosPortales: { to: string; texto: string }[] = []
+  if (perfil?.rol === 'admin' && profesional) {
+    enlacesOtrosPortales.push(
+      location.pathname.startsWith('/equipo-app')
         ? { to: '/admin', texto: 'Ir a Administración' }
-        : { to: '/equipo-app', texto: 'Ir a portal de empleadas' }
-      : null
+        : { to: '/equipo-app', texto: 'Ir a portal de empleadas' },
+    )
+  }
+  if (cliente && !location.pathname.startsWith('/cliente')) {
+    enlacesOtrosPortales.push({ to: '/cliente', texto: 'Ir a mi portal de clienta' })
+  }
 
   async function salir() {
     await cerrarSesion()
@@ -95,15 +103,16 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
           </nav>
 
           <div className="mt-auto flex flex-col gap-1 border-t border-piedra pt-3">
-            {enlaceOtroPortal && (
+            {enlacesOtrosPortales.map((enlace) => (
               <Link
-                to={enlaceOtroPortal.to}
-                title={enlaceOtroPortal.texto}
+                key={enlace.to}
+                to={enlace.to}
+                title={enlace.texto}
                 className={`rounded-lg py-2 text-sm font-medium text-oliva hover:bg-piedra/40 ${colapsado ? 'px-2 text-center' : 'px-3'}`}
               >
-                {colapsado ? '⇄' : enlaceOtroPortal.texto}
+                {colapsado ? '⇄' : enlace.texto}
               </Link>
-            )}
+            ))}
             <button
               onClick={alternar}
               aria-label={colapsado ? 'Expandir menú' : 'Contraer menú'}
@@ -188,7 +197,7 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
         items={items}
         titulo={titulo}
         onSalir={salir}
-        enlaceOtroPortal={enlaceOtroPortal}
+        enlacesOtrosPortales={enlacesOtrosPortales}
       />
     </div>
   )
@@ -200,14 +209,14 @@ function MenuMovilOverlay({
   items,
   titulo,
   onSalir,
-  enlaceOtroPortal,
+  enlacesOtrosPortales,
 }: {
   abierto: boolean
   onCerrar: () => void
   items: ItemNav[]
   titulo: string
   onSalir: () => void
-  enlaceOtroPortal: { to: string; texto: string } | null
+  enlacesOtrosPortales: { to: string; texto: string }[]
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
   useDialogAccesible(abierto, onCerrar, panelRef)
@@ -250,12 +259,12 @@ function MenuMovilOverlay({
             </NavLink>
           ))}
         </nav>
-        {enlaceOtroPortal && (
-          <Link to={enlaceOtroPortal.to} className="mt-auto rounded-lg px-3 py-2.5 text-sm font-medium text-oliva hover:bg-piedra/40">
-            {enlaceOtroPortal.texto}
+        {enlacesOtrosPortales.map((enlace) => (
+          <Link key={enlace.to} to={enlace.to} className="mt-auto rounded-lg px-3 py-2.5 text-sm font-medium text-oliva hover:bg-piedra/40">
+            {enlace.texto}
           </Link>
-        )}
-        <button onClick={onSalir} className={`rounded-lg px-3 py-2.5 text-left text-sm font-medium text-carbon/70 hover:bg-piedra/40 ${enlaceOtroPortal ? '' : 'mt-auto'}`}>
+        ))}
+        <button onClick={onSalir} className={`rounded-lg px-3 py-2.5 text-left text-sm font-medium text-carbon/70 hover:bg-piedra/40 ${enlacesOtrosPortales.length ? '' : 'mt-auto'}`}>
           Cerrar sesión
         </button>
       </div>
