@@ -94,3 +94,30 @@ h3,
     animation: none;
   }
 }
+
+/* Celebración de canje (CanjeCelebracion.tsx). El contador usa numeros tabulares para que el
+   ancho no salte mientras cuenta (sección 4 del pedido de mejora visual); la etiqueta de puntos
+   usados entra con un desplazamiento corto y un desvanecimiento suave, nunca temblor ni rojo de
+   error. Ambas se desactivan con prefers-reduced-motion: reduce (el componente además salta
+   directo al resultado final sin animar en absoluto). */
+.cc-contador {
+  font-variant-numeric: tabular-nums;
+}
+.cc-etiqueta {
+  animation: cc-etiqueta-entra 0.5s ease-out;
+}
+@keyframes cc-etiqueta-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-etiqueta {
+    animation: none;
+  }
+}

@@ -367,9 +367,56 @@ export const demoMiFidelizacion: MiFidelizacion = {
   puntos_faltantes: Math.max(demoMetaFidelizacion.costo_puntos - demoSaldoFidelizacion, 0),
 }
 
-export const demoNotificacionesFidelizacion: NotificacionFidelizacion[] = []
+// Un canje reciente sin ver, para poder previsualizar la celebración en desarrollo (modo demo)
+// sin tocar puntos de clientas reales — saldo_posterior coincide con demoSaldoFidelizacion a
+// propósito, para que se anime en vivo (ver esEventoReciente en lib/fidelizacion/celebracionCanje.ts).
+export const demoNotificacionesFidelizacion: NotificacionFidelizacion[] = [
+  {
+    id: 'demo-notificacion-canje-1',
+    cliente_id: demoClienteActual.id,
+    tipo: 'canje_confirmado',
+    titulo: '¡Disfruta tu recompensa!',
+    mensaje: `Usaste ${demoRecompensas[0].costo_puntos} puntos en "${demoRecompensas[0].nombre}".`,
+    origen_tipo: 'canje',
+    origen_id: 'demo-canje-1',
+    leida_en: null,
+    creado_en: enHoras(-1),
+    datos: {
+      canje_id: 'demo-canje-1',
+      recompensa_nombre: demoRecompensas[0].nombre,
+      recompensa_imagen_url: demoRecompensas[0].imagen_url,
+      recompensa_tipo: demoRecompensas[0].tipo,
+      costo_puntos: demoRecompensas[0].costo_puntos,
+      saldo_anterior: demoSaldoFidelizacion + demoRecompensas[0].costo_puntos,
+      saldo_posterior: demoSaldoFidelizacion,
+      puntos_ganados_en_esta_atencion: 0,
+    },
+  },
+]
 
-export const demoCanjesCliente: CanjeRecompensa[] = []
+export const demoCanjesCliente: CanjeRecompensa[] = [
+  {
+    id: 'demo-canje-1',
+    cliente_id: demoClienteActual.id,
+    recompensa_id: demoRecompensas[0].id,
+    atencion_id: null,
+    costo_puntos_snapshot: demoRecompensas[0].costo_puntos,
+    condiciones_snapshot: {
+      nombre: demoRecompensas[0].nombre,
+      tipo: demoRecompensas[0].tipo,
+      condiciones: demoRecompensas[0].condiciones,
+      servicio_id: demoRecompensas[0].servicio_id,
+      monto_descuento: demoRecompensas[0].monto_descuento,
+    },
+    estado: 'confirmado',
+    entregado: false,
+    empleada_id: null,
+    creado_en: enHoras(-1),
+    revertido_en: null,
+    saldo_anterior: demoSaldoFidelizacion + demoRecompensas[0].costo_puntos,
+    saldo_posterior: demoSaldoFidelizacion,
+  },
+]
 
 // --- Portal de empleadas (demo: sesión como Naldi) ---
 
