@@ -128,3 +128,50 @@ describe('CommandInterpreter — quitar y control', () => {
   })
 })
 
+describe('CommandInterpreter — contexto entre turnos y slot filling (sección 42)', () => {
+  it('BUG: "con NOMBRE de MONTO" (profesional ANTES del precio) no debe tragarse el resto de la frase', () => {
+    const r = u('Se hizo un blower con Claudia Patricia de 45 mil y agregó un champú de 85 mil')
+    expect(r.services[0]).toMatchObject({ query: 'blower', price: 45000 })
+    expect(r.services[0].professional?.query).toBe('Claudia Patricia')
+    expect(r.products[0]).toMatchObject({ query: 'champú', price: 85000 })
+  })
+
+  it('"también Ana ayudó" — "también" nunca se cuela en el nombre de la colaboradora', () => {
+    const r = u('también Ana ayudó y ganó 10 mil')
+    expect(r.services[0].collaborators[0]).toMatchObject({ query: 'Ana', compensation: 10000 })
+  })
+
+  it('"también ella se hizo un blower" — relleno puro, no se inventa un nombre de clienta', () => {
+    const r = u('también ella se hizo un blower de 45 mil')
+    expect(r.client).toBeUndefined()
+    expect(r.services[0]).toMatchObject({ query: 'blower', price: 45000 })
+  })
+
+  it('slot filling: "un servicio" genérico se marca queryUnknown, sin inventar un nombre', () => {
+    const r = u('Laura se hizo un servicio con Claudia Patricia de 45 mil y agregó un producto de 85 mil')
+    expect(r.client?.query).toBe('Laura')
+    expect(r.services[0].query).toBeUndefined()
+    expect(r.services[0].queryUnknown).toBe(true)
+    expect(r.services[0].price).toBe(45000)
+    expect(r.services[0].professional?.query).toBe('Claudia Patricia')
+    expect(r.products[0].query).toBeUndefined()
+    expect(r.products[0].queryUnknown).toBe(true)
+    expect(r.products[0].price).toBe(85000)
+  })
+
+  it('nombre compuesto mal transcrito: "con Claudia y Patricia" ofrece "Claudia Patricia" como lectura principal y "Claudia" como alternativa', () => {
+    const r = u('Se hizo un blower de 45 mil con Claudia y Patricia')
+    expect(r.services[0].professional?.query).toBe('Claudia Patricia')
+    expect(r.services[0].professional?.queryAlternativo).toBe('Claudia')
+  })
+
+  it('TEST 4 del pedido: servicio + colaboradora + producto en una sola frase, con "también" de relleno', () => {
+    const r = u('Se hizo un blower de 45 mil con Claudia Patricia, también Ana ayudó y ganó 10 mil, y agrega un champú de 85 mil')
+    expect(r.services).toHaveLength(1)
+    expect(r.services[0]).toMatchObject({ query: 'blower', price: 45000 })
+    expect(r.services[0].professional?.query).toBe('Claudia Patricia')
+    expect(r.services[0].collaborators[0]).toMatchObject({ query: 'Ana', compensation: 10000 })
+    expect(r.products[0]).toMatchObject({ query: 'champú', price: 85000 })
+  })
+})
+

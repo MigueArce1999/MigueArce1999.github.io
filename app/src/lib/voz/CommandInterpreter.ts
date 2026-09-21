@@ -47,7 +47,9 @@ function tokenizar(texto: string): Token[] {
 }
 
 // Palabras sin contenido propio: nunca forman parte de un nombre propio ni de un límite útil.
-const CONECTORES = new Set(['y', 'la', 'el', 'los', 'las', 'un', 'una', 'de', 'del', 'a', 'con', 'se', 'lo', 'que', 'le', 'al'])
+// "tambien" incluida a propósito (sección "referencias contextuales" del pedido): "también Ana
+// ayudó" no debe robarse "también" como si fuera parte del nombre de la colaboradora.
+const CONECTORES = new Set(['y', 'la', 'el', 'los', 'las', 'un', 'una', 'de', 'del', 'a', 'con', 'se', 'lo', 'que', 'le', 'al', 'tambien'])
 
 // --- Anclas --------------------------------------------------------------------------------
 // Cada ancla es una secuencia de 1-3 tokens normalizados. `reverse: true` significa que el
@@ -117,6 +119,10 @@ const ANCLAS: DefinicionAncla[] = [
   { tokens: ['hicimos'], tipo: 'SERVICIO' },
   { tokens: ['hazle'], tipo: 'SERVICIO' },
   { tokens: ['agrega'], tipo: 'SERVICIO' },
+  // Formas conjugadas reales del habla ("agregó un champú", nunca solo el imperativo/infinitivo
+  // que ya cubrían las líneas de arriba) — sin tilde porque sinTildes() ya normalizó el token.
+  { tokens: ['agrego'], tipo: 'SERVICIO' },
+  { tokens: ['anadio'], tipo: 'SERVICIO' },
   { tokens: ['anade'], tipo: 'SERVICIO' },
   { tokens: ['agregar'], tipo: 'SERVICIO' },
   { tokens: ['anadir'], tipo: 'SERVICIO' },
@@ -289,6 +295,18 @@ function limpiarNombrePropio(texto: string): string {
   return texto.replace(/^(a|la|el|una?)\s+/i, '').trim()
 }
 
+// Relleno puro de continuación que nunca es, por sí solo, el nombre de la clienta: "también",
+// "y", "ella"/"el" (pronombre, no artículo). Si tras quitarlo no queda nada, el preámbulo entero
+// era relleno — no hay nombre nuevo que extraer (ver uso en CLAVES_SUJETO_IMPLICITO).
+const PALABRAS_SUJETO_VACIO = new Set(['ella', 'el', 'tambien', 'y'])
+
+function limpiarPreambuloSujeto(tokens: Token[], start: number, end: number): string | undefined {
+  let i = start
+  while (i < end && PALABRAS_SUJETO_VACIO.has(tokens[i].norm)) i++
+  const texto = limpiarNombrePropio(textoDeRango(tokens, i, end))
+  return texto || undefined
+}
+
 // Palabras que en este salón casi siempre son un producto, no un servicio de catálogo — mismo
 // criterio que usaba el formulario manual (categorías sugeridas del <datalist>). Es solo una
 // pista rápida para no crear un "servicio" con nombre "champú"; la ambigüedad real de nombres
@@ -350,7 +368,11 @@ export function interpretarUtterance(rawText: string, utteranceId: string): Pars
   // de frase sería mucho más arriesgado que al principio).
   const CLAVES_SUJETO_IMPLICITO = new Set(['se hizo', 'le hicimos', 'hicimos'])
   if (anclas[0].tokenStart > 0 && anclas[0].def.tipo === 'SERVICIO' && CLAVES_SUJETO_IMPLICITO.has(anclas[0].def.tokens.join(' '))) {
-    const preambulo = limpiarNombrePropio(textoDeRango(tokens, 0, anclas[0].tokenStart))
+    // El preámbulo puede ser puro relleno de continuación ("también ella se hizo...", "y
+    // ella también se hizo...") en vez de un nombre real — en ese caso NO se toca `cliente`, así
+    // la clienta activa de la sesión sigue siendo la misma (ver VoiceExecutionService: cuando
+    // `client` queda undefined, el draft.client existente no se pisa).
+    const preambulo = limpiarPreambuloSujeto(tokens, 0, anclas[0].tokenStart)
     if (preambulo) cliente = { query: preambulo }
   }
 
@@ -411,12 +433,25 @@ export function interpretarUtterance(rawText: string, utteranceId: string): Pars
         const { nombre, monto, profesionalTexto, restanteIdx } = extraerServicioDelTramo(tokens, c.tokenDatosStart, c.tokenDatosEnd)
         if (!nombre) break
         void restanteIdx
+        // Sustantivo genérico ("un SERVICIO", "un PRODUCTO") en vez de un nombre real — la
+        // persona describió precio/profesional pero todavía no dijo QUÉ servicio o producto es
+        // (sección "información incompleta / slot filling" del pedido). Se guarda lo que sí se
+        // sabe y se marca para preguntar solo el nombre, en vez de tratar la palabra "servicio"
+        // como si fuera el nombre real de un servicio a buscar en el catálogo.
+        const nombreNorm = sinTildes(nombre.toLowerCase()).trim()
+        if (nombreNorm === 'producto' || nombreNorm === 'productos') {
+          productos.push({ queryUnknown: true, price: monto?.valor })
+          intentPrincipal = intentPrincipal === 'UNKNOWN' ? 'ADD_PRODUCT' : 'REGISTER_ATTENTION'
+          break
+        }
         if (esProbablementeProducto(nombre) && !profesionalTexto) {
           productos.push({ query: nombre, price: monto?.valor })
           intentPrincipal = intentPrincipal === 'UNKNOWN' ? 'ADD_PRODUCT' : 'REGISTER_ATTENTION'
           break
         }
-        const s = crearServicio(nombre)
+        const esNombreGenericoServicio = nombreNorm === 'servicio' || nombreNorm === 'servicios'
+        const s = crearServicio(esNombreGenericoServicio ? undefined : nombre)
+        if (esNombreGenericoServicio) s.queryUnknown = true
         servicioActivo = s
         colaboradorActivo = null
         if (monto) { s.price = monto.valor; s.priceAmbiguous = monto.ambiguo }
@@ -430,11 +465,19 @@ export function interpretarUtterance(rawText: string, utteranceId: string): Pars
       }
 
       case 'PROFESIONAL': {
-        // Nombre DESPUÉS del ancla ("con Valery", "lo hizo Claudia", "hecho por Ana").
-        const nombreProf = limpiarNombrePropio(datosTexto)
+        // Nombre DESPUÉS del ancla ("con Valery", "lo hizo Claudia", "hecho por Ana"). El tramo
+        // de datos puede traer MÁS que el nombre (p. ej. "con Claudia Patricia de 45 mil y
+        // agregó..." — el precio vino DESPUÉS del profesional en vez de antes) — se acota el
+        // nombre y, si sobra un "de/por MONTO" en el resto del tramo, se rescata como precio del
+        // servicio en curso en vez de tragárselo entero como si fuera parte del nombre.
+        const { nombre: nombreProf, alternativa: nombreProfAlt, monto: montoTrasNombre } = extraerNombrePropioYPrecioDelTramo(tokens, c.tokenDatosStart, c.tokenDatosEnd)
         if (!nombreProf) break
         if (servicioActivo) {
-          servicioActivo.professional = { query: nombreProf }
+          servicioActivo.professional = { query: nombreProf, queryAlternativo: nombreProfAlt }
+          if (montoTrasNombre && servicioActivo.price == null) {
+            servicioActivo.price = montoTrasNombre.valor
+            servicioActivo.priceAmbiguous = montoTrasNombre.ambiguo
+          }
         } else {
           // "El blower lo hizo Claudia": no hay servicio activo EN ESTA FRASE porque el nombre
           // del servicio vino antes del ancla — se recupera mirando hacia atrás, igual que
@@ -748,6 +791,62 @@ function extraerServicioDelTramo(
   }
 
   return { nombre: nombre || undefined, monto, profesionalTexto, restanteIdx: end }
+}
+
+// --- Nombre propio acotado tras un ancla PROFESIONAL ("con NOMBRE", "lo hizo NOMBRE") --------
+// El nombre nunca cruza un conector (de/por/y/…) ni una puntuación de cierre en el texto crudo,
+// y se topa en `maxNombre` tokens (los nombres de persona en español rara vez pasan de 2-3
+// palabras). Si sobra un "de/por MONTO" en lo que queda del tramo, se devuelve aparte — cubre
+// el orden "con Claudia Patricia de 45 mil" (profesional ANTES del precio), no solo el orden ya
+// soportado "de 45 mil con Claudia" (precio antes del profesional).
+//
+// Nombres compuestos mal transcritos ("Claudia y Patricia" en vez de "Claudia Patricia"): si el
+// nombre corto se topa justo en un "y" seguido de otra palabra que no es conector, se arma
+// también una lectura compuesta uniendo ambas partes SIN el "y" — EntityResolver decide cuál de
+// las dos existe de verdad contra el equipo real; nunca se adivina aquí (sección "nombres
+// compuestos" del pedido).
+function extraerNombrePropioYPrecioDelTramo(
+  tokens: Token[],
+  start: number,
+  end: number,
+): { nombre?: string; alternativa?: string; monto?: ReturnType<typeof extraerMonto> } {
+  const norm = tokensNormDeRango(tokens, start, end)
+  const maxNombre = 3
+
+  let finNombre = 0
+  while (finNombre < norm.length && finNombre < maxNombre && !CONECTORES.has(norm[finNombre])) {
+    const terminaClausula = /[.,!?;:]$/.test(tokens[start + finNombre]?.raw ?? '')
+    finNombre++
+    if (terminaClausula) break
+  }
+  const nombreCorto = textoDeRango(tokens, start, start + finNombre).trim() || undefined
+
+  let nombre = nombreCorto
+  let alternativa: string | undefined
+  if (
+    nombreCorto &&
+    finNombre < norm.length &&
+    norm[finNombre] === 'y' &&
+    finNombre + 1 < norm.length &&
+    !CONECTORES.has(norm[finNombre + 1]) &&
+    !/[.,!?;:]$/.test(tokens[start + finNombre]?.raw ?? '')
+  ) {
+    const siguiente = textoDeRango(tokens, start + finNombre + 1, start + finNombre + 2)
+    if (siguiente) {
+      nombre = `${nombreCorto} ${siguiente}`
+      alternativa = nombreCorto
+      finNombre += 2 // el compuesto también consume la palabra tras la "y" para el precio de abajo
+    }
+  }
+
+  let monto: ReturnType<typeof extraerMonto> | undefined
+  for (let j = finNombre; j < norm.length; j++) {
+    if (norm[j] !== 'de' && norm[j] !== 'por') continue
+    const intento = leerMontoDesdeTokens(norm, j + 1)
+    if (intento) { monto = intento.monto; break }
+  }
+
+  return { nombre, alternativa, monto }
 }
 
 function extraerProductoDelTramo(texto: string): { nombre?: string; monto?: ReturnType<typeof extraerMonto>; cantidad?: number } {
