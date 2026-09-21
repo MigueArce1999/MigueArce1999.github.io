@@ -47,6 +47,11 @@ export interface ParsedClientRef {
 
 export interface ParsedProfessionalRef {
   query?: string
+  /** Segunda lectura posible cuando el habla pudo transcribir un nombre compuesto como si
+   * fueran dos personas separadas por "y" ("Claudia y Patricia" ≈ "Claudia Patricia"). Se
+   * intenta `query` primero contra el equipo real; si no resuelve nada, se reintenta con esta
+   * alternativa antes de pedir aclaración — nunca se adivina cuál es la persona real. */
+  queryAlternativo?: string
   professionalId?: string
 }
 
@@ -61,6 +66,10 @@ export interface ParsedCollaboratorRef {
 export interface ParsedServiceRef {
   /** Cómo se referencia el servicio dentro de esta expresión (nunca los dos a la vez). */
   query?: string
+  /** true cuando la persona dijo un sustantivo genérico ("un servicio") en vez de un nombre real
+   * — se sabe que hay un servicio nuevo, pero no cuál; distinto de `query` undefined por
+   * referencia implícita al servicio ya activo (slot filling, sección 15 del pedido). */
+  queryUnknown?: boolean
   ordinal?: number
   refersToLast?: boolean
   serviceId?: string
@@ -72,6 +81,8 @@ export interface ParsedServiceRef {
 
 export interface ParsedProductRef {
   query?: string
+  /** Igual que en ParsedServiceRef: "un producto" sin nombre real todavía. */
+  queryUnknown?: boolean
   ordinal?: number
   refersToLast?: boolean
   productId?: string
@@ -215,5 +226,5 @@ export interface PendingClarification {
   question: string
   /** Vacío = pregunta abierta (espera un valor libre: un precio, un teléfono, un nombre). */
   options: ClarificationOption[]
-  field: CorrectionField | 'client' | 'service' | 'collaborator' | 'compensation' | 'create_client_confirm' | 'create_service_confirm'
+  field: CorrectionField | 'client' | 'service' | 'product' | 'collaborator' | 'compensation' | 'create_client_confirm' | 'create_service_confirm'
 }

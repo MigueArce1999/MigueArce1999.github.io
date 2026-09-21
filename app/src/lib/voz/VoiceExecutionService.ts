@@ -17,6 +17,7 @@ import {
   agregarProducto,
   agregarServicio,
   actualizarColaborador,
+  actualizarProducto,
   actualizarServicio,
   draftEstaCompleto,
   quitarColaborador,
@@ -187,12 +188,20 @@ async function procesarComando(comando: ParsedAttentionCommand, sesion: VoiceSes
     if (sesion.pendingClarification) return
   }
 
-  for (const servicioRef of fusionarServiciosPorNombre(comando.services)) {
+  // Slot filling (sección 15 del pedido): "se hizo un SERVICIO con Claudia de 45 mil y agregó
+  // un PRODUCTO de 85 mil" — se guarda YA lo que se sabe (precio, profesional) de cada pieza sin
+  // nombre real, y se pregunta el nombre de a una por vez, sin perder la otra ni volver a pedir
+  // lo que ya se entendió. Estas piezas se procesan aparte del resto — nunca junto al flujo
+  // normal, que sí necesita un nombre real para resolver contra el catálogo.
+  const huboPreguntaDeNombre = await procesarReferenciasSinNombre(comando, sesion, deps)
+  if (huboPreguntaDeNombre) return
+
+  for (const servicioRef of fusionarServiciosPorNombre(comando.services.filter((s) => !s.queryUnknown))) {
     await procesarServicio(servicioRef, comando.intent, sesion, deps)
     if (sesion.pendingClarification) return
   }
 
-  for (const productoRef of comando.products) {
+  for (const productoRef of comando.products.filter((p) => !p.queryUnknown)) {
     await procesarProducto(productoRef, comando.intent, sesion, deps)
     if (sesion.pendingClarification) return
   }
@@ -314,6 +323,144 @@ function ocultarTelefono(telefono: string | null): string {
   return `${digitos.slice(0, 3)}${'*'.repeat(digitos.length - 5)}${digitos.slice(-2)}`
 }
 
+// --- Slot filling: "un servicio"/"un producto" sin nombre real ------------------------------
+// (sección 15 del pedido). Se crea de una vez una línea de borrador con lo que sí se sabe
+// (precio, profesional/colaboradores ya resueltos) y se pregunta SOLO el nombre que falta —
+// nunca se pierde el precio/profesional mientras se espera la respuesta, y nunca se vuelve a
+// preguntar algo que ya se entendió. Si la misma frase trae varias piezas sin nombre (un
+// servicio Y un producto), se pregunta una a la vez — la siguiente se encola y se activa en
+// cuanto se responde la anterior (ver avanzarColaDeNombres).
+
+interface RefSinNombre {
+  kind: 'service' | 'product'
+  tempId: string
+}
+
+async function procesarReferenciasSinNombre(comando: ParsedAttentionCommand, sesion: VoiceSessionState, deps: VoiceExecutionDeps): Promise<boolean> {
+  const cola: RefSinNombre[] = []
+
+  for (const servicioRef of comando.services) {
+    if (!servicioRef.queryUnknown) continue
+    const profesionalId =
+      servicioRef.professional?.professionalId ??
+      (servicioRef.professional?.query ? await resolverIdProfesional(servicioRef.professional.query, deps, servicioRef.professional.queryAlternativo) : undefined)
+    const { draft, tempId } = agregarServicio(sesion.draft, {
+      displayName: '',
+      price: servicioRef.price ?? undefined,
+      priceStatus: servicioRef.price != null ? 'confirmed' : 'missing',
+      professionalId: profesionalId,
+      professionalName: profesionalId ? deps.obtenerEquipo().find((p) => p.id === profesionalId)?.nombre : undefined,
+    })
+    sesion.draft = draft
+    await procesarColaboradoresDeReferencia(servicioRef, tempId, sesion, deps)
+    cola.push({ kind: 'service', tempId })
+  }
+
+  for (const productoRef of comando.products) {
+    if (!productoRef.queryUnknown) continue
+    const { draft, tempId } = agregarProducto(sesion.draft, { displayName: '', quantity: productoRef.quantity ?? 1, price: productoRef.price ?? undefined })
+    sesion.draft = draft
+    cola.push({ kind: 'product', tempId })
+  }
+
+  if (cola.length === 0) return false
+  ;(sesion as any)._colaNombresPendientes = cola.slice(1)
+  activarPreguntaDeNombre(sesion, cola[0])
+  return true
+}
+
+function activarPreguntaDeNombre(sesion: VoiceSessionState, item: RefSinNombre): void {
+  sesion.pendingClarification = {
+    id: idTemporal(),
+    field: item.kind === 'service' ? 'service' : 'product',
+    question: item.kind === 'service' ? '¿Qué servicio se realizó?' : '¿Qué producto se agregó?',
+    options: [],
+  }
+  ;(sesion as any)._refSinNombrePendiente = item
+}
+
+function avanzarColaDeNombres(sesion: VoiceSessionState): void {
+  const cola = (sesion as any)._colaNombresPendientes as RefSinNombre[] | undefined
+  if (cola && cola.length > 0) activarPreguntaDeNombre(sesion, cola.shift()!)
+}
+
+// Simplificación deliberada de alcance: si el servicio resuelto necesita confirmar un precio
+// "desde"/"rango"/"a valorar" Y todavía no se sabe ningún precio, la línea queda con
+// priceStatus 'missing' en vez de encadenar una tercera pregunta — la tarjeta del draft ya dice
+// "Falta el precio" y se puede completar con una corrección normal ("cambia el precio a X")
+// sin bloquear el resto de la cola de nombres pendientes.
+function completarLineaServicioSinNombre(tempId: string, servicio: Servicio, sesion: VoiceSessionState): void {
+  const linea = sesion.draft.services.find((s) => s.tempId === tempId)
+  const precioFinal = linea?.price ?? servicio.precio ?? undefined
+  sesion.draft = actualizarServicio(sesion.draft, tempId, {
+    serviceId: servicio.id,
+    displayName: servicio.nombre,
+    query: servicio.nombre,
+    resolved: true,
+    price: precioFinal,
+    priceStatus: precioFinal != null ? 'confirmed' : 'missing',
+  })
+}
+
+async function completarReferenciaSinNombre(valor: string, sesion: VoiceSessionState, deps: VoiceExecutionDeps): Promise<void> {
+  const s = sesion as any
+
+  if (s._refSinNombreCandidatos) {
+    const { kind, tempId, candidatos } = s._refSinNombreCandidatos as { kind: 'service' | 'product'; tempId: string; candidatos: (Servicio | Producto)[] }
+    delete s._refSinNombreCandidatos
+    const idx = Number(valor) - 1
+    const elegido = candidatos[idx]
+    if (!elegido) return // selección no reconocida: se pierde silenciosamente, igual que el resto de flujos de "¿cuál?" del pipeline
+    if (kind === 'service') completarLineaServicioSinNombre(tempId, elegido as Servicio, sesion)
+    else sesion.draft = actualizarProducto(sesion.draft, tempId, { productId: elegido.id, displayName: elegido.nombre, resolved: true })
+    avanzarColaDeNombres(sesion)
+    return
+  }
+
+  if (!s._refSinNombrePendiente) return
+  const { kind, tempId } = s._refSinNombrePendiente as RefSinNombre
+  delete s._refSinNombrePendiente
+
+  if (kind === 'service') {
+    const resultado = await resolverServicio(valor, deps.obtenerServicios())
+    if (resultado.tipo === 'unica' || (resultado.tipo === 'aproximada' && resultado.puntaje >= 0.8)) {
+      completarLineaServicioSinNombre(tempId, resultado.item, sesion)
+    } else if (resultado.tipo === 'multiple') {
+      s._refSinNombreCandidatos = { kind, tempId, candidatos: resultado.opciones.map((o) => o.item) }
+      sesion.pendingClarification = {
+        id: idTemporal(),
+        field: 'service',
+        question: `Encontré varios servicios parecidos a "${valor}". ¿Cuál es?`,
+        options: resultado.opciones.map((o, i) => opcion(o.item.nombre, String(i + 1))),
+      }
+      return
+    } else {
+      sesion.pendingClarification = { id: idTemporal(), field: 'service', question: `No encontré "${valor}" en el catálogo. ¿Qué servicio se realizó?`, options: [] }
+      s._refSinNombrePendiente = { kind, tempId }
+      return
+    }
+  } else {
+    const resultado = await resolverProducto(valor, deps.obtenerProductos())
+    if (resultado.tipo === 'unica' || (resultado.tipo === 'aproximada' && resultado.puntaje >= 0.8)) {
+      sesion.draft = actualizarProducto(sesion.draft, tempId, { productId: resultado.item.id, displayName: resultado.item.nombre, resolved: true })
+    } else if (resultado.tipo === 'multiple') {
+      s._refSinNombreCandidatos = { kind, tempId, candidatos: resultado.opciones.map((o) => o.item) }
+      sesion.pendingClarification = {
+        id: idTemporal(),
+        field: 'product',
+        question: `Encontré varios productos parecidos a "${valor}". ¿Cuál es?`,
+        options: resultado.opciones.map((o, i) => opcion(o.item.nombre, String(i + 1))),
+      }
+      return
+    } else {
+      sesion.pendingClarification = { id: idTemporal(), field: 'product', question: `No encontré "${valor}" en el catálogo. ¿Qué producto se agregó?`, options: [] }
+      s._refSinNombrePendiente = { kind, tempId }
+      return
+    }
+  }
+  avanzarColaDeNombres(sesion)
+}
+
 // --- Servicios --------------------------------------------------------------------------------
 
 const MAX_COLABORADORES_POR_SERVICIO = 5
@@ -385,7 +532,7 @@ async function procesarServicio(
 }
 
 async function crearLineaServicioDesdeResolucion(servicio: Servicio, ref: ParsedServiceRef, sesion: VoiceSessionState, deps: VoiceExecutionDeps): Promise<void> {
-  const profesionalId = ref.professional?.professionalId ?? (ref.professional?.query ? await resolverIdProfesional(ref.professional.query, deps) : undefined)
+  const profesionalId = ref.professional?.professionalId ?? (ref.professional?.query ? await resolverIdProfesional(ref.professional.query, deps, ref.professional.queryAlternativo) : undefined)
   const necesitaConfirmarPrecio = (ref.priceAmbiguous || servicio.tipo_precio === 'desde' || servicio.tipo_precio === 'rango') && ref.price != null
   const necesitaImporte = ref.price == null && servicio.tipo_precio === 'a_valorar'
 
@@ -508,10 +655,15 @@ async function aplicarDatosSobreServicio(linea: DraftServiceLine, ref: ParsedSer
   }
 }
 
-async function resolverIdProfesional(texto: string, deps: VoiceExecutionDeps): Promise<string | undefined> {
+// `alternativa` es la segunda lectura de un nombre compuesto mal transcrito ("Claudia y
+// Patricia" ≈ "Claudia Patricia", ver extraerNombrePropioYPrecioDelTramo en CommandInterpreter):
+// se intenta primero el nombre principal contra el equipo real y, solo si no hay NINGUNA
+// coincidencia, se reintenta con la alternativa — nunca se combinan ni se adivina cuál es.
+async function resolverIdProfesional(texto: string, deps: VoiceExecutionDeps, alternativa?: string): Promise<string | undefined> {
   const resultado = await resolverProfesional(texto, deps.obtenerEquipo())
   if (resultado.tipo === 'unica') return resultado.item.id
   if (resultado.tipo === 'aproximada' && resultado.puntaje >= 0.75) return resultado.item.id
+  if (resultado.tipo === 'ninguna' && alternativa) return resolverIdProfesional(alternativa, deps)
   return undefined
 }
 
@@ -685,6 +837,11 @@ function resolverIndiceDeSeleccion(seleccion: string, cantidad: number): number 
 async function aplicarRespuestaClarificacion(pregunta: PendingClarification, valor: string, sesion: VoiceSessionState, deps: VoiceExecutionDeps): Promise<void> {
   const s = sesion as any
   const afirmativo = valor.toLowerCase() === 'si' || valor.toLowerCase() === 'sí'
+
+  if (s._refSinNombrePendiente || s._refSinNombreCandidatos) {
+    await completarReferenciaSinNombre(valor, sesion, deps)
+    return
+  }
 
   switch (pregunta.field) {
     case 'client': {
