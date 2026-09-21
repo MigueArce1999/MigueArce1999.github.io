@@ -506,7 +506,7 @@ export function EmpleadaAtender({
   }
 
   return (
-    <div className="mx-auto max-w-5xl pb-40 md:pb-24 lg:pb-6">
+    <div className="mx-auto max-w-5xl pb-48 md:pb-24 lg:pb-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-marca text-2xl font-semibold text-carbon">Registrar atención</h1>
@@ -641,10 +641,13 @@ export function EmpleadaAtender({
       </div>
 
       {/* Barra inferior en móvil. Se apoya justo encima de la navegación inferior propia del
-          portal (fixed, md:hidden en PortalLayout): el offset (72px) es la altura real de esa
-          barra, para quedar alineada justo arriba de ella, sin superponerse ni dejar un hueco
-          de por medio; de md a lg, esa navegación ya no existe y esta baja a bottom-0. */}
-      <div className="fixed inset-x-0 bottom-[72px] z-40 flex items-center justify-between gap-3 border-t border-piedra bg-blanco px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] md:bottom-0 lg:hidden">
+          portal (fixed, md:hidden en PortalLayout): 64px es la altura fija de esa barra (ícono +
+          etiqueta + su padding superior) más el padding inferior, que ya no es un valor fijo —
+          crece con env(safe-area-inset-bottom) en celulares con gesture bar (ver PortalLayout).
+          Repetir aquí la misma fórmula evita que esta barra quede tapada por una navegación más
+          alta de lo que este offset asumía; de md a lg, esa navegación ya no existe y esta baja
+          a bottom-0. */}
+      <div className="fixed inset-x-0 bottom-[calc(64px+max(8px,env(safe-area-inset-bottom)))] z-40 flex items-center justify-between gap-3 border-t border-piedra bg-blanco px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] md:bottom-0 lg:hidden">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">Total a cobrar</p>
           <p className="font-marca text-3xl font-semibold leading-tight text-carbon">{formatoMoneda(total)}</p>
