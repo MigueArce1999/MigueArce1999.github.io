@@ -6,6 +6,7 @@ import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { isDemoMode, supabaseRequerido } from '../../lib/supabase'
 import { listarServicios, listarServiciosDeProfesional } from '../../lib/api/catalogo'
 import { guardarServiciosPropios } from '../../lib/api/empleada'
+import { BotonInstalarApp } from '../../components/pwa/InstalarApp'
 import type { Servicio } from '../../lib/types'
 
 export function EmpleadaPerfil() {
@@ -26,6 +27,13 @@ export function EmpleadaPerfil() {
       <Card>
         <p className="mb-2 font-semibold text-carbon">Presentación</p>
         <p className="text-sm text-carbon/70">{profesional?.bio ?? 'Aún no tienes una presentación configurada. Pídele a administración que la complete desde el panel de Equipo.'}</p>
+      </Card>
+      <Card className="flex flex-col items-start gap-3">
+        <div>
+          <p className="mb-1 font-semibold text-carbon">App en tu teléfono</p>
+          <p className="text-sm text-carbon/60">Agrégala a tu pantalla de inicio para abrirla como cualquier otra app, sin el navegador de por medio.</p>
+        </div>
+        <BotonInstalarApp />
       </Card>
       <MisServicios />
       <CambiarContrasena />

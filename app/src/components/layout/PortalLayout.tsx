@@ -6,6 +6,7 @@ import { useAuth } from '../../state/AuthContext'
 import { cerrarSesion } from '../../lib/api/auth'
 import { useDialogAccesible } from '../ui/Modal'
 import { IconoChevronIzquierda, IconoMenu, IconoX } from '../ui/Icons'
+import { InstalarAppBanner } from '../pwa/InstalarApp'
 
 export interface ItemNav {
   to: string
@@ -142,7 +143,10 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
             </div>
             <button onClick={salir} className="text-sm font-medium text-carbon/70 md:hidden">Salir</button>
           </header>
-          <div className="p-4 sm:p-6 md:p-8">
+          <div className="flex flex-col gap-4 p-4 sm:p-6 md:p-8">
+            {/* Solo el portal de empleadas se ofrece como app instalable (ver pedido) — el resto
+                de los portales siguen siendo pestañas de navegador normales. */}
+            {titulo === 'Portal de empleadas' && <InstalarAppBanner />}
             <Outlet />
           </div>
         </div>
