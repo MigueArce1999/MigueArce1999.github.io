@@ -11,14 +11,17 @@ import {
   actualizarRecompensa,
   alternarRecompensaActiva,
   crearRecompensa,
+  listarCanjesPendientesEntrega,
   listarClientesFidelizacion,
   listarMisCanjes,
   listarMovimientosPuntosPagina,
   listarRecompensasAdmin,
+  marcarCanjeEntregado,
   obtenerConfiguracionFidelizacion,
   obtenerReglaPuntosVigente,
   obtenerResumenFidelizacion,
   guardarReglaPuntos,
+  type CanjePendienteEntrega,
   type ClienteFidelizacionResumen,
   type RecompensaFormulario,
   type ResumenFidelizacionPeriodo,
@@ -87,6 +90,8 @@ function PestanaResumen() {
 
   return (
     <div className="flex flex-col gap-4">
+      <CanjesPorEntregar />
+
       <div className="flex flex-wrap items-end gap-3">
         <Input id="desde" etiqueta="Desde" type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
         <Input id="hasta" etiqueta="Hasta" type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
@@ -111,6 +116,61 @@ function PestanaResumen() {
         </>
       ) : null}
     </div>
+  )
+}
+
+// Autocanjes (la clienta pidió su recompensa ella misma desde su perfil) que todavía no se le han
+// entregado — un canje aplicado durante un cobro normal no aparece acá porque ya se resolvió en
+// esa misma visita (ver vista_canje_pendiente_entrega en 0049_autocanje.sql).
+function CanjesPorEntregar() {
+  const [pendientes, setPendientes] = useState<CanjePendienteEntrega[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [entregando, setEntregando] = useState<string | null>(null)
+
+  function cargar() {
+    setError(null)
+    listarCanjesPendientesEntrega().then(setPendientes).catch((e) => setError(e.message))
+  }
+
+  useEffect(cargar, [])
+
+  async function entregar(canjeId: string) {
+    setEntregando(canjeId)
+    try {
+      await marcarCanjeEntregado(canjeId)
+      cargar()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setEntregando(null)
+    }
+  }
+
+  if (error) return <ErrorState mensaje={error} reintentar={cargar} />
+  if (!pendientes) return <Cargando filas={1} />
+  if (pendientes.length === 0) return null
+
+  return (
+    <Card className="flex flex-col gap-3 border-champan/60 bg-champan/10">
+      <div>
+        <p className="font-semibold text-carbon">Canjes por entregar</p>
+        <p className="text-xs text-carbon/60">Recompensas que clientas ya canjearon ellas mismas desde su perfil y todavía no reclaman.</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        {pendientes.map((c) => (
+          <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-blanco px-3 py-2">
+            <div>
+              <p className="text-sm font-medium text-carbon">{c.cliente_nombre} <span className="font-normal text-carbon/50">· {c.condiciones_snapshot.nombre}</span></p>
+              <p className="text-xs text-carbon/50">
+                {formatoEnteroCOP(c.costo_puntos_snapshot)} puntos · {formatoFecha(c.creado_en)}
+                {c.cliente_telefono && ` · ${c.cliente_telefono}`}
+              </p>
+            </div>
+            <Button tamano="sm" onClick={() => entregar(c.id)} cargando={entregando === c.id}>Marcar entregado</Button>
+          </div>
+        ))}
+      </div>
+    </Card>
   )
 }
 

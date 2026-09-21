@@ -26,8 +26,26 @@ import type {
 
 // --- Vista de la clienta ---------------------------------------------------------------------
 
+// Solo en modo demo: el autocanje (más abajo) necesita poder "gastar" puntos de verdad para que
+// la celebración se sienta real, sin tocar ningún dato del servidor. demoMiFidelizacion es un
+// snapshot fijo — este override en memoria es lo único que cambia durante la sesión del navegador.
+let demoSaldoOverride: number | null = null
+const demoCanjesExtra: CanjeRecompensa[] = []
+const demoNotificacionesExtra: NotificacionFidelizacion[] = []
+
+function demoFidelizacionActual(): MiFidelizacion {
+  const saldo = demoSaldoOverride ?? demoMiFidelizacion.saldo
+  const meta = demoMiFidelizacion.meta
+  return {
+    ...demoMiFidelizacion,
+    saldo,
+    progreso: meta ? Math.min(Math.max(saldo / meta.costo_puntos, 0), 1) : null,
+    puntos_faltantes: meta ? Math.max(meta.costo_puntos - saldo, 0) : null,
+  }
+}
+
 export async function obtenerMiFidelizacion(clienteId: string): Promise<MiFidelizacion> {
-  if (isDemoMode) return demoMiFidelizacion
+  if (isDemoMode) return demoFidelizacionActual()
   const { data, error } = await supabase!.rpc('fn_mi_fidelizacion', { p_cliente_id: clienteId })
   if (error) throw error
   return data as MiFidelizacion
@@ -77,7 +95,9 @@ export async function listarMovimientosPuntosPagina(
 const demoNotificacionesReconocidas = new Set<string>()
 
 export async function listarNotificacionesNoVistas(clienteId: string): Promise<NotificacionFidelizacion[]> {
-  if (isDemoMode) return demoNotificacionesFidelizacion.filter((n) => !demoNotificacionesReconocidas.has(n.id))
+  if (isDemoMode) {
+    return [...demoNotificacionesFidelizacion, ...demoNotificacionesExtra].filter((n) => !demoNotificacionesReconocidas.has(n.id))
+  }
   const { data, error } = await supabase!
     .from('notificacion_fidelizacion')
     .select('*')
@@ -96,7 +116,7 @@ export async function marcarNotificacionVista(notificacionId: string): Promise<v
 }
 
 export async function listarMisCanjes(clienteId: string): Promise<CanjeRecompensa[]> {
-  if (isDemoMode) return demoCanjesCliente
+  if (isDemoMode) return [...demoCanjesExtra, ...demoCanjesCliente]
   const { data, error } = await supabase!
     .from('canje_recompensa')
     .select('*')
@@ -104,6 +124,47 @@ export async function listarMisCanjes(clienteId: string): Promise<CanjeRecompens
     .order('creado_en', { ascending: false })
   if (error) throw error
   return data
+}
+
+// Canje directo desde el perfil de la clienta (sin pasar por un cobro de Atender) — decisión
+// explícita de negocio: la clienta puede pedir su recompensa ella misma. El canje queda
+// "pendiente de entregar" (atencion_id = null, entregado = false) hasta que alguien del salón lo
+// entregue y lo marque (ver marcarCanjeEntregado) — nunca se asume la entrega solo porque ya se
+// gastaron los puntos. Reutiliza EXACTAMENTE la misma tabla/notificación/celebración que el canje
+// durante un cobro (ver supabase/migrations/0049_autocanje.sql).
+export async function autocanjearRecompensa(clienteId: string, recompensaId: string, idempotencyKey: string): Promise<void> {
+  if (isDemoMode) {
+    const recompensa = demoRecompensas.find((r) => r.id === recompensaId)
+    if (!recompensa) throw new Error('Esa recompensa ya no está disponible.')
+    const saldoAnterior = demoSaldoOverride ?? demoMiFidelizacion.saldo
+    if (saldoAnterior < recompensa.costo_puntos) throw new Error('No tienes suficientes puntos para esta recompensa.')
+    const saldoPosterior = saldoAnterior - recompensa.costo_puntos
+    demoSaldoOverride = saldoPosterior
+    const ahora = new Date().toISOString()
+    demoCanjesExtra.unshift({
+      id: idempotencyKey, cliente_id: clienteId, recompensa_id: recompensa.id, atencion_id: null,
+      costo_puntos_snapshot: recompensa.costo_puntos,
+      condiciones_snapshot: { nombre: recompensa.nombre, tipo: recompensa.tipo, condiciones: recompensa.condiciones, servicio_id: recompensa.servicio_id, monto_descuento: recompensa.monto_descuento },
+      estado: 'confirmado', entregado: false, empleada_id: null, creado_en: ahora, revertido_en: null,
+      saldo_anterior: saldoAnterior, saldo_posterior: saldoPosterior,
+    })
+    demoNotificacionesExtra.push({
+      id: `demo-autocanje-notif-${idempotencyKey}`, cliente_id: clienteId, tipo: 'canje_confirmado',
+      titulo: '¡Disfruta tu recompensa!', mensaje: `Usaste ${recompensa.costo_puntos} puntos en "${recompensa.nombre}".`,
+      origen_tipo: 'canje', origen_id: idempotencyKey, leida_en: null, creado_en: ahora,
+      datos: {
+        canje_id: idempotencyKey, recompensa_nombre: recompensa.nombre, recompensa_imagen_url: recompensa.imagen_url,
+        recompensa_tipo: recompensa.tipo, costo_puntos: recompensa.costo_puntos,
+        saldo_anterior: saldoAnterior, saldo_posterior: saldoPosterior, puntos_ganados_en_esta_atencion: 0,
+      },
+    })
+    return
+  }
+  const client = supabaseRequerido()
+  const { error } = await client.rpc('fn_autocanjear_recompensa', {
+    p_cliente_id: clienteId, p_recompensa_id: recompensaId, p_idempotency_key: idempotencyKey,
+  })
+  if (error) throw error
 }
 
 // --- Uso desde Atender → Cobrar (empleada) -------------------------------------------------
@@ -320,4 +381,35 @@ export async function ajustarPuntosManual(clienteId: string, puntos: number, mot
   const { data, error } = await client.rpc('fn_ajustar_puntos_manual', { p_cliente_id: clienteId, p_puntos: puntos, p_motivo: motivo })
   if (error) throw error
   return data as MovimientoPuntos
+}
+
+// --- Entregas de autocanjes (sección "Canjes por entregar" del admin) ----------------------
+// Solo canjes SIN atención asociada (la clienta lo pidió ella misma desde su perfil) y aún sin
+// entregar — uno aplicado durante un cobro ya se resolvió en esa misma visita.
+
+export interface CanjePendienteEntrega extends CanjeRecompensa {
+  cliente_nombre: string
+  cliente_telefono: string | null
+}
+
+export async function listarCanjesPendientesEntrega(): Promise<CanjePendienteEntrega[]> {
+  if (isDemoMode) {
+    return demoCanjesExtra
+      .filter((c) => !c.entregado)
+      .map((c) => ({ ...c, cliente_nombre: demoClienteActual.nombre, cliente_telefono: demoClienteActual.telefono }))
+  }
+  const { data, error } = await supabase!.from('vista_canje_pendiente_entrega').select('*')
+  if (error) throw error
+  return data
+}
+
+export async function marcarCanjeEntregado(canjeId: string): Promise<void> {
+  if (isDemoMode) {
+    const canje = demoCanjesExtra.find((c) => c.id === canjeId)
+    if (canje) canje.entregado = true
+    return
+  }
+  const client = supabaseRequerido()
+  const { error } = await client.rpc('fn_marcar_canje_entregado', { p_canje_id: canjeId })
+  if (error) throw error
 }
