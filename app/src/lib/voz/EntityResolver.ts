@@ -123,7 +123,7 @@ export async function resolverCliente(texto: string): Promise<ResultadoBusqueda<
       completo ?? {
         id: c.id, usuario_id: null, nombre: c.nombre, telefono: c.telefono, email: null,
         consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0, activo: true,
-        origen_registro: 'admin', notas: null, resena_google_confirmada: false, creado_en: '',
+        origen_registro: 'admin', notas: null, resena_google_confirmada: false, meta_recompensa_id: null, creado_en: '',
       }
     )
   }

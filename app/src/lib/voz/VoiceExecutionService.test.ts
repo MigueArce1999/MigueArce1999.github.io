@@ -35,7 +35,7 @@ function clientesDemo(): Cliente[] {
   const base = (id: string, nombre: string, telefono: string): Cliente => ({
     id, usuario_id: null, nombre, telefono, email: null, consentimiento_marketing: false,
     visitas_completadas: 0, gasto_acumulado: 0, activo: true, origen_registro: 'admin', notas: null,
-    resena_google_confirmada: false, creado_en: new Date().toISOString(),
+    resena_google_confirmada: false, meta_recompensa_id: null, creado_en: new Date().toISOString(),
   })
   return [
     base('c1', 'Verónica', '3001111111'),
@@ -76,7 +76,7 @@ function depsDemo(overrides: Partial<VoiceExecutionDeps> = {}): VoiceExecutionDe
     crearClienteRapido: vi.fn(async (datos): Promise<Cliente> => ({
       id: 'nueva-cliente', usuario_id: null, nombre: datos.nombre, telefono: datos.telefono, email: null,
       consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0, activo: true,
-      origen_registro: 'admin', notas: null, resena_google_confirmada: false, creado_en: new Date().toISOString(),
+      origen_registro: 'admin', notas: null, resena_google_confirmada: false, meta_recompensa_id: null, creado_en: new Date().toISOString(),
     })),
     ...overrides,
   }
