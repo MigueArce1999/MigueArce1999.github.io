@@ -74,7 +74,7 @@ const navCliente: ItemNav[] = [
   { to: '/cliente', label: 'Inicio', icono: IconoInicio },
   { to: '/cliente/reservas', label: 'Reservas', icono: IconoAgenda },
   { to: '/cliente/historial', label: 'Historial', icono: IconoHistorial },
-  { to: '/cliente/puntos', label: 'Puntos', icono: IconoPuntos },
+  { to: '/cliente/puntos', label: 'Mis recompensas', icono: IconoPuntos },
   { to: '/cliente/perfil', label: 'Perfil', icono: IconoPerfil },
 ]
 

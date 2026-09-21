@@ -1,6 +1,6 @@
 import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
 import { demoClientesAdmin, demoComisionesEmpleada, demoReservasAgendaEmpleada } from '../demoData'
-import type { Atencion, Cliente, ComisionResumen, VentaLinea } from '../types'
+import type { Cliente, ComisionResumen, ResultadoCobro, VentaLinea } from '../types'
 
 // Clientes recién actualizados, para mostrar en el buscador de "Atender" antes de escribir
 // nada (actualizado_en es la mejor aproximación disponible a "actividad reciente" sin sumar
@@ -39,7 +39,7 @@ export async function crearClienteRapido(datos: { nombre: string; telefono: stri
     return {
       id: 'demo-cliente-' + Date.now(), usuario_id: null, nombre: datos.nombre, telefono: datos.telefono, email: null,
       consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0, activo: true, origen_registro: 'admin',
-      notas: null, resena_google_confirmada: false, creado_en: new Date().toISOString(),
+      notas: null, resena_google_confirmada: false, meta_recompensa_id: null, creado_en: new Date().toISOString(),
     }
   }
   const client = supabaseRequerido()
@@ -102,15 +102,20 @@ export async function completarYCobrarAtencion(params: {
   // Clave estable generada UNA vez por intento de cobro y reutilizada en reintentos (mismo
   // borrador, mismo clic repetido o recuperación tras error): evita cobrar dos veces.
   idempotencyKey: string
-}): Promise<Atencion> {
+  // Recompensa de fidelización elegida para canjear EN este cobro (sección 11 del pedido) — el
+  // servidor valida saldo/stock/estado contra el saldo ANTERIOR a este mismo cobro, nunca contra
+  // lo que esta misma compra va a generar.
+  recompensaId?: string | null
+}): Promise<ResultadoCobro> {
   const client = supabaseRequerido()
   const { data, error } = await client.rpc('fn_completar_y_cobrar_atencion', {
     p_atencion_id: params.atencionId,
     p_pagos: params.pagos,
     p_idempotency_key: params.idempotencyKey,
+    p_recompensa_id: params.recompensaId ?? null,
   })
   if (error) throw error
-  return data as Atencion
+  return data as ResultadoCobro
 }
 
 export async function listarComisiones(

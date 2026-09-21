@@ -3,18 +3,24 @@
 // Ver docs/07-plan-implementacion.md.
 import type {
   Atencion,
+  CanjeRecompensa,
   CategoriaGasto,
   CategoriaServicio,
   Cliente,
   ClienteResumen,
   ComisionResumen,
+  ConfiguracionFidelizacion,
   Cuenta,
   Gasto,
+  MiFidelizacion,
   MovimientoPuntos,
+  NotificacionFidelizacion,
   PlantillaGastoRecurrente,
   Profesional,
   Promocion,
   Proveedor,
+  Recompensa,
+  ReglaPuntos,
   Reserva,
   Servicio,
 } from './types'
@@ -180,6 +186,7 @@ export const demoClienteActual: Cliente = {
   origen_registro: 'admin',
   notas: null,
   resena_google_confirmada: false,
+  meta_recompensa_id: null,
   creado_en: enHoras(-720),
 }
 
@@ -274,13 +281,95 @@ export const demoMovimientosPuntos: MovimientoPuntos[] = [
     id: 'demo-mov-1',
     cliente_id: 'demo-cliente-1',
     tipo: 'abono',
-    puntos: 600,
+    puntos: 240,
     referencia_tipo: 'atencion',
     referencia_id: 'demo-atencion-1',
+    canje_id: null,
     motivo: null,
+    regla_aplicada: { monto_por_bloque: 1000, puntos_por_bloque: 1, monto_elegible_neto: 240000 },
     creado_en: enHoras(-47),
   },
 ]
+
+// --- Fidelización: datos de demostración ("Tu belleza florece") ----------------------------
+
+export const demoRecompensas: Recompensa[] = [
+  {
+    id: 'demo-recompensa-1',
+    nombre: 'Hidratación capilar de regalo',
+    descripcion: 'Un tratamiento de hidratación profunda, cortesía de la casa.',
+    costo_puntos: 300,
+    activa: true,
+    tipo: 'beneficio',
+    servicio_id: 'demo-serv-alisado',
+    servicio_nombre: 'Tratamiento capilar',
+    monto_descuento: null,
+    servicios_elegibles: [],
+    condiciones: 'Aplica una vez por clienta cada 60 días.',
+    requiere_atencion_pagada: true,
+    stock_ilimitado: true,
+    cantidad_disponible: null,
+    imagen_url: null,
+    orden_visualizacion: 0,
+    creado_en: enHoras(-2000),
+    actualizado_en: enHoras(-2000),
+  },
+  {
+    id: 'demo-recompensa-2',
+    nombre: 'Descuento de $15.000',
+    descripcion: 'Para usar en cualquier servicio de tu próxima visita.',
+    costo_puntos: 400,
+    activa: true,
+    tipo: 'descuento_fijo',
+    servicio_id: null,
+    monto_descuento: 15000,
+    servicios_elegibles: [],
+    condiciones: 'No se combina con otras promociones.',
+    requiere_atencion_pagada: true,
+    stock_ilimitado: true,
+    cantidad_disponible: null,
+    imagen_url: null,
+    orden_visualizacion: 1,
+    creado_en: enHoras(-2000),
+    actualizado_en: enHoras(-2000),
+  },
+]
+
+export const demoConfiguracionFidelizacion: ConfiguracionFidelizacion = {
+  acumulacion_activa: true,
+  canjes_activo: true,
+  texto_programa: 'Gana 1 punto por cada $1.000 en servicios elegibles. Cámbialos por regalos cuando quieras.',
+  actualizado_en: enHoras(-2000),
+}
+
+export const demoReglaPuntos: ReglaPuntos = {
+  id: 'demo-regla-1',
+  activa: true,
+  vigente_desde: enHoras(-2000),
+  vigente_hasta: null,
+  monto_por_bloque: 1000,
+  puntos_por_bloque: 1,
+  categorias_excluidas: [],
+  servicios_excluidos: [],
+  incluye_productos: true,
+}
+
+const demoSaldoFidelizacion = demoMovimientosPuntos.reduce((acc, m) => acc + Number(m.puntos), 0)
+const demoMetaFidelizacion = demoRecompensas[1]
+
+export const demoMiFidelizacion: MiFidelizacion = {
+  saldo: demoSaldoFidelizacion,
+  acumulacion_activa: demoConfiguracionFidelizacion.acumulacion_activa,
+  canjes_activo: demoConfiguracionFidelizacion.canjes_activo,
+  texto_programa: demoConfiguracionFidelizacion.texto_programa,
+  meta: demoMetaFidelizacion,
+  progreso: Math.min(Math.max(demoSaldoFidelizacion / demoMetaFidelizacion.costo_puntos, 0), 1),
+  puntos_faltantes: Math.max(demoMetaFidelizacion.costo_puntos - demoSaldoFidelizacion, 0),
+}
+
+export const demoNotificacionesFidelizacion: NotificacionFidelizacion[] = []
+
+export const demoCanjesCliente: CanjeRecompensa[] = []
 
 // --- Portal de empleadas (demo: sesión como Naldi) ---
 
@@ -386,6 +475,7 @@ export const demoClientesAdmin: ClienteResumen[] = [
     origen_registro: 'admin',
     notas: null,
     resena_google_confirmada: true,
+    meta_recompensa_id: null,
     creado_en: enHoras(-2000),
     ultima_visita: '2026-08-20T18:00:00Z',
     ultimo_servicio_nombre: 'Color y tinte',
@@ -404,6 +494,7 @@ export const demoClientesAdmin: ClienteResumen[] = [
     origen_registro: 'publico',
     notas: null,
     resena_google_confirmada: false,
+    meta_recompensa_id: null,
     creado_en: enHoras(-900),
     ultima_visita: null,
     ultimo_servicio_nombre: null,
@@ -422,6 +513,7 @@ export const demoClientesAdmin: ClienteResumen[] = [
     origen_registro: 'admin',
     notas: null,
     resena_google_confirmada: false,
+    meta_recompensa_id: null,
     creado_en: enHoras(-1),
     ultima_visita: null,
     ultimo_servicio_nombre: null,

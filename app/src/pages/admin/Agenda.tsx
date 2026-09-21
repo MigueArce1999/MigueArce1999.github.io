@@ -448,7 +448,7 @@ function FormularioNuevaCita({ servicios, equipo, onCreada }: { servicios: Servi
     setError(null)
     try {
       const { id } = await crearClienteAdmin({ nombre: nombreNuevo.trim(), telefono: telefonoNuevo.trim(), email: null, consentimientoMarketing: false })
-      setCliente({ id, usuario_id: null, nombre: nombreNuevo.trim(), telefono: telefonoNuevo.trim(), email: null, consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0, activo: true, origen_registro: 'admin', notas: null, resena_google_confirmada: false, creado_en: new Date().toISOString() })
+      setCliente({ id, usuario_id: null, nombre: nombreNuevo.trim(), telefono: telefonoNuevo.trim(), email: null, consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0, activo: true, origen_registro: 'admin', notas: null, resena_google_confirmada: false, meta_recompensa_id: null, creado_en: new Date().toISOString() })
       setCreandoCliente(false)
     } catch (e: any) {
       setError(e.message)

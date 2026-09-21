@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { CampoBase, CampoMoneda, Input, Select, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
+import { Modal } from '../../components/ui/Modal'
 import { useAuth } from '../../state/AuthContext'
 import { isDemoMode, supabase } from '../../lib/supabase'
 import { crearServicioRapido, listarProfesionales, listarServicios } from '../../lib/api/catalogo'
@@ -10,8 +11,11 @@ import { buscarClientes, completarYCobrarAtencion, crearClienteRapido, listarCli
 import { obtenerClienteAdmin } from '../../lib/api/clientes'
 import { obtenerReservaPorId } from '../../lib/api/reservas'
 import { estimarComision, type EstimacionComision } from '../../lib/api/comisiones'
-import { formatoFecha, formatoHora, formatoMoneda } from '../../lib/format'
-import type { Cliente, MetodoPago, Profesional, Servicio } from '../../lib/types'
+import { useMiFidelizacion } from '../../lib/fidelizacion/useMiFidelizacion'
+import { calcularDescuentoRecompensa, estimarPuntosGanados } from '../../lib/fidelizacion/estimarPuntos'
+import { listarRecompensasDisponiblesPara, obtenerConfiguracionFidelizacion, obtenerReglaPuntosVigente } from '../../lib/api/fidelizacion'
+import { formatoEnteroCOP, formatoFecha, formatoHora, formatoMoneda } from '../../lib/format'
+import type { Cliente, ConfiguracionFidelizacion, MetodoPago, MiFidelizacion, Profesional, ReglaPuntos, Recompensa, ResultadoCobro, Servicio } from '../../lib/types'
 import type { VoiceExecutionDeps } from '../../lib/voz/VoiceExecutionService'
 import type { AttentionDraft, Producto } from '../../lib/voz/schema'
 import { crearProductoRapido as crearProductoRapidoVoz, listarProductos } from '../../lib/voz/voiceApi'
@@ -40,6 +44,11 @@ interface LineaServicioBorrador {
   // Solo presente en una línea de colaboración: tempId de su línea de servicio principal, para
   // agruparla visualmente bajo esa tarjeta en el paso de registrar (hasta MAX_COLABORADORES_POR_SERVICIO).
   colaboracionDe?: string
+  // true = línea inyectada automáticamente al aplicar una recompensa tipo 'beneficio' (precio
+  // fijo en 0): fn_completar_y_cobrar_atencion la busca por servicio_id+precio_snapshot=0 para
+  // trazar el canje (ver 0047_fidelizacion.sql). No se puede quitar con la ✕ ni cambiar de
+  // servicio/precio a mano — solo desaparece si la empleada quita la recompensa aplicada.
+  esRecompensa?: boolean
 }
 
 interface LineaProductoBorrador {
@@ -187,6 +196,54 @@ export function EmpleadaAtender({
   const [notas, setNotas] = useState('')
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('efectivo')
 
+  // Fidelización (sección 11 del pedido): saldo/estado del programa de ESTA clienta, la
+  // recompensa que la empleada eligió canjear en este mismo cobro (o null) y la config/regla
+  // vigentes, solo para poder mostrar una ESTIMACIÓN de puntos a ganar antes de confirmar — el
+  // valor definitivo siempre lo calcula y devuelve fn_completar_y_cobrar_atencion.
+  const { fidelizacion, cargando: cargandoFidelizacion } = useMiFidelizacion(cliente?.id)
+  const [recompensasDisponibles, setRecompensasDisponibles] = useState<Recompensa[] | null>(null)
+  const [recompensaAplicada, setRecompensaAplicada] = useState<Recompensa | null>(null)
+  const [configFidelizacion, setConfigFidelizacion] = useState<ConfiguracionFidelizacion | null>(null)
+  const [reglaPuntos, setReglaPuntos] = useState<ReglaPuntos | null>(null)
+  const [resultadoCobro, setResultadoCobro] = useState<ResultadoCobro | null>(null)
+
+  useEffect(() => {
+    obtenerConfiguracionFidelizacion().then(setConfigFidelizacion).catch(() => {})
+    obtenerReglaPuntosVigente().then(setReglaPuntos).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!fidelizacion || !fidelizacion.canjes_activo) { setRecompensasDisponibles(fidelizacion ? [] : null); return }
+    let activo = true
+    listarRecompensasDisponiblesPara(fidelizacion.saldo).then((r) => { if (activo) setRecompensasDisponibles(r) }).catch(() => { if (activo) setRecompensasDisponibles([]) })
+    return () => { activo = false }
+  }, [fidelizacion])
+
+  // Aplica o quita la recompensa elegida para este cobro. Un 'beneficio' necesita una línea de
+  // servicio real en $0 (el servidor la busca para trazar el canje); un 'descuento_fijo' solo
+  // resta del total al cobrar, sin línea propia.
+  function aplicarRecompensa(nueva: Recompensa | null) {
+    setLineas((prev) => prev.filter((l) => !l.esRecompensa))
+    if (nueva && nueva.tipo === 'beneficio' && nueva.servicio_id) {
+      const servicioCatalogo = servicios.find((s) => s.id === nueva.servicio_id)
+      setLineas((prev) => [...prev, {
+        tempId: idTemporal(),
+        servicioId: nueva.servicio_id!,
+        nombre: `${servicioCatalogo?.nombre ?? nueva.servicio_nombre ?? nueva.nombre} (regalo de fidelización)`,
+        profesionalId: profesional?.id ?? equipo[0]?.id ?? '',
+        precio: 0,
+        esColaboracion: false,
+        esRecompensa: true,
+      }])
+    }
+    setRecompensaAplicada(nueva)
+  }
+
+  function cambiarCliente(c: Cliente | null) {
+    setCliente(c)
+    aplicarRecompensa(null)
+  }
+
   const [paso, setPaso] = useState<'registrar' | 'cobrar' | 'listo'>('registrar')
   const [errores, setErrores] = useState<string[]>([])
   // Se activa la primera vez que se intenta continuar; a partir de ahí, los campos
@@ -246,7 +303,28 @@ export function EmpleadaAtender({
 
   const subtotalServicios = lineas.reduce((acc, l) => acc + (l.precio ?? 0), 0)
   const subtotalProductos = productos.reduce((acc, p) => acc + p.cantidad * (p.precioUnitario ?? 0), 0)
-  const total = subtotalServicios + subtotalProductos
+  const subtotal = subtotalServicios + subtotalProductos
+  // Un 'beneficio' ya está reflejado en el subtotal (su línea vale $0, ver aplicarRecompensa); un
+  // 'descuento_fijo' resta aquí, igual que lo hace fn_completar_y_cobrar_atencion al cobrar.
+  const descuentoRecompensa = calcularDescuentoRecompensa(recompensaAplicada, subtotal)
+  const total = Math.max(subtotal - descuentoRecompensa, 0)
+
+  // Estimación de puntos a ganar (sección 11 y 12 del pedido: "puede ser inmediata, pero debe
+  // distinguirse del resultado confirmado") — ver lib/fidelizacion/estimarPuntos.ts; el valor que
+  // de verdad queda guardado siempre lo calcula y devuelve el servidor.
+  const puntosEstimados = useMemo(
+    () => estimarPuntosGanados({
+      acumulacionActiva: configFidelizacion?.acumulacion_activa ?? false,
+      regla: reglaPuntos,
+      lineas: lineas.map((l) => ({ servicioId: l.servicioId, precio: l.precio })),
+      servicios,
+      subtotalProductos,
+      subtotal,
+      descuentoRecompensa,
+      total,
+    }),
+    [configFidelizacion, reglaPuntos, lineas, servicios, subtotalProductos, subtotal, descuentoRecompensa, total],
+  )
 
   // El asistente de voz resuelve contra EXACTAMENTE el mismo catálogo (servicios/equipo/
   // productos) que ya usa este formulario, y solo entrega un AttentionDraft completo al
@@ -385,7 +463,13 @@ export function EmpleadaAtender({
         idAtencion = id
         atencionIdRef.current = id
       }
-      await completarYCobrarAtencion({ atencionId: idAtencion, pagos: [{ metodo: metodoPago, monto: total }], idempotencyKey: claveCobro })
+      const resultado = await completarYCobrarAtencion({
+        atencionId: idAtencion,
+        pagos: [{ metodo: metodoPago, monto: total }],
+        idempotencyKey: claveCobro,
+        recompensaId: recompensaAplicada?.id ?? null,
+      })
+      setResultadoCobro(resultado)
       setPaso('listo')
     } catch (e: any) {
       setError(e.message)
@@ -396,12 +480,28 @@ export function EmpleadaAtender({
   }
 
   if (paso === 'listo') {
+    // Valores DEFINITIVOS (nunca estimados): son los que fn_completar_y_cobrar_atencion acaba de
+    // devolver, ya guardados en el servidor — distinto de la vista previa que se mostraba en
+    // "Cobrar" antes de confirmar.
+    const huboMovimientoFidelizacion = !!resultadoCobro && (resultadoCobro.puntos_ganados > 0 || resultadoCobro.puntos_utilizados > 0 || !!resultadoCobro.recompensa_aplicada)
     return (
       <div className="mx-auto max-w-md">
         <Card className="flex flex-col items-center gap-3 text-center">
           <p className="text-3xl">✓</p>
           <p className="font-semibold text-carbon">Servicio registrado y cobrado</p>
-          <p className="text-sm text-carbon/60">El historial del cliente, tus ventas, tu comisión y sus puntos ya se actualizaron.</p>
+          <p className="text-sm text-carbon/60">El historial del cliente, tus ventas y tu comisión ya se actualizaron.</p>
+          {huboMovimientoFidelizacion && resultadoCobro && (
+            <div className="w-full rounded-xl bg-oliva/10 p-3 text-left text-sm">
+              <p className="mb-1 font-semibold text-carbon">🌸 Fidelización</p>
+              {resultadoCobro.recompensa_aplicada && (
+                <p className="text-carbon/80">Canjeó <span className="font-medium">{resultadoCobro.recompensa_aplicada.nombre}</span> por {formatoEnteroCOP(resultadoCobro.puntos_utilizados)} puntos.</p>
+              )}
+              {resultadoCobro.puntos_ganados > 0 && (
+                <p className="text-carbon/80">Ganó {formatoEnteroCOP(resultadoCobro.puntos_ganados)} puntos.</p>
+              )}
+              <p className="mt-1 font-semibold text-oliva">Saldo actual: {formatoEnteroCOP(resultadoCobro.saldo_nuevo)} puntos</p>
+            </div>
+          )}
           <Button onClick={() => navigate(rutaFinalizar)}>{etiquetaFinalizar}</Button>
         </Card>
       </div>
@@ -479,8 +579,14 @@ export function EmpleadaAtender({
               <span>{formatoMoneda(subtotalProductos)}</span>
             </div>
           )}
+          {recompensaAplicada && (
+            <div className="flex items-center justify-between text-sm text-carbon/60">
+              <span>Recompensa aplicada · {recompensaAplicada.nombre}</span>
+              {descuentoRecompensa > 0 && <span className="text-error">−{formatoMoneda(descuentoRecompensa)}</span>}
+            </div>
+          )}
           <div className="flex items-center justify-between border-t border-piedra pt-2 text-base font-semibold text-carbon">
-            <span>Total a cobrar</span>
+            <span>Total a pagar</span>
             <span className="text-oliva">{formatoMoneda(total)}</span>
           </div>
           <Select id="metodo" etiqueta="Método de pago" value={metodoPago} onChange={(e) => setMetodoPago(e.target.value as MetodoPago)}>
@@ -491,6 +597,29 @@ export function EmpleadaAtender({
           </Select>
           <Button onClick={confirmarCobro} cargando={enviando} tamano="lg">Confirmar cobro</Button>
         </Card>
+
+        {cliente && (fidelizacion?.acumulacion_activa || fidelizacion?.canjes_activo || recompensaAplicada) && (
+          <Card className="flex flex-col gap-2 bg-champan/10">
+            <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">Fidelización · estimado antes de confirmar</p>
+            {recompensaAplicada && (
+              <div className="flex items-center justify-between text-sm text-carbon/70">
+                <span>Puntos que utilizará</span>
+                <span className="font-medium text-error">−{formatoEnteroCOP(recompensaAplicada.costo_puntos)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-sm text-carbon/70">
+              <span>Puntos que ganará</span>
+              <span className="font-medium text-oliva">+{formatoEnteroCOP(puntosEstimados)}</span>
+            </div>
+            {fidelizacion && (
+              <div className="flex items-center justify-between border-t border-piedra/60 pt-2 text-sm font-semibold text-carbon">
+                <span>Saldo estimado después</span>
+                <span>{formatoEnteroCOP(fidelizacion.saldo - (recompensaAplicada?.costo_puntos ?? 0) + puntosEstimados)}</span>
+              </div>
+            )}
+            <p className="text-xs text-carbon/50">Estos números son un estimado: el saldo definitivo se confirma al cobrar.</p>
+          </Card>
+        )}
       </div>
     )
   }
@@ -548,7 +677,15 @@ export function EmpleadaAtender({
               <PasoBadge numero={1} />
               <p className="font-semibold text-carbon">Paso 1 · Cliente</p>
             </div>
-            <ClienteSeccion cliente={cliente} onSeleccionar={setCliente} onCambiar={() => setCliente(null)} />
+            <ClienteSeccion cliente={cliente} onSeleccionar={cambiarCliente} onCambiar={() => cambiarCliente(null)} />
+            <BloqueFidelizacion
+              cliente={cliente}
+              fidelizacion={fidelizacion}
+              cargando={cargandoFidelizacion}
+              disponibles={recompensasDisponibles}
+              recompensaAplicada={recompensaAplicada}
+              onAplicarRecompensa={aplicarRecompensa}
+            />
           </Card>
 
           <Card className="flex flex-col gap-4">
@@ -576,7 +713,7 @@ export function EmpleadaAtender({
                     equipo={equipo}
                     mostrarErrorPrecio={intentoContinuar && (l.precio == null || l.precio < 0)}
                     onCambiar={(cambios) => actualizarLinea(l.tempId, cambios)}
-                    onQuitar={() => quitarLinea(l.tempId)}
+                    onQuitar={l.esRecompensa ? undefined : () => quitarLinea(l.tempId)}
                     onAgregarColaboracion={agregarLinea}
                     onQuitarColaboracion={quitarLinea}
                     onCrearServicio={crearServicio}
@@ -716,6 +853,91 @@ function ResumenLateral({
   )
 }
 
+// --- Fidelización (sección 11 del pedido): bloque compacto en "Registrar atención" — nunca un
+// tercer paso del flujo. Muestra el saldo de la clienta y, si tiene alguna recompensa a su
+// alcance, deja elegirla para este mismo cobro. Si el programa está en pausa (ni acumulación ni
+// canjes activos) o la clienta aún no tiene saldo/recompensas disponibles, no estorba: no
+// renderiza nada o solo un texto discreto. ---
+
+function BloqueFidelizacion({
+  cliente,
+  fidelizacion,
+  cargando,
+  disponibles,
+  recompensaAplicada,
+  onAplicarRecompensa,
+}: {
+  cliente: Cliente | null
+  fidelizacion: MiFidelizacion | null
+  cargando: boolean
+  disponibles: Recompensa[] | null
+  recompensaAplicada: Recompensa | null
+  onAplicarRecompensa: (r: Recompensa | null) => void
+}) {
+  const [modalAbierto, setModalAbierto] = useState(false)
+
+  if (!cliente) return null
+  if (cargando && !fidelizacion) {
+    return (
+      <div className="mt-3">
+        <Cargando filas={1} />
+      </div>
+    )
+  }
+  if (!fidelizacion) return null
+  if (!fidelizacion.acumulacion_activa && !fidelizacion.canjes_activo) return null
+
+  return (
+    <div className="mt-3 rounded-xl border border-piedra bg-marfil p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-carbon">🌸 Fidelización</p>
+        <span className="text-sm font-semibold text-oliva">{formatoEnteroCOP(fidelizacion.saldo)} puntos</span>
+      </div>
+
+      {recompensaAplicada ? (
+        <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-oliva/10 px-3 py-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-carbon">{recompensaAplicada.nombre}</p>
+            <p className="text-xs text-carbon/60">{formatoEnteroCOP(recompensaAplicada.costo_puntos)} puntos</p>
+          </div>
+          <button onClick={() => onAplicarRecompensa(null)} className="shrink-0 text-sm font-semibold text-error hover:underline">
+            Quitar
+          </button>
+        </div>
+      ) : !fidelizacion.canjes_activo ? (
+        <p className="mt-2 text-xs text-carbon/60">Los canjes están en pausa por ahora.</p>
+      ) : disponibles === null ? (
+        <div className="mt-2"><Cargando filas={1} /></div>
+      ) : disponibles.length === 0 ? (
+        <p className="mt-2 text-xs text-carbon/60">Todavía no alcanza para ninguna recompensa disponible.</p>
+      ) : (
+        <button type="button" onClick={() => setModalAbierto(true)} className="mt-2 text-sm font-semibold text-oliva hover:underline">
+          Ver recompensas que puede usar ({disponibles.length})
+        </button>
+      )}
+
+      <Modal abierto={modalAbierto} onCerrar={() => setModalAbierto(false)} titulo="Recompensas disponibles">
+        <div className="flex flex-col gap-2">
+          {(disponibles ?? []).map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => { onAplicarRecompensa(r); setModalAbierto(false) }}
+              className="flex items-center justify-between gap-3 rounded-lg border border-piedra px-3 py-2 text-left hover:border-oliva"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-carbon">{r.nombre}</p>
+                {r.descripcion && <p className="truncate text-xs text-carbon/60">{r.descripcion}</p>}
+              </div>
+              <span className="shrink-0 text-sm font-semibold text-oliva">{formatoEnteroCOP(r.costo_puntos)} pts</span>
+            </button>
+          ))}
+        </div>
+      </Modal>
+    </div>
+  )
+}
+
 // --- Cliente: buscador con recientes, coincidencias parciales, navegación por teclado y
 // estados de carga/sin resultados/error. Tras seleccionar, ficha compacta con "Cambiar".
 // "+ Crear cliente" es una acción siempre visible (no depende de escribir una búsqueda
@@ -783,7 +1005,7 @@ function ClienteSeccion({
       seleccionar({
         id: 'demo-cliente-nuevo', usuario_id: null, nombre: nuevoNombre.trim(), telefono: nuevoTelefono || null, email: null,
         consentimiento_marketing: false, visitas_completadas: 0, gasto_acumulado: 0, activo: true, origen_registro: 'admin',
-        notas: null, resena_google_confirmada: false, creado_en: new Date().toISOString(),
+        notas: null, resena_google_confirmada: false, meta_recompensa_id: null, creado_en: new Date().toISOString(),
       })
       return
     }
@@ -1014,10 +1236,12 @@ function ServicioTarjeta({
     <div className="rounded-xl border border-piedra p-4">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-piedra/40 text-lg" aria-hidden>✂️</div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-piedra/40 text-lg" aria-hidden>{linea.esRecompensa ? '🎁' : '✂️'}</div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40">Servicio {numero}</p>
-            <p className="text-sm text-carbon/60">{linea.nombre ? 'Servicio seleccionado' : 'Elige un servicio'}</p>
+            <p className="text-sm text-carbon/60">
+              {linea.esRecompensa ? 'Regalo de fidelización' : linea.nombre ? 'Servicio seleccionado' : 'Elige un servicio'}
+            </p>
           </div>
         </div>
         {onQuitar && (
@@ -1032,14 +1256,20 @@ function ServicioTarjeta({
           Precio cobrado recibe algo más de ancho que sus dos vecinos: el prefijo "$" y el
           sufijo "COP" fijos le restan espacio útil al número frente a un input normal. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1.05fr_1.3fr]">
-        <ServicioBuscador
-          id={`servicio-${linea.tempId}`}
-          servicios={servicios}
-          valor={linea.nombre}
-          onSeleccionar={elegirServicio}
-          onCrear={crearYElegirServicio}
-          errorCrear={errorCrearServicio}
-        />
+        {linea.esRecompensa ? (
+          <CampoBase etiqueta="Servicio" id={`servicio-${linea.tempId}`} alinearAltura>
+            <div className="flex h-[42px] items-center rounded-lg border border-piedra bg-piedra/10 px-3 text-sm text-carbon/80">{linea.nombre}</div>
+          </CampoBase>
+        ) : (
+          <ServicioBuscador
+            id={`servicio-${linea.tempId}`}
+            servicios={servicios}
+            valor={linea.nombre}
+            onSeleccionar={elegirServicio}
+            onCrear={crearYElegirServicio}
+            errorCrear={errorCrearServicio}
+          />
+        )}
         <Select
           id={`prof-${linea.tempId}`}
           etiqueta="Profesional"
@@ -1050,19 +1280,25 @@ function ServicioTarjeta({
           <option value="">Elegir…</option>
           {opcionesProfesional.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
         </Select>
-        <CampoMoneda
-          id={`precio-${linea.tempId}`}
-          etiqueta="Precio cobrado"
-          alinearAltura
-          value={linea.precio}
-          onChange={(v) => onCambiar({ precio: v })}
-          error={mostrarErrorPrecio ? 'Ingresa el precio cobrado' : undefined}
-        />
+        {linea.esRecompensa ? (
+          <CampoBase etiqueta="Precio cobrado" id={`precio-${linea.tempId}`} alinearAltura>
+            <div className="flex h-[42px] items-center rounded-lg border border-piedra bg-piedra/10 px-3 text-sm font-semibold text-oliva">Gratis · regalo</div>
+          </CampoBase>
+        ) : (
+          <CampoMoneda
+            id={`precio-${linea.tempId}`}
+            etiqueta="Precio cobrado"
+            alinearAltura
+            value={linea.precio}
+            onChange={(v) => onCambiar({ precio: v })}
+            error={mostrarErrorPrecio ? 'Ingresa el precio cobrado' : undefined}
+          />
+        )}
       </div>
 
       <VistaPreviaComision linea={linea} />
 
-      {colaboradores.length > 0 && (
+      {!linea.esRecompensa && colaboradores.length > 0 && (
         <div className="mt-3 flex flex-col gap-1.5">
           {colaboradores.map((c) => {
             const nombreColaborador = equipo.find((p) => p.id === c.profesionalId)?.nombre ?? '—'
@@ -1085,7 +1321,7 @@ function ServicioTarjeta({
         </div>
       )}
 
-      {colaboradores.length >= MAX_COLABORADORES_POR_SERVICIO ? (
+      {linea.esRecompensa ? null : colaboradores.length >= MAX_COLABORADORES_POR_SERVICIO ? (
         <p className="mt-3 text-xs text-carbon/50">Máximo de {MAX_COLABORADORES_POR_SERVICIO} colaboradores por servicio.</p>
       ) : formAbierto ? (
         <div className="mt-3 flex flex-col gap-2 rounded-lg border border-piedra bg-marfil p-3">

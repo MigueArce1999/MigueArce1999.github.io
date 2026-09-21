@@ -72,3 +72,25 @@ h3,
     font-size: 16px;
   }
 }
+
+/* Flor de fidelización (FlorProgreso.tsx) — transición entre etapas y brillo de celebración.
+   Ambas se desactivan con prefers-reduced-motion: la flor sigue comunicando el progreso por su
+   forma final (sin animar el camino hasta ahí), nunca solo por movimiento. */
+.fp-petalo {
+  transition: transform 0.6s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.6s ease;
+}
+.fp-glow {
+  animation: fp-pulso 2.2s ease-in-out infinite;
+}
+@keyframes fp-pulso {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fp-petalo {
+    transition: none;
+  }
+  .fp-glow {
+    animation: none;
+  }
+}

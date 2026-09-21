@@ -39,6 +39,9 @@ export interface Cliente {
   notas: string | null
   // Se marca a mano desde el panel; nunca es una verificación automática contra Google.
   resena_google_confirmada: boolean
+  // Fidelización: meta que la propia clienta eligió (null = usar la de menor costo disponible
+  // por defecto — ver fn_mi_fidelizacion en 0047_fidelizacion.sql).
+  meta_recompensa_id: string | null
   creado_en: string
 }
 
@@ -220,7 +223,9 @@ export interface MovimientoPuntos {
   puntos: number
   referencia_tipo: string | null
   referencia_id: string | null
+  canje_id: string | null
   motivo: string | null
+  regla_aplicada: Record<string, unknown> | null
   creado_en: string
 }
 
@@ -434,4 +439,100 @@ export interface PlantillaGastoRecurrente {
   fecha_fin: string | null
   activa: boolean
   creado_en: string
+}
+
+// --- Fidelización ("Tu belleza florece") ----------------------------------------------------
+// Ver supabase/migrations/0047_fidelizacion.sql para el porqué de cada decisión de esquema.
+
+export type TipoRecompensa = 'beneficio' | 'descuento_fijo'
+export type EstadoCanje = 'confirmado' | 'revertido'
+
+export interface ReglaPuntos {
+  id: string
+  activa: boolean
+  vigente_desde: string
+  vigente_hasta: string | null
+  monto_por_bloque: number | null
+  puntos_por_bloque: number | null
+  categorias_excluidas: string[]
+  servicios_excluidos: string[]
+  incluye_productos: boolean
+}
+
+export interface ConfiguracionFidelizacion {
+  acumulacion_activa: boolean
+  canjes_activo: boolean
+  texto_programa: string
+  actualizado_en: string
+}
+
+export interface Recompensa {
+  id: string
+  nombre: string
+  descripcion: string | null
+  costo_puntos: number
+  activa: boolean
+  tipo: TipoRecompensa
+  servicio_id: string | null
+  servicio_nombre?: string
+  monto_descuento: number | null
+  servicios_elegibles: string[]
+  condiciones: string | null
+  requiere_atencion_pagada: boolean
+  stock_ilimitado: boolean
+  cantidad_disponible: number | null
+  imagen_url: string | null
+  orden_visualizacion: number
+  creado_en: string
+  actualizado_en: string
+}
+
+export interface CanjeRecompensa {
+  id: string
+  cliente_id: string
+  cliente_nombre?: string
+  recompensa_id: string
+  atencion_id: string | null
+  costo_puntos_snapshot: number
+  condiciones_snapshot: { nombre: string; tipo: TipoRecompensa; condiciones: string | null; servicio_id: string | null; monto_descuento: number | null }
+  estado: EstadoCanje
+  entregado: boolean
+  empleada_id: string | null
+  creado_en: string
+  revertido_en: string | null
+}
+
+// Snapshot devuelto por fn_mi_fidelizacion: todo lo que necesita la tarjeta de la clienta en una
+// sola llamada (saldo, meta con su progreso ya calculado, y el estado del programa).
+export interface MiFidelizacion {
+  saldo: number
+  acumulacion_activa: boolean
+  canjes_activo: boolean
+  texto_programa: string
+  meta: Recompensa | null
+  progreso: number | null
+  puntos_faltantes: number | null
+}
+
+export interface NotificacionFidelizacion {
+  id: string
+  cliente_id: string
+  tipo: 'puntos_ganados' | 'meta_alcanzada'
+  titulo: string
+  mensaje: string
+  origen_tipo: string
+  origen_id: string
+  leida_en: string | null
+  creado_en: string
+}
+
+// Valor definitivo que devuelve fn_completar_y_cobrar_atencion — nunca una estimación: es lo
+// que de verdad quedó guardado en el servidor (sección 12 del pedido: "la vista previa puede ser
+// inmediata, pero debe distinguirse del resultado confirmado").
+export interface ResultadoCobro {
+  atencion: Atencion
+  puntos_ganados: number
+  puntos_utilizados: number
+  saldo_nuevo: number
+  recompensa_aplicada: { canje_id: string; nombre: string; tipo: TipoRecompensa } | null
 }

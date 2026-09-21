@@ -26,7 +26,7 @@ function cliente(id: string, nombre: string): Cliente {
   return {
     id, usuario_id: null, nombre, telefono: '3000000000', email: null, consentimiento_marketing: false,
     visitas_completadas: 0, gasto_acumulado: 0, activo: true, origen_registro: 'admin', notas: null,
-    resena_google_confirmada: false, creado_en: new Date().toISOString(),
+    resena_google_confirmada: false, meta_recompensa_id: null, creado_en: new Date().toISOString(),
   }
 }
 

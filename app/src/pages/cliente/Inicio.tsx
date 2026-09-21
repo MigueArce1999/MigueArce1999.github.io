@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Card, Cargando, EmptyState } from '../../components/ui/Estados'
 import { EstadoReservaBadge } from '../../components/ui/StatusBadge'
+import { TarjetaFidelizacion } from '../../components/fidelizacion/TarjetaFidelizacion'
+import { CelebracionFidelizacion } from '../../components/fidelizacion/CelebracionFidelizacion'
+import { useMiFidelizacion } from '../../lib/fidelizacion/useMiFidelizacion'
 import { useAuth } from '../../state/AuthContext'
-import { listarMovimientosPuntos, marcarMiResenaGoogle, saldoPuntos } from '../../lib/api/cliente'
+import { marcarMiResenaGoogle } from '../../lib/api/cliente'
 import { listarPromocionesVigentes } from '../../lib/api/catalogo'
 import { listarReservasDeCliente } from '../../lib/api/reservas'
 import { formatoFecha, formatoHora } from '../../lib/format'
@@ -14,8 +17,9 @@ import type { Promocion, Reserva } from '../../lib/types'
 export function ClienteInicio() {
   const { cliente, perfil } = useAuth()
   const [reservas, setReservas] = useState<Reserva[] | null>(null)
-  const [puntos, setPuntos] = useState<number | null>(null)
   const [promos, setPromos] = useState<Promocion[] | null>(null)
+  const { fidelizacion, cargando: cargandoFidelizacion, error: errorFidelizacion, celebraciones, recargar, reconocerCelebracion } =
+    useMiFidelizacion(cliente?.id)
   // Estado local para poder ocultar la tarjeta apenas la clienta confirma, sin depender de que
   // AuthContext vuelva a leer su fila de `cliente` (solo lo hace al iniciar sesión).
   const [resenaConfirmada, setResenaConfirmada] = useState(cliente?.resena_google_confirmada ?? false)
@@ -24,7 +28,6 @@ export function ClienteInicio() {
   useEffect(() => {
     if (!cliente) return
     listarReservasDeCliente(cliente.id).then(setReservas)
-    listarMovimientosPuntos(cliente.id).then((m) => setPuntos(saldoPuntos(m)))
     listarPromocionesVigentes().then(setPromos)
     setResenaConfirmada(cliente.resena_google_confirmada)
   }, [cliente])
@@ -53,35 +56,37 @@ export function ClienteInicio() {
         <p className="text-sm text-carbon/60">Aquí tienes un resumen de tu cuenta.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">Próxima cita</p>
-          {!reservas ? (
-            <Cargando filas={1} />
-          ) : proxima ? (
-            <div className="mt-2">
-              <p className="font-semibold text-carbon">{proxima.servicio_nombre}</p>
-              <p className="text-sm text-carbon/60">
-                {formatoFecha(proxima.rango_inicio)} · {formatoHora(proxima.rango_inicio)} con {proxima.profesional_nombre}
-              </p>
-              <div className="mt-2"><EstadoReservaBadge estado={proxima.estado} /></div>
-            </div>
-          ) : (
-            <div className="mt-2 flex flex-col gap-2">
-              <p className="text-sm text-carbon/60">No tienes citas próximas.</p>
-              <Link to="/reservar"><Button tamano="sm">Reservar cita</Button></Link>
-            </div>
-          )}
-        </Card>
+      {celebraciones.length > 0 && (
+        <CelebracionFidelizacion celebraciones={celebraciones} onReconocer={reconocerCelebracion} />
+      )}
 
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">Puntos disponibles</p>
-          <p className="mt-2 text-3xl font-marca font-semibold text-oliva">{puntos ?? '—'}</p>
-          <Link to="/cliente/puntos" className="text-sm font-semibold text-oliva underline underline-offset-2">
-            Ver beneficios
-          </Link>
-        </Card>
-      </div>
+      <TarjetaFidelizacion
+        nombreClienta={perfil?.nombre}
+        fidelizacion={fidelizacion}
+        cargando={cargandoFidelizacion}
+        error={errorFidelizacion}
+        onReintentar={recargar}
+      />
+
+      <Card>
+        <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">Próxima cita</p>
+        {!reservas ? (
+          <Cargando filas={1} />
+        ) : proxima ? (
+          <div className="mt-2">
+            <p className="font-semibold text-carbon">{proxima.servicio_nombre}</p>
+            <p className="text-sm text-carbon/60">
+              {formatoFecha(proxima.rango_inicio)} · {formatoHora(proxima.rango_inicio)} con {proxima.profesional_nombre}
+            </p>
+            <div className="mt-2"><EstadoReservaBadge estado={proxima.estado} /></div>
+          </div>
+        ) : (
+          <div className="mt-2 flex flex-col gap-2">
+            <p className="text-sm text-carbon/60">No tienes citas próximas.</p>
+            <Link to="/reservar"><Button tamano="sm">Reservar cita</Button></Link>
+          </div>
+        )}
+      </Card>
 
       <div>
         <div className="mb-3 flex items-center justify-between">
