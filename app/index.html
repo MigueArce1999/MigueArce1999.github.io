@@ -14,7 +14,11 @@
     <!-- Safari (iOS) ignora <link rel="manifest">; estas etiquetas son la única forma de que
          una PWA agregada a la pantalla de inicio abra en modo standalone allí. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- "default" (opaca) en vez de "black-translucent": con la translúcida, iOS dibuja el
+         contenido de la página POR DEBAJO de la barra de estado/notch en modo standalone, así
+         que el botón de menú del header quedaba tapado/pegado ahí arriba y era imposible de
+         tocar — con la opaca, iOS reserva su propio espacio y el header nunca queda debajo. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="CP Equipo" />
 
     <style>

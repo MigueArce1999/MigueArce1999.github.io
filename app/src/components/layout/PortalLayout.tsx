@@ -125,7 +125,7 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
         </aside>
 
         {/* Contenido */}
-        <div className="min-h-screen min-w-0 flex-1 pb-20 md:pb-6">
+        <div className="min-h-screen min-w-0 flex-1 pb-24 md:pb-6">
           <header className="flex items-center justify-between gap-3 border-b border-piedra bg-blanco px-4 py-3 md:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <button onClick={() => setMenuMovilAbierto(true)} aria-label="Abrir menú" className="text-carbon md:hidden">
@@ -155,7 +155,10 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
       {/* Navegación inferior (móvil). Si hay más de 5 secciones (p. ej. Administración), la
           última pestaña se reemplaza por "Más", que abre el overlay con el resto — así ninguna
           sección queda inalcanzable en pantallas angostas. */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 border-t border-piedra bg-blanco px-2 py-2 md:hidden">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 border-t border-piedra bg-blanco px-2 pt-2 md:hidden"
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+      >
         {(items.length > 5 ? items.slice(0, 4) : items).map((item) => (
           <NavLink
             key={item.to}
@@ -222,7 +225,8 @@ function MenuMovilOverlay({
         aria-modal="true"
         aria-label={`Menú de ${titulo}`}
         onClick={(e) => e.stopPropagation()}
-        className="relative flex h-full w-72 max-w-[80vw] flex-col gap-4 overflow-y-auto bg-blanco p-5 shadow-xl"
+        className="relative flex h-full w-72 max-w-[80vw] flex-col gap-4 overflow-y-auto bg-blanco px-5 pb-5 shadow-xl"
+        style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
       >
         <div className="flex items-center justify-between">
           <p className="font-marca text-lg font-semibold text-carbon">Claudia Patricia</p>

@@ -28,7 +28,10 @@ export function PublicLayout() {
     <div className="min-h-screen bg-marfil">
       {isDemoMode && <DemoBanner />}
       <header className="sticky top-0 z-40 border-b border-piedra bg-blanco/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 sm:px-[40px] py-3">
+        <div
+          className="mx-auto flex max-w-[1440px] items-center justify-between px-5 sm:px-[40px] py-4 md:py-3"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+        >
           <Link to="/" className="flex items-center">
             <img src={logo} alt="Claudia Patricia" className="h-12 w-auto" />
           </Link>
@@ -148,7 +151,8 @@ function MenuMovil({
         aria-modal="true"
         aria-label="Menú"
         onClick={(e) => e.stopPropagation()}
-        className="relative flex h-full w-full max-w-xs flex-col gap-6 overflow-y-auto bg-blanco p-5 shadow-xl"
+        className="relative flex h-full w-full max-w-xs flex-col gap-6 overflow-y-auto bg-blanco px-5 pb-5 shadow-xl"
+        style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
       >
         <div className="flex items-center justify-between">
           <img src={logo} alt="Claudia Patricia" className="h-10 w-auto" />
