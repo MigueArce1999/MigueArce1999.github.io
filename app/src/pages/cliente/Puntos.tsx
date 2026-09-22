@@ -8,6 +8,7 @@ import { useAuth } from '../../state/AuthContext'
 import { useMiFidelizacion } from '../../lib/fidelizacion/useMiFidelizacion'
 import { useCelebracionCanje } from '../../lib/fidelizacion/useCelebracionCanje'
 import {
+  autocanjearRecompensa,
   elegirMetaRecompensa,
   listarMisCanjes,
   listarMovimientosPuntosPagina,
@@ -34,13 +35,17 @@ export function ClientePuntos() {
   const [detalle, setDetalle] = useState<Recompensa | null>(null)
   const [guardandoMeta, setGuardandoMeta] = useState<string | null>(null)
   const [ultimoCanje, setUltimoCanje] = useState<CanjeRecompensa | null | undefined>(undefined)
+  const [autocanjeando, setAutocanjeando] = useState(false)
+  const [errorAutocanje, setErrorAutocanje] = useState<string | null>(null)
 
-  useEffect(() => {
+  function recargarUltimoCanje() {
     if (!cliente) return
     listarMisCanjes(cliente.id)
       .then((canjes) => setUltimoCanje(canjes.find((c) => c.estado === 'confirmado') ?? null))
       .catch(() => setUltimoCanje(null))
-  }, [cliente])
+  }
+
+  useEffect(recargarUltimoCanje, [cliente])
 
   function cargarCatalogo() {
     setErrorCatalogo(null)
@@ -58,6 +63,29 @@ export function ClientePuntos() {
       recargar()
     } finally {
       setGuardandoMeta(null)
+    }
+  }
+
+  // Autocanje desde el propio perfil (sin pasar por un cobro de Atender): la clienta pide su
+  // recompensa ella misma. Después de que el servidor confirme, se recarga la fidelización —
+  // eso trae el saldo nuevo Y la notificación canje_confirmado, que useCelebracionCanje ya
+  // detecta sola y dispara la MISMA animación que el canje hecho durante un cobro (ninguna
+  // lógica de celebración nueva, se reutiliza tal cual).
+  async function autocanjear(recompensa: Recompensa) {
+    if (!cliente || autocanjeando) return
+    setAutocanjeando(true)
+    setErrorAutocanje(null)
+    const idempotencyKey = `autocanje-${cliente.id}-${recompensa.id}-${Date.now()}`
+    try {
+      await autocanjearRecompensa(cliente.id, recompensa.id, idempotencyKey)
+      setDetalle(null)
+      recargar()
+      recargarUltimoCanje()
+      cargarCatalogo()
+    } catch (e: any) {
+      setErrorAutocanje(e.message)
+    } finally {
+      setAutocanjeando(false)
     }
   }
 
@@ -122,7 +150,15 @@ export function ClientePuntos() {
         <HistorialPuntos clienteId={cliente?.id} />
       </div>
 
-      <DetalleRecompensaModal recompensa={detalle} onCerrar={() => setDetalle(null)} />
+      <DetalleRecompensaModal
+        recompensa={detalle}
+        saldo={fidelizacion?.saldo ?? 0}
+        canjesActivos={fidelizacion?.canjes_activo ?? false}
+        autocanjeando={autocanjeando}
+        error={errorAutocanje}
+        onCerrar={() => { setDetalle(null); setErrorAutocanje(null) }}
+        onCanjear={autocanjear}
+      />
     </div>
   )
 }
@@ -231,28 +267,75 @@ function TarjetaRecompensa({
   )
 }
 
-function DetalleRecompensaModal({ recompensa, onCerrar }: { recompensa: Recompensa | null; onCerrar: () => void }) {
+function DetalleRecompensaModal({
+  recompensa,
+  saldo,
+  canjesActivos,
+  autocanjeando,
+  error,
+  onCerrar,
+  onCanjear,
+}: {
+  recompensa: Recompensa | null
+  saldo: number
+  canjesActivos: boolean
+  autocanjeando: boolean
+  error: string | null
+  onCerrar: () => void
+  onCanjear: (recompensa: Recompensa) => void
+}) {
+  const [confirmando, setConfirmando] = useState(false)
+
+  // El estado de confirmación es propio de CADA recompensa que se está viendo — si se cierra el
+  // modal o se abre una distinta, nunca debe quedar "armado" un canje de la anterior.
+  useEffect(() => setConfirmando(false), [recompensa?.id])
+
+  if (!recompensa) return null
+
+  const agotada = !recompensa.stock_ilimitado && (recompensa.cantidad_disponible ?? 0) <= 0
+  const alcanza = saldo >= recompensa.costo_puntos
+
   return (
-    <Modal abierto={recompensa !== null} onCerrar={onCerrar} titulo={recompensa?.nombre ?? ''}>
-      {recompensa && (
-        <div className="flex flex-col gap-3 text-sm text-carbon">
-          {recompensa.imagen_url && <img src={recompensa.imagen_url} alt="" className="h-40 w-full rounded-lg object-cover" />}
-          {recompensa.descripcion && <p>{recompensa.descripcion}</p>}
-          <p className="font-semibold text-oliva">{formatoEnteroCOP(recompensa.costo_puntos)} puntos</p>
-          {recompensa.tipo === 'beneficio' && recompensa.servicio_nombre && (
-            <p><span className="font-semibold">Incluye:</span> {recompensa.servicio_nombre}</p>
-          )}
-          {recompensa.tipo === 'descuento_fijo' && recompensa.monto_descuento && (
-            <p><span className="font-semibold">Descuento:</span> {formatoEnteroCOP(recompensa.monto_descuento)} COP sobre servicios elegibles.</p>
-          )}
-          {recompensa.condiciones && (
-            <p className="text-carbon/60"><span className="font-semibold text-carbon">Condiciones:</span> {recompensa.condiciones}</p>
-          )}
+    <Modal abierto={true} onCerrar={onCerrar} titulo={recompensa.nombre}>
+      <div className="flex flex-col gap-3 text-sm text-carbon">
+        {recompensa.imagen_url && <img src={recompensa.imagen_url} alt="" className="h-40 w-full rounded-lg object-cover" />}
+        {recompensa.descripcion && <p>{recompensa.descripcion}</p>}
+        <p className="font-semibold text-oliva">{formatoEnteroCOP(recompensa.costo_puntos)} puntos</p>
+        {recompensa.tipo === 'beneficio' && recompensa.servicio_nombre && (
+          <p><span className="font-semibold">Incluye:</span> {recompensa.servicio_nombre}</p>
+        )}
+        {recompensa.tipo === 'descuento_fijo' && recompensa.monto_descuento && (
+          <p><span className="font-semibold">Descuento:</span> {formatoEnteroCOP(recompensa.monto_descuento)} COP sobre servicios elegibles.</p>
+        )}
+        {recompensa.condiciones && (
+          <p className="text-carbon/60"><span className="font-semibold text-carbon">Condiciones:</span> {recompensa.condiciones}</p>
+        )}
+
+        {error && <ErrorState mensaje={error} />}
+
+        {agotada ? (
+          <p className="rounded-lg bg-champan/15 px-3 py-2 text-carbon/80">Esta recompensa se agotó por ahora.</p>
+        ) : !canjesActivos ? (
+          <p className="rounded-lg bg-champan/15 px-3 py-2 text-carbon/80">Los canjes están en pausa por ahora — vuelve a intentarlo más tarde.</p>
+        ) : !alcanza ? (
           <p className="rounded-lg bg-champan/15 px-3 py-2 text-carbon/80">
-            Solicita esta recompensa durante tu próxima visita. La aplicaremos al confirmar tu atención.
+            Te faltan {formatoEnteroCOP(recompensa.costo_puntos - saldo)} puntos para poder canjearla.
           </p>
-        </div>
-      )}
+        ) : confirmando ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-oliva/30 bg-oliva/5 px-3 py-3">
+            <p className="text-carbon">
+              ¿Confirmas usar <span className="font-semibold">{formatoEnteroCOP(recompensa.costo_puntos)} puntos</span> en esta recompensa?
+              Preséntate en el salón para reclamarla.
+            </p>
+            <div className="flex gap-2">
+              <Button tamano="sm" onClick={() => onCanjear(recompensa)} cargando={autocanjeando}>Sí, canjear</Button>
+              <Button tamano="sm" variante="ghost" onClick={() => setConfirmando(false)} disabled={autocanjeando}>Cancelar</Button>
+            </div>
+          </div>
+        ) : (
+          <Button tamano="md" onClick={() => setConfirmando(true)} className="self-start">Canjear ahora</Button>
+        )}
+      </div>
     </Modal>
   )
 }
