@@ -6,9 +6,8 @@ import { listarCategorias, listarProfesionalesHomepage, listarPromocionesVigente
 import { obtenerConfiguracionHomepage } from '../../lib/api/homepage'
 import { isDemoMode } from '../../lib/supabase'
 import { useAuth } from '../../state/AuthContext'
-import type { CategoriaServicio, ConfiguracionHomepage, Profesional, Promocion, Rol } from '../../lib/types'
-
-const rutaPorRol: Record<Rol, string> = { cliente: '/cliente', empleada: '/equipo-app', admin: '/admin' }
+import { rutaEnEsteSalon } from '../../lib/rutas'
+import type { CategoriaServicio, ConfiguracionHomepage, Profesional, Promocion } from '../../lib/types'
 
 // El diseño de Figma usa fotografía de campaña en el hero y en cada tarjeta (servicios,
 // promociones, equipo). No hay todavía esas fotos reales en el proyecto, así que se muestra
@@ -21,7 +20,7 @@ function FotoPlaceholder({ className = '' }: { className?: string }) {
 
 export function Home() {
   const navigate = useNavigate()
-  const { perfil } = useAuth()
+  const { perfil, cliente } = useAuth()
   const [categorias, setCategorias] = useState<CategoriaServicio[] | null>(null)
   const [promos, setPromos] = useState<Promocion[] | null>(null)
   const [equipo, setEquipo] = useState<Profesional[] | null>(null)
@@ -44,8 +43,8 @@ export function Home() {
   // por primera vez se quedaría viendo la página pública en vez de su portal.
   useEffect(() => {
     if (isDemoMode || !perfil) return
-    navigate(rutaPorRol[perfil.rol], { replace: true })
-  }, [perfil, navigate])
+    navigate(rutaEnEsteSalon(perfil, cliente !== null), { replace: true })
+  }, [perfil, cliente, navigate])
 
   return (
     <div>

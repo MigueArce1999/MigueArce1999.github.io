@@ -2,7 +2,7 @@
 // Mantener sincronizado a mano es aceptable para el alcance de la Fase 1;
 // en Fase 2 conviene generarlos con `supabase gen types typescript`.
 
-export type Rol = 'cliente' | 'empleada' | 'admin'
+export type Rol = 'cliente' | 'empleada' | 'admin' | 'super_admin'
 
 export type EstadoReserva =
   | 'pendiente'
@@ -23,6 +23,23 @@ export interface Perfil {
   telefono: string | null
   rol: Rol
   activo: boolean
+  local_id?: string
+}
+
+export interface LocalMarca {
+  id: string
+  nombre: string
+  slug: string
+  activo: boolean
+  logo_url: string | null
+  favicon_url: string | null
+  logo_footer_url: string | null
+  url_sitio: string | null
+  nombre_corto: string | null
+  eslogan: string | null
+  color_primario?: string | null
+  color_acento?: string | null
+  creado_en?: string
 }
 
 export interface Cliente {

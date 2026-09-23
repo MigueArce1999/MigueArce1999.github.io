@@ -5,25 +5,22 @@ import { Input } from '../../components/ui/Campos'
 import { ErrorState } from '../../components/ui/Estados'
 import { isDemoMode } from '../../lib/supabase'
 import { iniciarSesion } from '../../lib/api/auth'
+import { rutaEnEsteSalon } from '../../lib/rutas'
 import { useAuth } from '../../state/AuthContext'
-import type { Rol } from '../../lib/types'
-
-const rutaPorRol: Record<Rol, string> = { cliente: '/cliente', empleada: '/equipo-app', admin: '/admin' }
 
 export function Ingresar() {
   const navigate = useNavigate()
-  const { perfil, fijarDemoRol } = useAuth()
+  const { perfil, cliente, fijarDemoRol } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
 
   useEffect(() => {
-    // En modo demo, /ingresar sirve para ELEGIR o CAMBIAR de portal, así que no se redirige
-    // automáticamente aunque ya haya un demoRol activo (ver más abajo, isDemoMode).
     if (perfil && isDemoMode) return
-    if (perfil) navigate(rutaPorRol[perfil.rol], { replace: true })
-  }, [perfil, navigate])
+    if (!perfil) return
+    navigate(rutaEnEsteSalon(perfil, cliente !== null), { replace: true })
+  }, [perfil, cliente, navigate])
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
@@ -67,7 +64,6 @@ export function Ingresar() {
       <p className="mt-4 text-center text-sm text-carbon/60">
         ¿Primera vez aquí? <Link to="/registro" className="font-semibold text-oliva">Crea tu cuenta</Link>
       </p>
-      <p className="mt-8 text-center text-xs text-carbon/40">Acceso de clientes y del equipo del salón.</p>
     </div>
   )
 }

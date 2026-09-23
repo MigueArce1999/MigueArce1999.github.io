@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { isDemoMode } from '../../lib/supabase'
 import { DemoBanner } from '../ui/Estados'
 import { useAuth } from '../../state/AuthContext'
+import { useBranding } from '../../state/BrandingContext'
 import { cerrarSesion } from '../../lib/api/auth'
 import { useDialogAccesible } from '../ui/Modal'
 import { IconoChevronIzquierda, IconoMenu, IconoX } from '../ui/Icons'
@@ -41,6 +42,7 @@ function usarSidebarColapsado() {
 
 export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: string }) {
   const { perfil, cliente, profesional, cerrarSesionLocal } = useAuth()
+  const { marca } = useBranding()
   const { colapsado, alternar } = usarSidebarColapsado()
   const location = useLocation()
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false)
@@ -76,8 +78,8 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
         {/* Sidebar (tablet/escritorio) */}
         <aside className={`hidden shrink-0 flex-col gap-6 border-r border-piedra bg-blanco py-6 md:flex ${colapsado ? 'w-[72px] px-2' : 'w-60 px-4'}`}>
           <div className={`flex items-center ${colapsado ? 'justify-center' : 'justify-between px-2'}`}>
-            <Link to="/" className="font-marca text-xl font-semibold text-carbon" title="Claudia Patricia">
-              {colapsado ? 'CP' : 'Claudia Patricia'}
+            <Link to="/" className="font-marca text-xl font-semibold text-carbon" title={marca.nombre}>
+              {colapsado ? (marca.nombre_corto || marca.nombre.slice(0, 2)) : marca.nombre}
             </Link>
           </div>
           {!colapsado && <p className="-mt-4 px-2 font-sans text-[10px] font-semibold uppercase tracking-[0.15em] text-carbon/40">{titulo}</p>}
@@ -218,6 +220,7 @@ function MenuMovilOverlay({
   onSalir: () => void
   enlacesOtrosPortales: { to: string; texto: string }[]
 }) {
+  const { marca } = useBranding()
   const panelRef = useRef<HTMLDivElement>(null)
   useDialogAccesible(abierto, onCerrar, panelRef)
   // Cerrar automáticamente al navegar, para no dejar el overlay abierto tapando la página nueva.
@@ -238,7 +241,7 @@ function MenuMovilOverlay({
         style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
       >
         <div className="flex items-center justify-between">
-          <p className="font-marca text-lg font-semibold text-carbon">Claudia Patricia</p>
+          <p className="font-marca text-lg font-semibold text-carbon">{marca.nombre}</p>
           <button onClick={onCerrar} aria-label="Cerrar menú" className="text-carbon/60 hover:text-carbon">
             <IconoX className="h-5 w-5" />
           </button>

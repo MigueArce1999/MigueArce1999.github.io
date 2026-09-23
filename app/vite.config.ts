@@ -9,8 +9,10 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icons/apple-touch-icon.png'],
+      // `prompt` evita location.reload() al activar un SW nuevo (autoUpdate recargaba
+      // al volver de otra pestaña si había un deploy). El SW se actualiza en la siguiente visita.
+      registerType: 'prompt',
+      includeAssets: ['favicon.png', 'favicon.svg', 'logo-claudia-patricia.png', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'Claudia Patricia · Equipo',
         short_name: 'CP Equipo',

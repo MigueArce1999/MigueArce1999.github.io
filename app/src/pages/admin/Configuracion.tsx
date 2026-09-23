@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Input, Select } from '../../components/ui/Campos'
 import { Card, ErrorState } from '../../components/ui/Estados'
-import { isDemoMode, supabase } from '../../lib/supabase'
+import { isDemoMode, LOCAL_ID, supabase } from '../../lib/supabase'
 import type { ConfiguracionNegocio } from '../../lib/types'
 
 const configDemo: ConfiguracionNegocio = {
@@ -34,7 +34,7 @@ export function AdminConfiguracion() {
     setError(null)
     try {
       if (!isDemoMode) {
-        const { error: err } = await supabase!.from('configuracion_negocio').update(config).eq('id', true)
+        const { error: err } = await supabase!.from('configuracion_negocio').update(config).eq('local_id', LOCAL_ID)
         if (err) throw err
       }
       setGuardado(true)
