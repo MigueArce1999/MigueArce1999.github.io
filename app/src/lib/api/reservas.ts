@@ -1,4 +1,4 @@
-import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
+import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../supabase'
 import { demoReservasAgendaEmpleada, demoReservasCliente } from '../demoData'
 import type { Reserva, SlotDisponible, SlotEquipoDisponible } from '../types'
 
@@ -141,6 +141,7 @@ export async function listarReservasDeCliente(clienteId: string): Promise<Reserv
     .from('vista_reserva')
     .select('*')
     .eq('cliente_id', clienteId)
+    .eq('local_id', LOCAL_ID)
     .order('inicio', { ascending: false })
   if (error) throw error
   return (data ?? []).map(mapVistaReserva)
@@ -156,6 +157,7 @@ export async function listarReservasDeProfesional(
     .from('vista_reserva')
     .select('*')
     .eq('profesional_id', profesionalId)
+    .eq('local_id', LOCAL_ID)
     .gte('inicio', desdeISO)
     .lt('inicio', hastaISO)
     .order('inicio')
@@ -168,6 +170,7 @@ export async function listarAgendaGeneral(desdeISO: string, hastaISO: string): P
   const { data, error } = await supabase!
     .from('vista_reserva')
     .select('*')
+    .eq('local_id', LOCAL_ID)
     .gte('inicio', desdeISO)
     .lt('inicio', hastaISO)
     .order('inicio')
@@ -177,7 +180,7 @@ export async function listarAgendaGeneral(desdeISO: string, hastaISO: string): P
 
 export async function obtenerReservaPorId(reservaId: string): Promise<Reserva | null> {
   if (isDemoMode) return demoReservasAgendaEmpleada.find((r) => r.id === reservaId) ?? null
-  const { data, error } = await supabase!.from('vista_reserva').select('*').eq('id', reservaId).maybeSingle()
+  const { data, error } = await supabase!.from('vista_reserva').select('*').eq('id', reservaId).eq('local_id', LOCAL_ID).maybeSingle()
   if (error) throw error
   return data ? mapVistaReserva(data) : null
 }

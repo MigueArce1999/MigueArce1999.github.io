@@ -1,4 +1,4 @@
-import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
+import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../supabase'
 import { demoClientesAdmin, demoComisionesEmpleada, demoReservasAgendaEmpleada } from '../demoData'
 import type { Cliente, ComisionResumen, ResultadoCobro, VentaLinea } from '../types'
 
@@ -143,6 +143,7 @@ export async function listarReservasDelDia(profesionalId: string, fechaISO: stri
     .from('vista_reserva')
     .select('*')
     .eq('profesional_id', profesionalId)
+    .eq('local_id', LOCAL_ID)
     .gte('inicio', desde)
     .lte('inicio', hasta)
     .order('inicio')
