@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { isDemoMode, supabase } from '../lib/supabase'
+import { isDemoMode, LOCAL_ID, supabase } from '../lib/supabase'
 import { obtenerClientePorUsuario } from '../lib/api/cliente'
+import { asegurarClienteEnLocal } from '../lib/api/auth'
 import { demoClienteActual, demoProfesionales } from '../lib/demoData'
 import type { Cliente, Perfil, Profesional, Rol } from '../lib/types'
 
 interface AuthState {
   cargando: boolean
+  haySesion: boolean
   perfil: Perfil | null
   cliente: Cliente | null
   profesional: Profesional | null
@@ -14,6 +16,7 @@ interface AuthState {
   demoRol: Rol | null
   fijarDemoRol: (rol: Rol | null) => void
   cerrarSesionLocal: () => void
+  motivoRechazo: string | null
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -24,9 +27,11 @@ const DEMO_CLIENTE: Perfil = { id: 'demo-usuario-cliente', nombre: demoClienteAc
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [cargando, setCargando] = useState(!isDemoMode)
+  const [haySesion, setHaySesion] = useState(false)
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [profesional, setProfesional] = useState<Profesional | null>(null)
+  const [motivoRechazo, setMotivoRechazo] = useState<string | null>(null)
   const [demoRol, setDemoRol] = useState<Rol | null>(() => {
     if (!isDemoMode) return null
     try {
@@ -65,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function cargar(usuarioId: string | undefined) {
       if (!usuarioId) {
         if (activo) {
+          setHaySesion(false)
           setPerfil(null)
           setCliente(null)
           setProfesional(null)
@@ -72,29 +78,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return
       }
+      setHaySesion(true)
+      setMotivoRechazo(null)
       const { data: perfilRow } = await supabase!.from('perfil').select('*').eq('id', usuarioId).maybeSingle()
       if (!activo) return
+      if (!perfilRow) {
+        setPerfil(null)
+        setCliente(null)
+        setProfesional(null)
+        setCargando(false)
+        return
+      }
       setPerfil(perfilRow)
-      // Toda cuenta nace con su propia fila `cliente` (ver 0002_identidad.sql → fn_manejar_
-      // usuario_nuevo) y esa fila NUNCA se borra al ascender a empleada/admin — así que se busca
-      // siempre, sin importar el rol actual, para que quien además es clienta pueda entrar
-      // también a su portal de clienta (ver RutaProtegida) sin perder su rol principal.
-      const c = await obtenerClientePorUsuario(usuarioId)
-      if (activo) setCliente(c)
-      if (perfilRow?.rol === 'empleada' || perfilRow?.rol === 'admin') {
-        // Un admin que ADEMÁS tiene fila en `profesional` (p. ej. quien administra el salón y
-        // también atiende) puede entrar al portal de empleadas sin cambiar de rol — ver
-        // RutaProtegida. Para un admin sin esa fila, esto simplemente devuelve null.
+      try {
+        await asegurarClienteEnLocal()
+      } catch {
+        /* el SELECT de cliente puede devolver la fila si ya existía */
+      }
+      if (!activo) return
+      try {
+        const c = await obtenerClientePorUsuario(usuarioId)
+        if (activo) setCliente(c)
+      } catch {
+        if (activo) setCliente(null)
+      }
+      const esEquipoDeEsteSalon = Boolean(LOCAL_ID && perfilRow.local_id === LOCAL_ID)
+      if (esEquipoDeEsteSalon && (perfilRow.rol === 'empleada' || perfilRow.rol === 'admin')) {
         const { data: profRow } = await supabase!.from('vista_profesional').select('*').eq('id', usuarioId).maybeSingle()
         if (activo) setProfesional(profRow)
+      } else if (activo) {
+        setProfesional(null)
       }
       setCargando(false)
     }
 
     supabase!.auth.getSession().then(({ data }) => cargar(data.session?.user.id))
-    const { data: sub } = supabase!.auth.onAuthStateChange((_evento, sesion) => {
+    const { data: sub } = supabase!.auth.onAuthStateChange((evento, sesion) => {
+      // TOKEN_REFRESHED y INITIAL_SESSION disparan al volver de otra pestaña (y al arrancar).
+      // Recargar el perfil ahí desmonta el portal (RutaProtegida muestra Cargando).
+      if (evento === 'INITIAL_SESSION' || evento === 'TOKEN_REFRESHED') return
+      if (evento === 'SIGNED_OUT' || !sesion?.user.id) {
+        cargar(undefined)
+        return
+      }
       setCargando(true)
-      cargar(sesion?.user.id)
+      cargar(sesion.user.id)
     })
     return () => {
       activo = false
@@ -104,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [demoRol])
 
   function cerrarSesionLocal() {
+    setHaySesion(false)
     setPerfil(null)
     setCliente(null)
     setProfesional(null)
@@ -111,8 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const valor = useMemo(
-    () => ({ cargando, perfil, cliente, profesional, demoRol, fijarDemoRol, cerrarSesionLocal }),
-    [cargando, perfil, cliente, profesional, demoRol],
+    () => ({ cargando, haySesion, perfil, cliente, profesional, demoRol, fijarDemoRol, cerrarSesionLocal, motivoRechazo }),
+    [cargando, haySesion, perfil, cliente, profesional, demoRol, motivoRechazo],
   )
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>

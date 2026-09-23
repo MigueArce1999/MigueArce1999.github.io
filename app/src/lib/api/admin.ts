@@ -1,4 +1,5 @@
-import { isDemoMode, supabaseRequerido } from '../supabase'
+import { isDemoMode, LOCAL_ID, supabaseRequerido } from '../supabase'
+import { origenAuth } from './auth'
 import {
   demoClientesAdmin,
   demoEquipoResumen,
@@ -410,20 +411,11 @@ export async function invitarEmpleada(
 ): Promise<'invitada' | 'ya_era_empleada' | 'creada_sin_correo'> {
   if (isDemoMode) return 'invitada'
   const client = supabaseRequerido()
-  // Sin sufijo de ruta (#/ingresar): la app usa HashRouter, y Supabase añade su propio
-  // fragmento "#access_token=...&type=magiclink" al final de emailRedirectTo. Si ya trae un
-  // "#" (p. ej. "...#/ingresar"), el resultado queda con DOS "#" en la misma URL
-  // ("...#/ingresar#access_token=..."), y supabase-js ya no logra leer access_token del hash
-  // (window.location.hash.substring(1) deja de ser un query string válido). Dejando el
-  // origen "limpio", el enlace del correo llega como ".../#access_token=...", supabase-js
-  // detecta la sesión, y luego limpia el hash — Home.tsx se encarga de redirigir a su portal.
-  const origen = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
-
   const { error: errInvitar } = await client.auth.signInWithOtp({
     email: params.email,
     options: {
-      data: { nombre: params.nombre },
-      emailRedirectTo: origen,
+      data: { nombre: params.nombre, local_id: LOCAL_ID },
+      emailRedirectTo: origenAuth(),
     },
   })
   // El proyecto usa el correo compartido de Supabase (cuota muy baja, pensada solo para
@@ -460,7 +452,7 @@ export async function invitarEmpleada(
 
   const { error: errRol } = await client.from('perfil').update({ rol: 'empleada' }).eq('id', usuarioId)
   if (errRol) throw errRol
-  const { error: errProf } = await client.from('profesional').insert({ id: usuarioId, slug: params.slug })
+  const { error: errProf } = await client.from('profesional').insert({ id: usuarioId, slug: params.slug, local_id: LOCAL_ID })
   if (errProf) throw errProf
   // La cuenta y el rol quedaron listos, pero si el correo de acceso nunca salió (límite de envíos),
   // la empleada no tiene forma de entrar por su cuenta todavía — se lo dejamos claro a quien invita

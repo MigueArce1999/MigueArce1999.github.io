@@ -7,7 +7,8 @@
 | `cliente` | Persona que reserva/recibe servicios. |
 | `empleada` | Profesional del salón (Claudia, Naldi, Ana, Valery, futuras). |
 | `recepcion` | Permiso opcional, asignable a una `empleada`, para operar caja/agenda de otras profesionales sin ser administración plena. |
-| `admin` | Dueña / administración general. Acceso global. |
+| `admin` | Dueña / administración general del salón. Acceso global **de ese local**. |
+| `super_admin` | Plataforma: gestiona locales en el sitio `adminpeluquerias` (marca, empresa, colores). No opera el salón; si entra a esta SPA se redirige a `VITE_PLATAFORMA_URL`. |
 
 Los permisos finos (p. ej. "puede aplicar descuentos", "puede ver agenda de todo el equipo") se modelan como **flags en `perfil_permiso`**, no hardcodeados por rol, para que administración pueda ajustar sin desplegar código.
 

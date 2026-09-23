@@ -1,6 +1,6 @@
 // API del módulo admin "Configuración de la homepage". Reutiliza las tablas del catálogo
 // (categoria_servicio, promocion, profesional) en vez de un modelo paralelo — ver 0041.
-import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
+import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../supabase'
 import { demoCategorias, demoPromociones } from '../demoData'
 import type { CategoriaServicio, ConfiguracionHomepage, EstadoPromocion, Promocion } from '../types'
 
@@ -8,7 +8,11 @@ import type { CategoriaServicio, ConfiguracionHomepage, EstadoPromocion, Promoci
 
 export async function obtenerConfiguracionHomepage(): Promise<ConfiguracionHomepage> {
   if (isDemoMode) return { hero_imagen_url: null, hero_editable: true }
-  const { data, error } = await supabase!.from('configuracion_homepage').select('hero_imagen_url, hero_editable').maybeSingle()
+  const { data, error } = await supabase!
+    .from('configuracion_homepage')
+    .select('hero_imagen_url, hero_editable')
+    .eq('local_id', LOCAL_ID)
+    .maybeSingle()
   if (error) throw error
   return data ?? { hero_imagen_url: null, hero_editable: true }
 }
@@ -19,7 +23,7 @@ export async function actualizarHeroHomepage(heroImagenUrl: string | null): Prom
   const { error } = await client
     .from('configuracion_homepage')
     .update({ hero_imagen_url: heroImagenUrl, actualizado_en: new Date().toISOString(), actualizado_por: perfil.user?.id ?? null })
-    .eq('id', true)
+    .eq('local_id', LOCAL_ID)
   if (error) throw error
 }
 
@@ -28,7 +32,11 @@ export async function actualizarHeroHomepage(heroImagenUrl: string | null): Prom
 // ocultas para poder reactivarlas.
 export async function listarCategoriasAdmin(): Promise<CategoriaServicio[]> {
   if (isDemoMode) return demoCategorias
-  const { data, error } = await supabase!.from('categoria_servicio').select('*').order('orden_visualizacion')
+  const { data, error } = await supabase!
+    .from('categoria_servicio')
+    .select('*')
+    .eq('local_id', LOCAL_ID)
+    .order('orden_visualizacion')
   if (error) throw error
   return data
 }
@@ -74,6 +82,7 @@ export async function listarPromocionesAdmin(): Promise<Promocion[]> {
   const { data, error } = await supabase!
     .from('promocion')
     .select('*, promocion_servicio(servicio_id)')
+    .eq('local_id', LOCAL_ID)
     .order('orden_visualizacion')
   if (error) throw error
   return (data ?? []).map((p: any) => ({ ...p, servicios: (p.promocion_servicio ?? []).map((ps: any) => ps.servicio_id) }))
@@ -126,6 +135,7 @@ export async function crearPromocion(datos: DatosPromocion): Promise<Promocion> 
   const { data, error } = await client
     .from('promocion')
     .insert({
+      local_id: LOCAL_ID,
       nombre: datos.nombre.trim(),
       descripcion: datos.descripcion,
       condiciones: datos.condiciones,
@@ -241,7 +251,11 @@ const BUCKET_IMAGENES_PUBLICO = 'imagenes-publico'
 export const TIPOS_IMAGEN_PERMITIDOS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 export const TAMANO_MAXIMO_IMAGEN = 5 * 1024 * 1024 // 5 MB
 
-export async function subirImagenPublica(archivo: File, carpeta: 'categorias' | 'promociones' | 'equipo' | 'hero'): Promise<string> {
+export async function subirImagenPublica(
+  archivo: File,
+  carpeta: 'categorias' | 'promociones' | 'equipo' | 'hero' | 'marca',
+  localIdDestino?: string,
+): Promise<string> {
   if (!TIPOS_IMAGEN_PERMITIDOS.includes(archivo.type)) {
     throw new Error('Formato no admitido: sube una imagen JPG, PNG o WEBP.')
   }
@@ -250,7 +264,7 @@ export async function subirImagenPublica(archivo: File, carpeta: 'categorias' | 
   }
   const client = supabaseRequerido()
   const extension = archivo.name.split('.').pop() || 'jpg'
-  const ruta = `${carpeta}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
+  const ruta = `${localIdDestino || LOCAL_ID}/${carpeta}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
   const { error } = await client.storage.from(BUCKET_IMAGENES_PUBLICO).upload(ruta, archivo, { upsert: false })
   if (error) throw error
   const { data } = client.storage.from(BUCKET_IMAGENES_PUBLICO).getPublicUrl(ruta)

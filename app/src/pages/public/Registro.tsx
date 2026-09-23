@@ -27,7 +27,11 @@ export function Registro() {
         navigate('/cliente')
         return
       }
-      await registrarCliente(email, password, nombre)
+      const resultado = await registrarCliente(email, password, nombre)
+      if (resultado.sesion) {
+        navigate('/cliente')
+        return
+      }
       setListo(true)
     } catch (err: any) {
       setError(err.message)
@@ -56,7 +60,8 @@ export function Registro() {
         <Button type="submit" cargando={cargando}>Crear cuenta</Button>
       </form>
       <p className="mt-4 text-center text-sm text-carbon/60">
-        ¿Ya tienes cuenta? <Link to="/ingresar" className="font-semibold text-oliva">Ingresa aquí</Link>
+        ¿Ya tienes cuenta en este u otro salón? Usa el mismo correo y contraseña.{' '}
+        <Link to="/ingresar" className="font-semibold text-oliva">Ingresa aquí</Link>
       </p>
     </div>
   )

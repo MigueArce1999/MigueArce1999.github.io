@@ -1,18 +1,28 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim()
+const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim()
+const localIdRaw = (import.meta.env.VITE_LOCAL_ID as string | undefined)?.trim()
 
-// Modo demostración: no hay proyecto Supabase conectado en este entorno (ver
-// docs/07-plan-implementacion.md → "Qué pasa si nunca se conecta Supabase").
-// Toda la capa de datos (lib/api/*.ts) revisa este flag antes de decidir si
-// llama a Supabase real o devuelve datos de ejemplo desde lib/demoData.ts.
+// Modo demostración: no hay proyecto Supabase conectado (ver docs/07-plan-implementacion.md).
 export const isDemoMode = !url || !anonKey
 
-export const supabase = isDemoMode
+if (!isDemoMode && !localIdRaw) {
+  throw new Error(
+    'Hay conexión a Supabase pero falta VITE_LOCAL_ID. Cada instalación pertenece a un local; ' +
+      'sin ese UUID la app mezclaría datos de todos los negocios. Cópialo desde la tabla `local`.',
+  )
+}
+
+export const LOCAL_ID = localIdRaw ?? ''
+
+export const supabase: SupabaseClient | null = isDemoMode
   ? null
   : createClient(url as string, anonKey as string, {
       auth: { persistSession: true, autoRefreshToken: true },
+      global: {
+        headers: { 'x-local-id': LOCAL_ID },
+      },
     })
 
 export function supabaseRequerido() {

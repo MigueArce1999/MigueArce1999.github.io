@@ -17,9 +17,9 @@ export function useMiFidelizacion(clienteId: string | undefined) {
   const [error, setError] = useState<string | null>(null)
   const [celebraciones, setCelebraciones] = useState<NotificacionFidelizacion[]>([])
 
-  const cargar = useCallback(() => {
+  const cargar = useCallback((silencioso = false) => {
     if (!clienteId) return
-    setCargando(true)
+    if (!silencioso) setCargando(true)
     setError(null)
     obtenerMiFidelizacion(clienteId)
       .then(setFidelizacion)
@@ -34,17 +34,13 @@ export function useMiFidelizacion(clienteId: string | undefined) {
     cargar()
   }, [cargar])
 
-  // "Actualiza... al recuperar el foco" (sección 17 del pedido): la app no tiene tiempo real,
-  // así que esto es lo más parecido sin construir una infraestructura nueva solo para esto.
   useEffect(() => {
     function alVolverFoco() {
-      if (document.visibilityState === 'visible') cargar()
+      if (document.visibilityState === 'visible') cargar(true)
     }
     document.addEventListener('visibilitychange', alVolverFoco)
-    window.addEventListener('focus', alVolverFoco)
     return () => {
       document.removeEventListener('visibilitychange', alVolverFoco)
-      window.removeEventListener('focus', alVolverFoco)
     }
   }, [cargar])
 

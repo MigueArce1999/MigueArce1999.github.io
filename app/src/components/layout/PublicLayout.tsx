@@ -4,10 +4,11 @@ import { isDemoMode } from '../../lib/supabase'
 import { DemoBanner } from '../ui/Estados'
 import { Button } from '../ui/Button'
 import { useAuth } from '../../state/AuthContext'
+import { useBranding } from '../../state/BrandingContext'
 import { useDialogAccesible } from '../ui/Modal'
 import { IconoChevronDerecha, IconoMenu, IconoPerfil, IconoX } from '../ui/Icons'
-import type { Rol } from '../../lib/types'
-import logo from '../../assets/logo-claudia-patricia.png'
+import { rutaEnEsteSalon } from '../../lib/rutas'
+import logoFallback from '../../assets/logo-claudia-patricia.png'
 
 const enlaces = [
   { to: '/', label: 'Inicio' },
@@ -16,12 +17,13 @@ const enlaces = [
   { to: '/promociones', label: 'Promociones' },
 ]
 
-const rutaPorRol: Record<Rol, string> = { cliente: '/cliente', empleada: '/equipo-app', admin: '/admin' }
-
 export function PublicLayout() {
   const [menuAbierto, setMenuAbierto] = useState(false)
-  const { perfil } = useAuth()
-  const rutaCuenta = perfil ? rutaPorRol[perfil.rol] : '/ingresar'
+  const { perfil, cliente } = useAuth()
+  const { marca } = useBranding()
+  const logo = marca.logo_url || logoFallback
+  const logoFooter = marca.logo_footer_url || logo
+  const rutaCuenta = perfil ? rutaEnEsteSalon(perfil, cliente !== null) : '/ingresar'
   const etiquetaCuenta = perfil ? 'Mi cuenta' : 'Ingresar'
 
   return (
@@ -33,7 +35,7 @@ export function PublicLayout() {
           style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
         >
           <Link to="/" className="flex items-center">
-            <img src={logo} alt="Claudia Patricia" className="h-12 w-auto" />
+            <img src={logo} alt={marca.nombre} className="h-12 w-auto" />
           </Link>
           <nav className="hidden items-center gap-6 md:flex lg:gap-12">
             {enlaces.map((e) => (
@@ -75,6 +77,8 @@ export function PublicLayout() {
         onCerrar={() => setMenuAbierto(false)}
         rutaCuenta={rutaCuenta}
         etiquetaCuenta={etiquetaCuenta}
+        logo={logo}
+        nombre={marca.nombre}
       />
 
       <main>
@@ -83,9 +87,15 @@ export function PublicLayout() {
 
       <footer className="border-t border-piedra bg-blanco px-5 sm:px-[40px] py-12">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-10 sm:flex-row sm:flex-wrap sm:gap-16">
-          <div className="flex max-w-md flex-col gap-3">
-            <img src={logo} alt="Claudia Patricia" className="h-16 w-auto" />
-            <p className="text-sm text-carbon/60">Un espacio para tu belleza y bienestar.</p>
+          <div className="flex max-w-sm flex-col gap-4">
+            <img
+              src={logoFooter}
+              alt={marca.nombre}
+              className="h-16 w-auto max-w-[240px] object-contain object-left"
+            />
+            <p className="text-sm leading-relaxed text-carbon/60">
+              {marca.eslogan || 'Un espacio para tu belleza y bienestar.'}
+            </p>
           </div>
           <div className="flex flex-col gap-3">
             <p className="text-base text-carbon">Conoce el salón</p>
@@ -100,7 +110,7 @@ export function PublicLayout() {
             <Link to="/cliente/reservas" className="text-sm text-carbon/60 hover:text-carbon">Mis reservas</Link>
           </div>
         </div>
-        <p className="mx-auto mt-10 max-w-[1440px] text-sm text-carbon/60">© {new Date().getFullYear()} Claudia Patricia · Privacidad · Términos y condiciones</p>
+        <p className="mx-auto mt-10 max-w-[1440px] text-sm text-carbon/60">© {new Date().getFullYear()} {marca.nombre} · Privacidad · Términos y condiciones</p>
       </footer>
 
       <div className="bg-oliva px-5 sm:px-[40px] py-16">
@@ -130,11 +140,15 @@ function MenuMovil({
   onCerrar,
   rutaCuenta,
   etiquetaCuenta,
+  logo,
+  nombre,
 }: {
   abierto: boolean
   onCerrar: () => void
   rutaCuenta: string
   etiquetaCuenta: string
+  logo: string
+  nombre: string
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
   useDialogAccesible(abierto, onCerrar, panelRef)
@@ -155,7 +169,7 @@ function MenuMovil({
         style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
       >
         <div className="flex items-center justify-between">
-          <img src={logo} alt="Claudia Patricia" className="h-10 w-auto" />
+          <img src={logo} alt={nombre} className="h-10 w-auto" />
           <button onClick={onCerrar} aria-label="Cerrar menú" className="rounded-lg p-1.5 text-carbon/60 hover:bg-piedra/40 hover:text-carbon">
             <IconoX className="h-6 w-6" />
           </button>

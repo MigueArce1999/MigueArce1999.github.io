@@ -1,10 +1,11 @@
-import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
+import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../supabase'
 import { demoClienteActual, demoHistorialAtenciones, demoMovimientosPuntos } from '../demoData'
 import type { Atencion, Cliente, MovimientoPuntos } from '../types'
 
 export async function obtenerClientePorUsuario(usuarioId: string): Promise<Cliente | null> {
   if (isDemoMode) return demoClienteActual
-  const { data, error } = await supabase!.from('cliente').select('*').eq('usuario_id', usuarioId).maybeSingle()
+  const q = supabase!.from('cliente').select('*').eq('usuario_id', usuarioId)
+  const { data, error } = LOCAL_ID ? await q.eq('local_id', LOCAL_ID).maybeSingle() : await q.maybeSingle()
   if (error) throw error
   return data
 }

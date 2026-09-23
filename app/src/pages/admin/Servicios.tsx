@@ -3,7 +3,7 @@ import { Button } from '../../components/ui/Button'
 import { Input, Select, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { Modal } from '../../components/ui/Modal'
-import { isDemoMode, supabase, supabaseRequerido } from '../../lib/supabase'
+import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../../lib/supabase'
 import { eliminarServicio, listarCategorias, listarServiciosAdmin } from '../../lib/api/catalogo'
 import { formatoPrecioServicio } from '../../lib/format'
 import type { CategoriaServicio, Servicio, TipoPrecioServicio } from '../../lib/types'
@@ -174,7 +174,7 @@ function FormularioServicio({
       }
       const { error: err } = servicio
         ? await supabase!.from('servicio').update(datos).eq('id', servicio.id)
-        : await supabase!.from('servicio').insert(datos)
+        : await supabase!.from('servicio').insert({ ...datos, local_id: LOCAL_ID })
       if (err) throw err
       onGuardado()
     } catch (e: any) {
@@ -242,7 +242,7 @@ function FormularioCategoria({ onCreada }: { onCreada: () => void }) {
     setGuardando(true)
     setError(null)
     try {
-      const { error: err } = await supabase!.from('categoria_servicio').insert({ nombre })
+      const { error: err } = await supabase!.from('categoria_servicio').insert({ nombre, local_id: LOCAL_ID })
       if (err) throw err
       onCreada()
     } catch (e: any) {

@@ -1,4 +1,4 @@
-import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
+import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../supabase'
 import {
   demoCategorias,
   demoProfesionales,
@@ -24,7 +24,7 @@ const configuracionDemo: ConfiguracionNegocio = {
 // pública (0014_rls.sql), la misma fila que ya administra Admin → Configuración.
 export async function obtenerConfiguracionNegocio(): Promise<ConfiguracionNegocio> {
   if (isDemoMode) return configuracionDemo
-  const { data, error } = await supabase!.from('configuracion_negocio').select('*').maybeSingle()
+  const { data, error } = await supabase!.from('configuracion_negocio').select('*').eq('local_id', LOCAL_ID).maybeSingle()
   if (error) throw error
   return data ?? configuracionDemo
 }
@@ -34,6 +34,7 @@ export async function listarCategorias(): Promise<CategoriaServicio[]> {
   const { data, error } = await supabase!
     .from('categoria_servicio')
     .select('*')
+    .eq('local_id', LOCAL_ID)
     .eq('activa', true)
     .order('orden_visualizacion')
   if (error) throw error
@@ -66,6 +67,7 @@ export async function listarServicios(categoriaId?: string): Promise<Servicio[]>
   let query = supabase!
     .from('servicio')
     .select('*, categoria:categoria_id(nombre), servicio_profesional(profesional:profesional_id(*))')
+    .eq('local_id', LOCAL_ID)
     .eq('activo', true)
   if (categoriaId) query = query.eq('categoria_id', categoriaId)
   const { data, error } = await query
@@ -113,6 +115,7 @@ export async function listarServiciosAdmin(categoriaId?: string): Promise<Servic
   let query = supabase!
     .from('servicio')
     .select('*, categoria:categoria_id(nombre), servicio_profesional(profesional:profesional_id(*))')
+    .eq('local_id', LOCAL_ID)
   if (categoriaId) query = query.eq('categoria_id', categoriaId)
   const { data, error } = await query
   if (error) throw error
@@ -137,6 +140,7 @@ export async function listarProfesionales(): Promise<Profesional[]> {
   const { data, error } = await supabase!
     .from('vista_profesional')
     .select('*')
+    .eq('local_id', LOCAL_ID)
     .eq('activo', true)
     .order('orden_visualizacion')
   if (error) throw error
@@ -150,6 +154,7 @@ export async function listarProfesionalesHomepage(): Promise<Profesional[]> {
   const { data, error } = await supabase!
     .from('vista_profesional')
     .select('*')
+    .eq('local_id', LOCAL_ID)
     .eq('activo', true)
     .eq('mostrar_en_home', true)
     .order('orden_visualizacion')
@@ -159,7 +164,12 @@ export async function listarProfesionalesHomepage(): Promise<Profesional[]> {
 
 export async function obtenerProfesional(slug: string): Promise<Profesional | null> {
   if (isDemoMode) return demoProfesionales.find((p) => p.slug === slug) ?? null
-  const { data, error } = await supabase!.from('vista_profesional').select('*').eq('slug', slug).maybeSingle()
+  const { data, error } = await supabase!
+    .from('vista_profesional')
+    .select('*')
+    .eq('local_id', LOCAL_ID)
+    .eq('slug', slug)
+    .maybeSingle()
   if (error) throw error
   return data as Profesional | null
 }
@@ -187,6 +197,7 @@ export async function listarPromocionesVigentes(): Promise<Promocion[]> {
   const { data, error } = await supabase!
     .from('promocion')
     .select('*, promocion_servicio(servicio_id)')
+    .eq('local_id', LOCAL_ID)
     .eq('activa', true)
     .order('orden_visualizacion')
   if (error) throw error

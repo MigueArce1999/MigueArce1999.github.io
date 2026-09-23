@@ -5,7 +5,7 @@ Ver SQL real y comentado en `supabase/migrations/`. Este documento es el mapa de
 ## 4.1 Identidad y roles
 
 - **`perfil`** — 1:1 con `auth.users` (Supabase Auth). `id = auth.users.id`. Campos: `nombre`, `telefono`,
-  `rol` (`cliente`|`empleada`|`admin`), `activo`.
+  `rol` (`cliente`|`empleada`|`admin`|`super_admin`), `activo`, `local_id` (NULL solo si `super_admin`).
 - **`permiso`** — flags finos opcionales por perfil (`puede_ver_agenda_equipo`, `puede_descuentos_hasta`,
   `puede_caja`, `puede_anular_ventas`, …). Un perfil sin fila en `permiso` tiene los permisos base de su rol.
 - **`cliente`** — puede o no tener `usuario_id → perfil.id` (NULL = creado en recepción, sin cuenta).
@@ -123,6 +123,20 @@ Ver SQL real y comentado en `supabase/migrations/`. Este documento es el mapa de
   la capa de presentación (`Intl.DateTimeFormat` con `timeZone: 'America/Bogota'`) y en las funciones SQL
   de reporte (`AT TIME ZONE 'America/Bogota'`), nunca se guarda una hora "local" ambigua.
   `configuracion_negocio.zona_horaria = 'America/Bogota'` es el valor de referencia.
-- `configuracion_negocio` es fila única (`id boolean primary key default true` con `CHECK (id)`) que
+- `configuracion_negocio` es **una fila por local** (`local_id` PK) que
   centraliza: moneda (`COP`), confirmación de reservas, ventana de cancelación, minutos de expiración de
-  pendientes, tasa de puntos por defecto, etc.
+  pendientes, tasa de puntos por defecto, etc. El frontend filtra con `VITE_LOCAL_ID`.
+
+## 4.11 Multi-local (mismo Supabase)
+
+- **`local`** — un negocio. Semilla `c1a4d1a4-c1a4-41a4-81a4-c1a4d1a40001` (Claudia Patricia).
+  Marca: `nombre`, `nombre_corto`, `eslogan`, `logo_url`, `favicon_url`, `url_sitio`, `slug`,
+  `color_primario`, `color_acento`. Empresa: `razon_social`, `nit`, `email_contacto`.
+  Producto: `requiere_facturacion_electronica`. Las edita el super admin en `adminpeluquerias`.
+  El `super_admin` tiene `perfil.local_id` NULL; RLS le deja leer su propia fila (0055) para poder iniciar sesión.
+  En el salón entra como clienta (se crea `cliente` de ese local con `fn_asegurar_cliente_en_local`, 0056).
+- **`cliente`** es por local: unique `(local_id, usuario_id)`. El mismo correo Auth puede ser clienta en varios salones.
+  La contraseña es **una** por correo (Supabase Auth); no hay una clave distinta por local.
+- Casi todas las tablas de operación tienen `local_id`. RLS restrictiva: catálogo público por header `x-local-id` o perfil; datos privados solo `perfil.local_id`.
+- Alta comercial: `fn_provisionar_local(nombre, slug, …)` → UUID para `VITE_LOCAL_ID` de esa instalación (el dominio no importa). Primer super admin: en el SQL editor, `select fn_conceder_super_admin('correo@…');`.
+- Auth es del proyecto, no del local. Cada dominio se lista en Redirect URLs (`https://dominio.com/**`). El registro manda `emailRedirectTo` al origen de esa instalación. Si el correo ya existe, el registro intenta iniciar sesión y vincular la clienta a este local.

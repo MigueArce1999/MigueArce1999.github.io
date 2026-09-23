@@ -2,7 +2,7 @@
 // funciones RPC y el porqué de cada regla — este archivo solo las expone al frontend, nunca
 // reimplementa lógica de negocio que ya vive (y debe seguir viviendo) en el servidor.
 
-import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
+import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../supabase'
 import {
   demoCanjesCliente,
   demoClienteActual,
@@ -181,8 +181,9 @@ export async function listarRecompensasDisponiblesPara(saldo: number): Promise<R
 
 export async function obtenerConfiguracionFidelizacion(): Promise<ConfiguracionFidelizacion> {
   if (isDemoMode) return demoConfiguracionFidelizacion
-  const { data, error } = await supabase!.from('configuracion_fidelizacion').select('*').eq('id', true).single()
+  const { data, error } = await supabase!.from('configuracion_fidelizacion').select('*').eq('local_id', LOCAL_ID).maybeSingle()
   if (error) throw error
+  if (!data) throw new Error('No hay configuración de fidelización para este local.')
   return data
 }
 
@@ -197,7 +198,7 @@ export async function actualizarConfiguracionFidelizacion(cambios: {
   if (cambios.acumulacionActiva !== undefined) patch.acumulacion_activa = cambios.acumulacionActiva
   if (cambios.canjesActivo !== undefined) patch.canjes_activo = cambios.canjesActivo
   if (cambios.textoPrograma !== undefined) patch.texto_programa = cambios.textoPrograma
-  const { error } = await client.from('configuracion_fidelizacion').update(patch).eq('id', true)
+  const { error } = await client.from('configuracion_fidelizacion').update(patch).eq('local_id', LOCAL_ID)
   if (error) throw error
 }
 
