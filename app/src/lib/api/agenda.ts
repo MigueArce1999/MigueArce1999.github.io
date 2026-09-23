@@ -3,7 +3,7 @@
 // Todas las escrituras sensibles pasan por RPC (SECURITY DEFINER): el frontend nunca hace
 // INSERT/UPDATE directo sobre horario_disponibilidad/bloqueo_ausencia/solicitud_horario salvo
 // quien tenga el permiso puede_editar_horario_propio (y aun así, vía RPC — ver 0032).
-import { isDemoMode, supabaseRequerido } from '../supabase'
+import { isDemoMode, LOCAL_ID, supabaseRequerido } from '../supabase'
 import type { BloqueoAusencia, EstadoSolicitud, HorarioDisponibilidad, IntervaloHorario, Reserva, SolicitudHorario, TipoBloqueoAusencia } from '../types'
 
 // fn_reservas_afectadas_bloqueo/horario devuelven `setof reserva` (la fila cruda de la tabla,
@@ -176,7 +176,7 @@ async function nombresDeProfesionales(ids: string[]): Promise<Map<string, string
   const unicos = [...new Set(ids)]
   if (unicos.length === 0) return new Map()
   const client = supabaseRequerido()
-  const { data, error } = await client.from('vista_profesional').select('id, nombre').in('id', unicos)
+  const { data, error } = await client.from('vista_profesional').select('id, nombre').eq('local_id', LOCAL_ID).in('id', unicos)
   if (error) throw error
   return new Map((data ?? []).map((p: any) => [p.id, p.nombre]))
 }

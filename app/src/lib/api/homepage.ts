@@ -129,6 +129,7 @@ export async function crearPromocion(datos: DatosPromocion): Promise<Promocion> 
   const { data: ultima } = await client
     .from('promocion')
     .select('orden_visualizacion')
+    .eq('local_id', LOCAL_ID)
     .order('orden_visualizacion', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -232,13 +233,14 @@ export async function editarProfesionalHomepage(id: string, datos: DatosProfesio
       mostrar_en_home: datos.mostrarEnHome,
     })
     .eq('id', id)
+    .eq('local_id', LOCAL_ID)
   if (error) throw error
 }
 
 export async function actualizarOrdenEquipoHomepage(orden: { id: string; ordenVisualizacion: number }[]): Promise<void> {
   const client = supabaseRequerido()
   const resultados = await Promise.all(
-    orden.map((o) => client.from('profesional').update({ orden_visualizacion: o.ordenVisualizacion }).eq('id', o.id)),
+    orden.map((o) => client.from('profesional').update({ orden_visualizacion: o.ordenVisualizacion }).eq('id', o.id).eq('local_id', LOCAL_ID)),
   )
   const conError = resultados.find((r) => r.error)
   if (conError?.error) throw conError.error

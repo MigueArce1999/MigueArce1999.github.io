@@ -3,7 +3,7 @@ import { Button } from '../../components/ui/Button'
 import { Input, Select, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { Drawer, Modal } from '../../components/ui/Modal'
-import { isDemoMode, supabase, supabaseRequerido } from '../../lib/supabase'
+import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../../lib/supabase'
 import {
   actualizarNombreProfesional,
   eliminarEmpleada,
@@ -169,7 +169,7 @@ function FormularioProfesional({
       const { error: errDel } = await client.from('servicio_profesional').delete().eq('profesional_id', profesional.id)
       if (errDel) throw errDel
       if (serviciosAsignados.size > 0) {
-        const filas = Array.from(serviciosAsignados).map((servicio_id) => ({ servicio_id, profesional_id: profesional.id }))
+        const filas = Array.from(serviciosAsignados).map((servicio_id) => ({ servicio_id, profesional_id: profesional.id, local_id: LOCAL_ID }))
         const { error: errIns } = await client.from('servicio_profesional').insert(filas)
         if (errIns) throw errIns
       }

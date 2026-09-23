@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const esEquipoDeEsteSalon = Boolean(LOCAL_ID && perfilRow.local_id === LOCAL_ID)
       if (esEquipoDeEsteSalon && (perfilRow.rol === 'empleada' || perfilRow.rol === 'admin')) {
-        const { data: profRow } = await supabase!.from('vista_profesional').select('*').eq('id', usuarioId).maybeSingle()
+        const { data: profRow } = await supabase!.from('vista_profesional').select('*').eq('id', usuarioId).eq('local_id', LOCAL_ID).maybeSingle()
         if (activo) setProfesional(profRow)
       } else if (activo) {
         setProfesional(null)

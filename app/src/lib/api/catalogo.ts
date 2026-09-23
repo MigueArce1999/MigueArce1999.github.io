@@ -49,7 +49,7 @@ async function adjuntarNombresProfesionales(filas: any[]): Promise<any[]> {
   const ids = [...new Set(filas.flatMap((s) => (s.servicio_profesional ?? []).map((sp: any) => sp.profesional?.id).filter(Boolean)))]
   let nombres = new Map<string, string>()
   if (ids.length > 0) {
-    const { data, error } = await supabase!.from('vista_profesional').select('id, nombre').in('id', ids)
+    const { data, error } = await supabase!.from('vista_profesional').select('id, nombre').eq('local_id', LOCAL_ID).in('id', ids)
     if (error) throw error
     nombres = new Map((data ?? []).map((p: any) => [p.id, p.nombre]))
   }
@@ -128,6 +128,7 @@ export async function obtenerServicio(id: string): Promise<Servicio | null> {
     .from('servicio')
     .select('*, categoria:categoria_id(nombre), servicio_profesional(profesional:profesional_id(*))')
     .eq('id', id)
+    .eq('local_id', LOCAL_ID)
     .maybeSingle()
   if (error) throw error
   if (!data) return null
@@ -180,6 +181,7 @@ export async function listarServiciosDeProfesional(profesionalId: string): Promi
     .from('servicio_profesional')
     .select('servicio:servicio_id(*, categoria:categoria_id(nombre))')
     .eq('profesional_id', profesionalId)
+    .eq('local_id', LOCAL_ID)
   if (error) throw error
   return (data ?? []).map((row: any) => ({ ...row.servicio, categoria_nombre: row.servicio?.categoria?.nombre }))
 }

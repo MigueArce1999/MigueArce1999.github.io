@@ -253,7 +253,7 @@ export async function listarVentasDeCliente(clienteId: string): Promise<VentaLin
 export async function listarEquipoConRendimiento() {
   if (isDemoMode) return demoEquipoResumen
   const client = supabaseRequerido()
-  const { data, error } = await client.from('vista_profesional').select('*').order('orden_visualizacion')
+  const { data, error } = await client.from('vista_profesional').select('*').eq('local_id', LOCAL_ID).order('orden_visualizacion')
   if (error) throw error
   return data
 }
@@ -450,7 +450,7 @@ export async function invitarEmpleada(
   if (errRevisar) throw errRevisar
   if (yaProfesional) return 'ya_era_empleada'
 
-  const { error: errRol } = await client.from('perfil').update({ rol: 'empleada' }).eq('id', usuarioId)
+  const { error: errRol } = await client.from('perfil').update({ rol: 'empleada', local_id: LOCAL_ID }).eq('id', usuarioId)
   if (errRol) throw errRol
   const { error: errProf } = await client.from('profesional').insert({ id: usuarioId, slug: params.slug, local_id: LOCAL_ID })
   if (errProf) throw errProf

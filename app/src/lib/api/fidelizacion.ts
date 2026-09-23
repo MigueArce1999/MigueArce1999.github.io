@@ -64,6 +64,7 @@ export async function listarRecompensasActivas(): Promise<Recompensa[]> {
     .from('recompensa')
     .select('*')
     .eq('activa', true)
+    .eq('local_id', LOCAL_ID)
     .order('orden_visualizacion')
     .order('costo_puntos')
   if (error) throw error
@@ -208,6 +209,7 @@ export async function obtenerReglaPuntosVigente(): Promise<ReglaPuntos | null> {
     .from('regla_puntos')
     .select('*')
     .eq('activa', true)
+    .eq('local_id', LOCAL_ID)
     .is('vigente_hasta', null)
     .maybeSingle()
   if (error) throw error
@@ -227,9 +229,10 @@ export async function guardarReglaPuntos(datos: {
 }): Promise<void> {
   if (isDemoMode) return
   const client = supabaseRequerido()
-  await client.from('regla_puntos').update({ vigente_hasta: new Date().toISOString(), activa: false }).is('vigente_hasta', null)
+  await client.from('regla_puntos').update({ vigente_hasta: new Date().toISOString(), activa: false }).eq('local_id', LOCAL_ID).is('vigente_hasta', null)
   const { error } = await client.from('regla_puntos').insert({
     activa: true,
+    local_id: LOCAL_ID,
     monto_por_bloque: datos.montoPorBloque,
     puntos_por_bloque: datos.puntosPorBloque,
     categorias_excluidas: datos.categoriasExcluidas,
@@ -258,7 +261,7 @@ export interface RecompensaFormulario {
 
 export async function listarRecompensasAdmin(): Promise<Recompensa[]> {
   if (isDemoMode) return demoRecompensas
-  const { data, error } = await supabase!.from('recompensa').select('*').order('orden_visualizacion').order('creado_en')
+  const { data, error } = await supabase!.from('recompensa').select('*').eq('local_id', LOCAL_ID).order('orden_visualizacion').order('creado_en')
   if (error) throw error
   return data
 }
@@ -279,6 +282,7 @@ function datosRecompensa(f: RecompensaFormulario) {
     imagen_url: f.imagenUrl,
     orden_visualizacion: f.ordenVisualizacion,
     activa: f.activa,
+    local_id: LOCAL_ID,
   }
 }
 
@@ -299,13 +303,14 @@ export async function actualizarRecompensa(id: string, datos: RecompensaFormular
     .from('recompensa')
     .update({ ...datosRecompensa(datos), actualizado_en: new Date().toISOString() })
     .eq('id', id)
+    .eq('local_id', LOCAL_ID)
   if (error) throw error
 }
 
 export async function alternarRecompensaActiva(id: string, activa: boolean): Promise<void> {
   if (isDemoMode) return
   const client = supabaseRequerido()
-  const { error } = await client.from('recompensa').update({ activa, actualizado_en: new Date().toISOString() }).eq('id', id)
+  const { error } = await client.from('recompensa').update({ activa, actualizado_en: new Date().toISOString() }).eq('id', id).eq('local_id', LOCAL_ID)
   if (error) throw error
 }
 

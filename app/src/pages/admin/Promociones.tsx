@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Input, Select } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
-import { isDemoMode, supabase } from '../../lib/supabase'
+import { isDemoMode, LOCAL_ID, supabase } from '../../lib/supabase'
 import { listarPromocionesVigentes } from '../../lib/api/catalogo'
 import { formatoFecha } from '../../lib/format'
 import type { Promocion } from '../../lib/types'
@@ -40,6 +40,7 @@ export function AdminPromociones() {
         vigente_hasta: hasta,
         tipo_descuento: tipo,
         valor,
+        local_id: LOCAL_ID,
       })
       if (err) throw err
       setNombre(''); setDescripcion(''); setDesde(''); setHasta('')
