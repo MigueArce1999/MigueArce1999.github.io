@@ -8,11 +8,25 @@ import { cerrarSesion } from '../../lib/api/auth'
 import { useDialogAccesible } from '../ui/Modal'
 import { IconoChevronIzquierda, IconoMenu, IconoX } from '../ui/Icons'
 import { InstalarAppBanner } from '../pwa/InstalarApp'
+import { useContadorCanjesPendientes } from '../../lib/fidelizacion/useContadorCanjesPendientes'
 
 export interface ItemNav {
   to: string
   label: string
   icono: ComponentType<SVGProps<SVGSVGElement>>
+  contador?: number
+}
+
+function BadgeContador({ contador }: { contador: number }) {
+  if (contador <= 0) return null
+  return (
+    <span
+      className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-error px-1 text-[11px] font-semibold text-blanco"
+      aria-label={`${contador} pendiente${contador === 1 ? '' : 's'}`}
+    >
+      {contador > 99 ? '99+' : contador}
+    </span>
+  )
 }
 
 // "Colapsado" es una preferencia de vista (como recordar una pestaña abierta), no datos del
@@ -46,6 +60,16 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
   const { colapsado, alternar } = usarSidebarColapsado()
   const location = useLocation()
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false)
+
+  // Aviso a la administración de autocanjes por entregar: un número junto a "Fidelización" en
+  // vez de un toast en vivo (ver useContadorCanjesPendientes) — reutiliza la misma consulta que
+  // ya usa la pestaña "Canjes por entregar", solo la asoma también en el menú.
+  const contadorCanjesPendientes = useContadorCanjesPendientes(perfil?.rol === 'admin')
+  const itemsConBadge = items.map((item) =>
+    item.to === '/admin/fidelizacion' ? { ...item, contador: contadorCanjesPendientes } : item,
+  )
+  const contadorOculto =
+    itemsConBadge.length > 5 ? itemsConBadge.slice(4).reduce((acc, item) => acc + (item.contador ?? 0), 0) : 0
 
   // Puede haber más de un portal alcanzable sin cerrar sesión ni cambiar de rol: un admin que
   // ADEMÁS tiene perfil de profesional (ver RutaProtegida), y cualquier cuenta que además tiene
@@ -85,13 +109,13 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
           {!colapsado && <p className="-mt-4 px-2 font-sans text-[10px] font-semibold uppercase tracking-[0.15em] text-carbon/40">{titulo}</p>}
 
           <nav className="flex flex-col gap-1.5">
-            {items.map((item) => (
+            {itemsConBadge.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to === items[0].to}
                 title={item.label}
-                aria-label={item.label}
+                aria-label={item.contador ? `${item.label}, ${item.contador} pendientes` : item.label}
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-colors ${colapsado ? 'justify-center px-2' : 'px-3'} ${
                     isActive ? 'bg-piedra text-oliva' : 'text-carbon/70 hover:bg-piedra/40'
@@ -100,6 +124,7 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
               >
                 <item.icono className="h-[18px] w-[18px] shrink-0" />
                 {!colapsado && item.label}
+                {!colapsado && <BadgeContador contador={item.contador ?? 0} />}
               </NavLink>
             ))}
           </nav>
@@ -170,25 +195,35 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
         className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 border-t border-piedra bg-blanco px-2 pt-2 md:hidden"
         style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
-        {(items.length > 5 ? items.slice(0, 4) : items).map((item) => (
+        {(itemsConBadge.length > 5 ? itemsConBadge.slice(0, 4) : itemsConBadge).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.to === items[0].to}
             className={({ isActive }) =>
-              `flex flex-1 flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition-colors ${
+              `relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition-colors ${
                 isActive ? 'bg-piedra/60 text-oliva' : 'text-carbon/50'
               }`
             }
           >
             <item.icono className="h-[22px] w-[22px]" />
             {item.label}
+            {!!item.contador && (
+              <span className="absolute right-3 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-[10px] font-semibold text-blanco">
+                {item.contador > 99 ? '99+' : item.contador}
+              </span>
+            )}
           </NavLink>
         ))}
-        {items.length > 5 && (
-          <button onClick={() => setMenuMovilAbierto(true)} className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-[11px] font-medium text-carbon/50">
+        {itemsConBadge.length > 5 && (
+          <button onClick={() => setMenuMovilAbierto(true)} className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-[11px] font-medium text-carbon/50">
             <IconoMenu className="h-[22px] w-[22px]" />
             Más
+            {contadorOculto > 0 && (
+              <span className="absolute right-3 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-[10px] font-semibold text-blanco">
+                {contadorOculto > 99 ? '99+' : contadorOculto}
+              </span>
+            )}
           </button>
         )}
       </nav>
@@ -196,7 +231,7 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
       <MenuMovilOverlay
         abierto={menuMovilAbierto}
         onCerrar={() => setMenuMovilAbierto(false)}
-        items={items}
+        items={itemsConBadge}
         titulo={titulo}
         onSalir={salir}
         enlacesOtrosPortales={enlacesOtrosPortales}
@@ -259,6 +294,7 @@ function MenuMovilOverlay({
             >
               <item.icono className="h-[18px] w-[18px] shrink-0" />
               {item.label}
+              <BadgeContador contador={item.contador ?? 0} />
             </NavLink>
           ))}
         </nav>

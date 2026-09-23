@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../state/AuthContext'
 import type { Rol } from '../../lib/types'
-import { LOCAL_ID } from '../../lib/supabase'
+import { isDemoMode, LOCAL_ID } from '../../lib/supabase'
 import { Cargando } from '../ui/Estados'
 
 // Esta guarda solo mejora la experiencia (oculta pantallas que no aplican). La barrera real
@@ -18,7 +18,9 @@ export function RutaProtegida({ rolRequerido, children }: { rolRequerido: Rol; c
   if (!perfil) {
     return <Navigate to="/ingresar" replace />
   }
-  const esEquipoDeEsteSalon = Boolean(LOCAL_ID && perfil.local_id === LOCAL_ID)
+  // En modo demo no hay LOCAL_ID real ni perfiles con local_id (ver AuthContext DEMO_ADMIN/
+  // DEMO_EMPLEADA) — solo hay un salón de ejemplo, así que siempre "pertenece" a él.
+  const esEquipoDeEsteSalon = isDemoMode || Boolean(LOCAL_ID && perfil.local_id === LOCAL_ID)
   const puedeEntrar =
     (rolRequerido === 'cliente' && cliente !== null) ||
     (rolRequerido === 'admin' && perfil.rol === 'admin' && esEquipoDeEsteSalon) ||
