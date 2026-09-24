@@ -22,10 +22,8 @@
     <meta name="apple-mobile-web-app-title" content="CP Equipo" />
 
     <style>
-      /* Pantalla de carga con la identidad de marca, visible desde el primer byte — antes de
-         que React monte — para que abrir la app instalada nunca se sienta como una pestaña de
-         navegador en blanco. Se retira sola en cuanto main.tsx confirma que React ya pintó
-         (ver el script inline más abajo). */
+      /* Visible desde el primer byte. La URL sale de localStorage (visita anterior) o del
+         logo por defecto. React la sostiene exactamente 3 segundos y luego la retira. */
       #pantalla-carga {
         position: fixed;
         inset: 0;
@@ -38,7 +36,14 @@
         background: #e6e1d7;
         transition: opacity 0.25s ease;
       }
-      #pantalla-carga img { width: min(220px, 60vw); height: auto; }
+      #pantalla-carga img,
+      #pantalla-carga video {
+        width: min(280px, 70vw);
+        max-height: 50vh;
+        height: auto;
+        border-radius: 16px;
+        object-fit: contain;
+      }
       #pantalla-carga .aro {
         width: 28px;
         height: 28px;
@@ -53,21 +58,35 @@
   </head>
   <body>
     <div id="pantalla-carga" aria-hidden="true">
-      <img src="/logo-claudia-patricia.png" alt="" />
+      <div id="pantalla-carga-media">
+        <img src="/logo-claudia-patricia.png" alt="" />
+      </div>
       <div class="aro"></div>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Retira la pantalla de carga en cuanto el DOM real de React reemplaza el placeholder
-      // (nunca con un temporizador fijo, que se vería mal en un celular lento o en 3G).
-      new MutationObserver((_muts, obs) => {
-        if (document.getElementById('root')?.firstElementChild) {
-          const p = document.getElementById('pantalla-carga')
-          if (p) { p.classList.add('oculta'); setTimeout(() => p.remove(), 300) }
-          obs.disconnect()
+      (function () {
+        var def = '/logo-claudia-patricia.png'
+        var url = def
+        try { url = localStorage.getItem('glowdesk-splash-url') || def } catch (e) {}
+        var box = document.getElementById('pantalla-carga-media')
+        if (!box || url === def) return
+        var video = /\.(mp4|webm|mov)(\?|#|$)/i.test(url)
+        var el
+        if (video) {
+          el = document.createElement('video')
+          el.src = url
+          el.muted = true
+          el.autoplay = true
+          el.setAttribute('playsinline', '')
+        } else {
+          el = document.createElement('img')
+          el.src = url
+          el.alt = ''
         }
-      }).observe(document.getElementById('root'), { childList: true })
+        box.replaceChildren(el)
+      })()
     </script>
   </body>
 </html>

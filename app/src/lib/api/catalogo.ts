@@ -22,6 +22,7 @@ const configuracionDemo: ConfiguracionNegocio = {
   live_umbral_disponible_limitado_minutos: 45,
   live_expiracion_solicitud_minutos: 3,
   live_hold_minutos: 20,
+  voz_asistente_genero: 'femenina',
 }
 
 // Solo los campos que le importan al flujo público de reserva (política de cancelación, modo

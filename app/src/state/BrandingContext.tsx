@@ -4,6 +4,7 @@ import type { LocalMarca } from '../lib/types'
 
 interface BrandingState {
   marca: LocalMarca
+  listo: boolean
 }
 
 const BrandingContext = createContext<BrandingState | null>(null)
@@ -75,6 +76,7 @@ function aplicarFaviconYTitulo(marca: LocalMarca) {
 
 export function BrandingProvider({ children }: { children: ReactNode }) {
   const [marca, setMarca] = useState<LocalMarca>(marcaFallback)
+  const [listo, setListo] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -84,6 +86,9 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (vivo) setMarca(marcaFallback())
+      })
+      .finally(() => {
+        if (vivo) setListo(true)
       })
     return () => {
       vivo = false
@@ -95,7 +100,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     aplicarColores(marca)
   }, [marca])
 
-  const valor = useMemo(() => ({ marca }), [marca])
+  const valor = useMemo(() => ({ marca, listo }), [marca, listo])
   return <BrandingContext.Provider value={valor}>{children}</BrandingContext.Provider>
 }
 

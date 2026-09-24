@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './state/AuthContext'
 import { BrandingProvider } from './state/BrandingContext'
+import { PantallaCarga } from './components/layout/PantallaCarga'
 import { PublicLayout } from './components/layout/PublicLayout'
 import { PortalLayout } from './components/layout/PortalLayout'
 import { RutaProtegida } from './components/layout/RutaProtegida'
@@ -117,6 +118,7 @@ function App() {
     <HashRouter>
       <AuthProvider>
         <BrandingProvider>
+        <PantallaCarga />
         <Routes>
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Home />} />

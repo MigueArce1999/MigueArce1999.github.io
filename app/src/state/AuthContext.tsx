@@ -67,9 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let activo = true
+    const usuarioCargadoRef = { current: null as string | null }
+
     async function cargar(usuarioId: string | undefined) {
       if (!usuarioId) {
         if (activo) {
+          usuarioCargadoRef.current = null
           setHaySesion(false)
           setPerfil(null)
           setCliente(null)
@@ -83,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: perfilRow } = await supabase!.from('perfil').select('*').eq('id', usuarioId).maybeSingle()
       if (!activo) return
       if (!perfilRow) {
+        usuarioCargadoRef.current = null
         setPerfil(null)
         setCliente(null)
         setProfesional(null)
@@ -90,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
       setPerfil(perfilRow)
+      usuarioCargadoRef.current = usuarioId
       try {
         await asegurarClienteEnLocal()
       } catch {
@@ -114,9 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase!.auth.getSession().then(({ data }) => cargar(data.session?.user.id))
     const { data: sub } = supabase!.auth.onAuthStateChange((evento, sesion) => {
-      // TOKEN_REFRESHED y INITIAL_SESSION disparan al volver de otra pestaña (y al arrancar).
-      // Recargar el perfil ahí desmonta el portal (RutaProtegida muestra Cargando).
       if (evento === 'INITIAL_SESSION' || evento === 'TOKEN_REFRESHED') return
+      if (evento === 'SIGNED_IN' && sesion?.user.id && sesion.user.id === usuarioCargadoRef.current) return
       if (evento === 'SIGNED_OUT' || !sesion?.user.id) {
         cargar(undefined)
         return

@@ -45,7 +45,7 @@ export async function crearClienteRapido(datos: { nombre: string; telefono: stri
   const client = supabaseRequerido()
   const { data, error } = await client
     .from('cliente')
-    .insert({ nombre: datos.nombre, telefono: datos.telefono, consentimiento_marketing: false })
+    .insert({ nombre: datos.nombre, telefono: datos.telefono, consentimiento_marketing: false, local_id: LOCAL_ID })
     .select()
     .single()
   if (error) throw error

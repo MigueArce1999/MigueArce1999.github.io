@@ -9,7 +9,6 @@ import { useDialogAccesible } from '../ui/Modal'
 import { IconoChevronIzquierda, IconoMenu, IconoX } from '../ui/Icons'
 import { InstalarAppBanner } from '../pwa/InstalarApp'
 import { useContadorCanjesPendientes } from '../../lib/fidelizacion/useContadorCanjesPendientes'
-
 export interface ItemNav {
   to: string
   label: string
@@ -180,9 +179,7 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
             <button onClick={salir} className="text-sm font-medium text-carbon/70 md:hidden">Salir</button>
           </header>
           <div className="flex flex-col gap-4 p-4 sm:p-6 md:p-8">
-            {/* Solo el portal de empleadas se ofrece como app instalable (ver pedido) — el resto
-                de los portales siguen siendo pestañas de navegador normales. */}
-            {titulo === 'Portal de empleadas' && <InstalarAppBanner />}
+            {(titulo === 'Portal de empleadas' || titulo === 'Administración') && <InstalarAppBanner />}
             <Outlet />
           </div>
         </div>

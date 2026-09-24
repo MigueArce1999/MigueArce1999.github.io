@@ -55,7 +55,7 @@ export function VoiceRegistrationPanel({
     <div className="flex flex-col gap-4 rounded-2xl border border-oliva/30 bg-oliva/5 p-5" role="region" aria-label="Asistente de registro por voz">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-marca text-lg font-semibold text-carbon">Registrar con voz</p>
+          <p className="font-marca text-lg font-semibold text-carbon">Dictado de la atención</p>
           <VoiceStatus fase={asistente.fase} />
         </div>
         <button

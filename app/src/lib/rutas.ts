@@ -10,8 +10,10 @@ export const rutaPorRol: Record<Perfil['rol'], string> = {
   super_admin: '/cliente',
 }
 
-/** Portal de ESTA instalación: equipo solo si el perfil es de este local; si no, clienta. */
+/** Portal de ESTA instalación: equipo solo si el perfil es de este local; si no, clienta.
+ *  super_admin no tiene local_id: en cualquier tienda entra como clienta. */
 export function rutaEnEsteSalon(perfil: Perfil, tieneCliente: boolean): string {
+  if (perfil.rol === 'super_admin') return tieneCliente ? '/cliente' : '/'
   if (LOCAL_ID && perfil.local_id === LOCAL_ID) {
     if (perfil.rol === 'admin') return '/admin'
     if (perfil.rol === 'empleada') return '/equipo-app'

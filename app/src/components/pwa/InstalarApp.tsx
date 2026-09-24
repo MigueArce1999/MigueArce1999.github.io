@@ -20,9 +20,7 @@ export function InstalarAppBanner() {
     }
   })
 
-  // Nada que ofrecer: ya está instalada, o es un navegador (p. ej. de escritorio) que no soporta
-  // instalación nativa ni tiene una guía manual sensata.
-  if (instalada || oculto || (plataforma === 'otra' && !puedeInstalarNativo)) return null
+  if (instalada || oculto) return null
 
   function descartar() {
     setOculto(true)
@@ -73,10 +71,6 @@ export function BotonInstalarApp() {
   if (instalada) {
     return <p className="text-sm text-carbon/60">✅ Ya tienes esta app instalada en este dispositivo.</p>
   }
-  if (plataforma === 'otra' && !puedeInstalarNativo) {
-    return <p className="text-sm text-carbon/60">Abre este enlace desde el celular (Chrome en Android o Safari en iPhone) para instalarla.</p>
-  }
-
   async function alPulsar() {
     if (puedeInstalarNativo) {
       await instalar()
@@ -110,11 +104,17 @@ function GuiaInstalacionModal({
           <PasoGuia numero={2} texto='Desliza hacia abajo en la lista y toca "Agregar a inicio".' icono="➕" />
           <PasoGuia numero={3} texto='Toca "Agregar" arriba a la derecha.' icono="✔️" />
         </ol>
-      ) : (
+      ) : plataforma === 'android' ? (
         <ol className="flex flex-col gap-3 text-sm text-carbon">
           <PasoGuia numero={1} texto="Toca el menú (⋮) arriba a la derecha de Chrome." icono="⋮" />
           <PasoGuia numero={2} texto='Toca "Instalar app" o "Agregar a pantalla de inicio".' icono="➕" />
           <PasoGuia numero={3} texto="Confirma tocando Instalar." icono="✔️" />
+        </ol>
+      ) : (
+        <ol className="flex flex-col gap-3 text-sm text-carbon">
+          <PasoGuia numero={1} texto="En Chrome o Edge, mira el icono de instalar en la barra de direcciones." icono="💻" />
+          <PasoGuia numero={2} texto='Si no está, abre el menú del navegador y elige "Instalar app" o "Instalar Claudia Patricia".' icono="⋮" />
+          <PasoGuia numero={3} texto="Confirma. El icono queda en el Dock o en el escritorio." icono="✔️" />
         </ol>
       )}
       <p className="mt-4 text-xs text-carbon/50">

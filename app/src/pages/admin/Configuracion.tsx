@@ -20,6 +20,7 @@ const configDemo: ConfiguracionNegocio = {
   live_umbral_disponible_limitado_minutos: 45,
   live_expiracion_solicitud_minutos: 3,
   live_hold_minutos: 20,
+  voz_asistente_genero: 'femenina',
 }
 
 export function AdminConfiguracion() {
@@ -107,6 +108,16 @@ export function AdminConfiguracion() {
             onChange={(e) => setConfig({ ...config, margen_entre_citas_minutos: Number(e.target.value) })}
             ayuda="Tiempo libre que se reserva automáticamente antes y después de cada cita, para que dos citas seguidas nunca queden pegadas."
           />
+          <Select
+            id="voz-glowdesk"
+            etiqueta="Voz del asistente Glowdesk"
+            value={config.voz_asistente_genero ?? 'femenina'}
+            onChange={(e) => setConfig({ ...config, voz_asistente_genero: e.target.value as 'femenina' | 'masculina' })}
+            ayuda="Se usa cuando Glowdesk te habla (hola Glowdesk). El micrófono sigue siendo el del navegador."
+          >
+            <option value="femenina">Femenina</option>
+            <option value="masculina">Masculina</option>
+          </Select>
           <Button type="submit" cargando={guardando}>Guardar configuración</Button>
           {guardado && <p className="text-sm font-medium text-exito">Configuración guardada.</p>}
         </form>

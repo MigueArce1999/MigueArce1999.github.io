@@ -34,6 +34,7 @@ export interface LocalMarca {
   logo_url: string | null
   favicon_url: string | null
   logo_footer_url: string | null
+  splash_url: string | null
   url_sitio: string | null
   nombre_corto: string | null
   eslogan: string | null
@@ -285,6 +286,7 @@ export interface ConfiguracionNegocio {
   live_umbral_disponible_limitado_minutos: number
   live_expiracion_solicitud_minutos: number
   live_hold_minutos: number
+  voz_asistente_genero?: 'femenina' | 'masculina'
 }
 
 // --- Agenda compartida (ver supabase/migrations/0031/0032) -----------------------------

@@ -17,6 +17,10 @@ export interface CandidatoClienteFuzzy extends CandidatoFuzzy {
   telefono: string | null
 }
 
+export interface CandidatoServicioFuzzy extends CandidatoFuzzy {
+  precio: number | null
+}
+
 export interface CandidatoProductoFuzzy extends CandidatoFuzzy {
   categoria: string | null
   precio: number | null
@@ -30,12 +34,17 @@ export async function buscarClientesFuzzy(texto: string, limite = 5): Promise<Ca
   return (data ?? []) as CandidatoClienteFuzzy[]
 }
 
-export async function buscarServiciosFuzzy(texto: string, limite = 5): Promise<CandidatoFuzzy[]> {
+export async function buscarServiciosFuzzy(texto: string, limite = 5): Promise<CandidatoServicioFuzzy[]> {
   if (isDemoMode) return []
   const client = supabaseRequerido()
   const { data, error } = await client.rpc('fn_buscar_servicios_fuzzy', { p_texto: texto, p_limite: limite })
   if (error) throw error
-  return (data ?? []) as CandidatoFuzzy[]
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    nombre: row.nombre,
+    score: row.score,
+    precio: row.precio != null ? Number(row.precio) : null,
+  }))
 }
 
 export async function buscarProfesionalesFuzzy(texto: string, limite = 5): Promise<CandidatoFuzzy[]> {
