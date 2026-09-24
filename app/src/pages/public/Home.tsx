@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { ErrorState } from '../../components/ui/Estados'
+import { WidgetSalonEnVivo } from '../../components/disponibilidadEnVivo/WidgetSalonEnVivo'
 import { listarCategorias, listarProfesionalesHomepage, listarPromocionesVigentes } from '../../lib/api/catalogo'
 import { obtenerConfiguracionHomepage } from '../../lib/api/homepage'
 import { isDemoMode } from '../../lib/supabase'
@@ -91,6 +92,10 @@ export function Home() {
           <FotoPlaceholder className="h-[280px] w-full sm:h-[400px] lg:h-[570px] lg:w-auto lg:flex-1" />
         )}
       </section>
+
+      <div className="pt-16">
+        <WidgetSalonEnVivo />
+      </div>
 
       {/* Servicios */}
       <section className="mx-auto flex max-w-[1440px] flex-col gap-10 bg-marfil px-5 sm:px-[40px] py-16">
