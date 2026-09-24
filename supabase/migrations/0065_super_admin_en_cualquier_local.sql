@@ -1,4 +1,4 @@
--- 0062_super_admin_en_cualquier_local.sql
+-- 0065_super_admin_en_cualquier_local.sql
 -- fn_conceder_super_admin deja rol = super_admin y local_id NULL (no pertenece a un salón).
 -- Las políticas restrictivas comparan local_id = fn_local_id(), así que esa cuenta no veía
 -- ni sus citas ni su portal en ninguna instalación.
