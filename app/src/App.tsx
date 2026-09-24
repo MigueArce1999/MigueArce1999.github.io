@@ -13,6 +13,7 @@ import { Promociones } from './pages/public/Promociones'
 import { Equipo } from './pages/public/Equipo'
 import { ProfesionalDetalle } from './pages/public/ProfesionalDetalle'
 import { Ubicacion } from './pages/public/Ubicacion'
+import { SalonEnVivo } from './pages/public/SalonEnVivo'
 import { Ingresar } from './pages/public/Ingresar'
 import { Registro } from './pages/public/Registro'
 import { RegistroSalon } from './pages/public/RegistroSalon'
@@ -123,6 +124,7 @@ function App() {
             <Route path="/equipo" element={<Equipo />} />
             <Route path="/equipo/:slug" element={<ProfesionalDetalle />} />
             <Route path="/ubicacion" element={<Ubicacion />} />
+            <Route path="/salon-en-vivo" element={<SalonEnVivo />} />
             <Route path="/ingresar" element={<Ingresar />} />
             <Route path="/registro" element={<Registro />} />
             <Route path="/reservar" element={<Reservar />} />
