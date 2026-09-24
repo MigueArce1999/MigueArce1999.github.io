@@ -655,15 +655,12 @@ export function EmpleadaAtender({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {!panelVozAbierto && (
-            <Button type="button" variante="secondary" tamano="sm" onClick={() => setPanelVozAbierto(true)} disabled={cargandoCatalogo}>
-              <span aria-hidden>🎙️</span> Registrar con voz
-            </Button>
-          )}
           <Stepper paso="registrar" />
         </div>
       </div>
 
+      {/* "Registrar con voz" desactivado a pedido del salón: se quita el botón que lo abre,
+          sin borrar el motor de voz (lib/voz, components/voz) por si se reactiva más adelante. */}
       {panelVozAbierto && (
         <div className="mb-4">
           <VoiceRegistrationPanel deps={vozDeps} onConfirmar={onConfirmarDraft} onCerrar={() => setPanelVozAbierto(false)} />
