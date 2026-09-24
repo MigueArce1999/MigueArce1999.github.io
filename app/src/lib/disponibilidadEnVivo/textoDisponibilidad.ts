@@ -69,6 +69,46 @@ export function textoEstadoDisponibilidad(estado: EstadoProfesionalAhora, ahoraM
   }
 }
 
+const ETIQUETAS_RAZON_MANUAL: Record<string, string> = {
+  descanso: 'En descanso',
+  almuerzo: 'En almuerzo',
+  no_disponible: 'Marcada como no disponible',
+  ocupado_temporal: 'Ocupada temporalmente',
+}
+
+const ETIQUETAS_RAZON_FIJA: Record<string, string> = {
+  fuera_de_horario: 'Fuera de tu horario',
+  dia_libre: 'Día libre',
+  ausencia: 'En ausencia aprobada',
+  bloqueo: 'Bloqueo de agenda',
+}
+
+export interface TextoMiEstado extends TextoDisponibilidad {
+  // A diferencia de textoEstadoDisponibilidad (para la clienta, que nunca debe saber el motivo
+  // exacto — sección 26), esta versión es para la propia profesional viendo su pantalla "Mi
+  // disponibilidad": sí puede ver el motivo real, y `esManual` indica si puede quitarlo ella
+  // misma (fn_limpiar_estado_manual) o si viene del horario/una cita/un bloqueo aprobado.
+  esManual: boolean
+}
+
+export function textoMiEstadoAhora(estado: EstadoProfesionalAhora, ahoraMs: number = Date.now()): TextoMiEstado {
+  if (estado.status !== 'unavailable') {
+    return { ...textoEstadoDisponibilidad(estado, ahoraMs), esManual: false }
+  }
+  if (estado.razon && estado.razon in ETIQUETAS_RAZON_MANUAL) {
+    const hasta = estado.proxima_disponible_en ? `Hasta las ${FORMATO_HORA.format(new Date(estado.proxima_disponible_en))}` : null
+    return {
+      emoji: estado.razon === 'ocupado_temporal' ? '🟣' : '⚪',
+      titulo: ETIQUETAS_RAZON_MANUAL[estado.razon],
+      detalle: hasta,
+      clase: 'bg-carbon/10 text-carbon/70',
+      esManual: true,
+    }
+  }
+  const titulo = (estado.razon && ETIQUETAS_RAZON_FIJA[estado.razon]) || 'No disponible'
+  return { emoji: '⚪', titulo, detalle: null, clase: 'bg-carbon/10 text-carbon/60', esManual: false }
+}
+
 // Sección 3: estado general del salón en el widget de home.
 export function textoDemandaSalon(demanda: 'tranquilo' | 'movimiento_medio' | 'alta_demanda'): { emoji: string; texto: string } {
   switch (demanda) {
