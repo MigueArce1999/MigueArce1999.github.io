@@ -574,3 +574,97 @@ export interface ResultadoCobro {
   saldo_nuevo: number
   recompensa_aplicada: { canje_id: string; nombre: string; tipo: TipoRecompensa } | null
 }
+
+// --- GlowDesk Live: disponibilidad en tiempo real -------------------------------------------
+// Los tipos de esta sección reflejan exactamente el jsonb que devuelven las funciones de
+// supabase/migrations/0061_glowdesk_live_motor.sql — no hay transformación de forma entre el
+// motor SQL (fuente única de verdad) y lo que consume la UI.
+
+export interface ZonaSalon {
+  id: string
+  nombre: string
+  icono: string | null
+  orden_visualizacion: number
+  activa: boolean
+}
+
+// Devuelto por fn_estado_profesional_ahora. `razon` nunca revela información privada del
+// cliente que esté siendo atendido (sección 26 del pedido) — son categorías internas seguras
+// de mostrar tal cual o de traducir a texto amigable en la UI.
+export type EstadoDisponibilidad = 'available' | 'busy' | 'ending_soon' | 'upcoming_appointment' | 'unavailable'
+
+export type RazonNoDisponible =
+  | 'fuera_de_horario'
+  | 'dia_libre'
+  | 'ausencia'
+  | 'bloqueo'
+  | 'descanso'
+  | 'almuerzo'
+  | 'no_disponible'
+  | 'ocupado_temporal'
+  | 'servicio_activo'
+  | 'cita'
+  | null
+
+export interface EstadoProfesionalAhora {
+  status: EstadoDisponibilidad
+  razon: RazonNoDisponible
+  disponible_ahora: boolean
+  disponible_hasta: string | null
+  proxima_disponible_en: string | null
+  minutos_libres: number | null
+  // null = no se pidió filtrar por un servicio concreto, o la duración de ese servicio es
+  // desconocida (no se puede confirmar con certeza que le alcanza el tiempo libre).
+  puede_atender_servicio: boolean | null
+}
+
+export interface ProfesionalEnVivo {
+  profesional_id: string
+  nombre: string
+  foto_url: string | null
+  zonas: string[]
+  estado: EstadoProfesionalAhora
+}
+
+export type DemandaSalon = 'tranquilo' | 'movimiento_medio' | 'alta_demanda'
+
+// Devuelto por fn_salon_en_vivo. `activo: false` significa que el feature flag
+// live_disponibilidad_activo está apagado para este local — la UI debe ocultar todo el módulo,
+// no mostrar un estado vacío.
+export type SalonEnVivo =
+  | { activo: false }
+  | {
+      activo: true
+      demanda: DemandaSalon
+      actualizado_en: string
+      zonas: ZonaSalon[]
+      profesionales: ProfesionalEnVivo[]
+    }
+
+export type EstadoSolicitudDisponibilidad =
+  | 'pendiente'
+  | 'aceptada'
+  | 'aceptada_luego'
+  | 'rechazada'
+  | 'expirada'
+  | 'cancelada'
+  | 'cliente_en_camino'
+  | 'completada'
+
+// Devuelto por fn_resultado_solicitud_disponibilidad (y por cada función que muta el estado de
+// una solicitud) — nunca una reconstrucción en el cliente, siempre lo que el servidor guardó.
+export interface SolicitudDisponibilidad {
+  id: string
+  estado: EstadoSolicitudDisponibilidad
+  expira_en: string
+  disponible_desde: string | null
+  llegada_minutos: number
+  profesional_id: string
+  profesional_nombre: string
+  servicio_id: string
+  servicio_nombre: string
+  creado_en: string
+  respondido_en: string | null
+}
+
+export type EstadoManualProfesional = 'disponible' | 'descanso' | 'almuerzo' | 'no_disponible' | 'ocupado_temporal'
