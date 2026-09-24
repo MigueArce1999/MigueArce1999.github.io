@@ -81,7 +81,7 @@ function MiEstadoAhora({ profesionalId }: { profesionalId: string }) {
     setAplicando(true)
     setErrorAccion(null)
     try {
-      await marcarEstadoManual(estadoElegido, minutos)
+      await marcarEstadoManual(estadoElegido, minutos, profesionalId)
       recargar()
     } catch (e: any) {
       setErrorAccion(e.message)
@@ -94,7 +94,7 @@ function MiEstadoAhora({ profesionalId }: { profesionalId: string }) {
     setAplicando(true)
     setErrorAccion(null)
     try {
-      await limpiarEstadoManual()
+      await limpiarEstadoManual(profesionalId)
       recargar()
     } catch (e: any) {
       setErrorAccion(e.message)

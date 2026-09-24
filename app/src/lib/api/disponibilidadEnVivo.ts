@@ -5,6 +5,7 @@ import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../supabase'
 import { demoProfesionales, demoServicios, demoClienteActual } from '../demoData'
 import { emitirCambioDemo } from '../disponibilidadEnVivo/eventosDemo'
 import type {
+  EstadoEquipoItem,
   EstadoManualProfesional,
   EstadoProfesionalAhora,
   SalonEnVivo,
@@ -149,30 +150,46 @@ export async function quitarProfesionalDeZona(profesionalId: string, zonaId: str
 
 // 'disponible' no es un estado manual real (fn_marcar_estado_manual lo rechaza) — es el botón
 // de la UI que significa "quita cualquier override", así que se traduce a limpiarEstadoManual().
+// profesionalId es obligatorio (no se infiere del lado del servidor con auth.uid() por defecto)
+// porque desde 0066 esto también lo puede usar un admin sobre CUALQUIER profesional de su local
+// — el servidor sigue siendo quien autoriza de verdad (uno mismo, o admin + mismo local), esto
+// solo evita la ambigüedad de "¿a quién se refiere esta llamada?" en el propio código del cliente.
 export async function marcarEstadoManual(
   estado: Exclude<EstadoManualProfesional, 'disponible'>,
   minutos: number,
+  profesionalId: string,
   motivo?: string | null,
 ): Promise<void> {
   if (isDemoMode) {
-    demoEstadoManual = { estado, hasta: new Date(Date.now() + minutos * 60_000).toISOString(), motivo: motivo ?? null }
+    demoEstadosManuales[profesionalId] = { estado, hasta: new Date(Date.now() + minutos * 60_000).toISOString(), motivo: motivo ?? null }
     emitirCambioDemo()
     return
   }
   const client = supabaseRequerido()
-  const { error } = await client.rpc('fn_marcar_estado_manual', { p_estado: estado, p_minutos: minutos, p_motivo: motivo ?? null })
+  const { error } = await client.rpc('fn_marcar_estado_manual', {
+    p_estado: estado, p_minutos: minutos, p_motivo: motivo ?? null, p_profesional_id: profesionalId,
+  })
   if (error) throw error
 }
 
-export async function limpiarEstadoManual(): Promise<void> {
+export async function limpiarEstadoManual(profesionalId: string): Promise<void> {
   if (isDemoMode) {
-    demoEstadoManual = null
+    delete demoEstadosManuales[profesionalId]
     emitirCambioDemo()
     return
   }
   const client = supabaseRequerido()
-  const { error } = await client.rpc('fn_limpiar_estado_manual')
+  const { error } = await client.rpc('fn_limpiar_estado_manual', { p_profesional_id: profesionalId })
   if (error) throw error
+}
+
+// Vista de equipo para el panel admin (0066): a diferencia de obtenerSalonEnVivo, siempre
+// responde para quien administra, incluso con live_disponibilidad_activo apagado.
+export async function obtenerEstadoEquipoEnVivo(): Promise<EstadoEquipoItem[]> {
+  if (isDemoMode) return demoProfesionales.map((p) => ({ profesional_id: p.id, nombre: p.nombre, foto_url: p.foto_url, estado: demoEstadoProfesional(p.id) }))
+  const { data, error } = await supabase!.rpc('fn_estado_equipo_en_vivo')
+  if (error) throw error
+  return (data ?? []) as EstadoEquipoItem[]
 }
 
 // ---------------------------------------------------------------------------
@@ -301,16 +318,20 @@ const DEMO_GUION: Record<string, { status: EstadoProfesionalAhora['status']; min
   'demo-prof-valery': { status: 'upcoming_appointment', minutosLibres: 25 },
 }
 
-let demoEstadoManual: { estado: EstadoManualProfesional; hasta: string; motivo: string | null } | null = null
+// Antes era un único valor global (compartía el override entre TODAS las profesionales del
+// guion demo, sin importar cuál se hubiera marcado) — con el panel de equipo del admin (0066)
+// pudiendo tocar a cualquier profesional, hace falta que cada una guarde el suyo aparte.
+const demoEstadosManuales: Record<string, { estado: EstadoManualProfesional; hasta: string; motivo: string | null }> = {}
 
 function demoEstadoProfesional(profesionalId: string, servicioId?: string | null): EstadoProfesionalAhora {
-  if (demoEstadoManual && demoEstadoManual.estado !== 'disponible' && new Date(demoEstadoManual.hasta) > new Date()) {
+  const manual = demoEstadosManuales[profesionalId]
+  if (manual && manual.estado !== 'disponible' && new Date(manual.hasta) > new Date()) {
     return {
       status: 'unavailable',
-      razon: demoEstadoManual.estado,
+      razon: manual.estado,
       disponible_ahora: false,
       disponible_hasta: null,
-      proxima_disponible_en: demoEstadoManual.hasta,
+      proxima_disponible_en: manual.hasta,
       minutos_libres: null,
       puede_atender_servicio: false,
     }
@@ -412,7 +433,7 @@ function demoResponderSolicitud(
   s.respondido_en = new Date().toISOString()
   if (respuesta === 'aceptar') {
     s.estado = 'aceptada'
-    demoEstadoManual = { estado: 'ocupado_temporal', hasta: new Date(Date.now() + 20 * 60_000).toISOString(), motivo: 'cliente_en_camino' }
+    demoEstadosManuales[s.profesional_id] = { estado: 'ocupado_temporal', hasta: new Date(Date.now() + 20 * 60_000).toISOString(), motivo: 'cliente_en_camino' }
   } else if (respuesta === 'rechazar') {
     s.estado = 'rechazada'
   } else {
