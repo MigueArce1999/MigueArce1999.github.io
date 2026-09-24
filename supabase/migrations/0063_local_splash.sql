@@ -10,5 +10,5 @@ comment on column local.splash_url is
 update storage.buckets
 set
   file_size_limit = 15728640,
-  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm']
+  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm']
 where id = 'imagenes-publico';

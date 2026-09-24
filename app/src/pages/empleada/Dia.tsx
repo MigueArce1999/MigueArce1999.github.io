@@ -17,7 +17,7 @@ export function EmpleadaDia() {
   useEffect(() => {
     if (!profesional) return
     const hoy = fechaBogotaISO()
-    listarReservasDelDia(profesional.id, hoy).then(setReservas as any)
+    listarReservasDelDia(profesional.id, hoy).then(setReservas)
     listarAtencionesDelDia(profesional.id, hoy).then(setVentasMostrador)
   }, [profesional])
 

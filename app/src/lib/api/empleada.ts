@@ -1,6 +1,6 @@
 import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../supabase'
 import { demoClientesAdmin, demoComisionesEmpleada, demoReservasAgendaEmpleada } from '../demoData'
-import type { Cliente, ComisionResumen, ResultadoCobro, VentaLinea } from '../types'
+import type { Cliente, ComisionResumen, Reserva, ResultadoCobro, VentaLinea } from '../types'
 
 // Clientes recién actualizados, para mostrar en el buscador de "Atender" antes de escribir
 // nada (actualizado_en es la mejor aproximación disponible a "actividad reciente" sin sumar
@@ -135,7 +135,7 @@ export async function listarComisiones(
   return data
 }
 
-export async function listarReservasDelDia(profesionalId: string, fechaISO: string) {
+export async function listarReservasDelDia(profesionalId: string, fechaISO: string): Promise<Reserva[]> {
   if (isDemoMode) return demoReservasAgendaEmpleada
   const desde = `${fechaISO}T00:00:00`
   const hasta = `${fechaISO}T23:59:59`
@@ -148,7 +148,22 @@ export async function listarReservasDelDia(profesionalId: string, fechaISO: stri
     .lte('inicio', hasta)
     .order('inicio')
   if (error) throw error
-  return data
+  // vista_reserva expone lower(rango) como `inicio`, no como `rango_inicio`.
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    cliente_id: row.cliente_id,
+    cliente_nombre: row.cliente_nombre,
+    servicio_id: row.servicio_id,
+    servicio_nombre: row.servicio_nombre,
+    profesional_id: row.profesional_id,
+    profesional_nombre: row.profesional_nombre,
+    rango_inicio: row.inicio,
+    rango_fin: row.fin,
+    precio_estimado: row.precio_estimado,
+    estado: row.estado,
+    origen: row.origen,
+    notas: row.notas,
+  }))
 }
 
 // Servicios que la profesional registró y cobró hoy directamente desde "Atender", sin pasar

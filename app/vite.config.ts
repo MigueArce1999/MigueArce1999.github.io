@@ -9,9 +9,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      // `prompt` evita location.reload() al activar un SW nuevo (autoUpdate recargaba
-      // al volver de otra pestaña si había un deploy). El SW se actualiza en la siguiente visita.
-      registerType: 'prompt',
+      // autoUpdate reemplaza el service worker en la siguiente visita. Con `prompt` el
+      // worker viejo se quedaba instalado y seguía sirviendo un JS que ya no existe.
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'favicon.svg', 'logo-claudia-patricia.png', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'Claudia Patricia · Equipo',
