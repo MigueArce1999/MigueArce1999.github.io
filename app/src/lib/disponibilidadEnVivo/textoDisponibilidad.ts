@@ -65,15 +65,22 @@ export function textoEstadoDisponibilidad(estado: EstadoProfesionalAhora, ahoraM
       if (estado.razon === 'ocupado_temporal') {
         return { emoji: '🟣', titulo: 'Ocupada temporalmente', detalle: 'Otra clienta viene en camino', clase: 'bg-champan/25 text-carbon' }
       }
-      return { emoji: '⚪', titulo: 'No disponible', detalle: null, clase: 'bg-carbon/10 text-carbon/60' }
+      return { emoji: '🔴', titulo: 'No disponible', detalle: null, clase: 'bg-error/15 text-error' }
   }
 }
 
 const ETIQUETAS_RAZON_MANUAL: Record<string, string> = {
   descanso: 'En descanso',
   almuerzo: 'En almuerzo',
-  no_disponible: 'Marcada como no disponible',
+  no_disponible: 'Marcada como ocupada',
   ocupado_temporal: 'Ocupada temporalmente',
+}
+
+// Mismo criterio que 'busy'/'ending_soon' en textoEstadoDisponibilidad: "ocupada" debe leerse en
+// rojo, no en el gris neutro de un estado ausente/planificado (descanso, almuerzo).
+const CLASE_RAZON_MANUAL: Record<string, string> = {
+  no_disponible: 'bg-error/15 text-error',
+  ocupado_temporal: 'bg-champan/25 text-carbon',
 }
 
 const ETIQUETAS_RAZON_FIJA: Record<string, string> = {
@@ -97,11 +104,12 @@ export function textoMiEstadoAhora(estado: EstadoProfesionalAhora, ahoraMs: numb
   }
   if (estado.razon && estado.razon in ETIQUETAS_RAZON_MANUAL) {
     const hasta = estado.proxima_disponible_en ? `Hasta las ${FORMATO_HORA.format(new Date(estado.proxima_disponible_en))}` : null
+    const emoji = estado.razon === 'ocupado_temporal' ? '🟣' : estado.razon === 'no_disponible' ? '🔴' : '⚪'
     return {
-      emoji: estado.razon === 'ocupado_temporal' ? '🟣' : '⚪',
+      emoji,
       titulo: ETIQUETAS_RAZON_MANUAL[estado.razon],
       detalle: hasta,
-      clase: 'bg-carbon/10 text-carbon/70',
+      clase: CLASE_RAZON_MANUAL[estado.razon] ?? 'bg-carbon/10 text-carbon/70',
       esManual: true,
     }
   }
