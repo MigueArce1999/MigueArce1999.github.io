@@ -279,6 +279,12 @@ export interface ConfiguracionNegocio {
   anticipacion_minima_reserva_minutos: number
   horizonte_reservas_dias: number
   margen_entre_citas_minutos: number
+  // GlowDesk Live (0060_glowdesk_live_esquema.sql) — sección 22 del pedido.
+  live_disponibilidad_activo: boolean
+  live_umbral_termina_pronto_minutos: number
+  live_umbral_disponible_limitado_minutos: number
+  live_expiracion_solicitud_minutos: number
+  live_hold_minutos: number
 }
 
 // --- Agenda compartida (ver supabase/migrations/0031/0032) -----------------------------

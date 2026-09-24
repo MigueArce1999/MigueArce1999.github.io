@@ -15,6 +15,11 @@ const configDemo: ConfiguracionNegocio = {
   anticipacion_minima_reserva_minutos: 0,
   horizonte_reservas_dias: 60,
   margen_entre_citas_minutos: 0,
+  live_disponibilidad_activo: false,
+  live_umbral_termina_pronto_minutos: 20,
+  live_umbral_disponible_limitado_minutos: 45,
+  live_expiracion_solicitud_minutos: 3,
+  live_hold_minutos: 20,
 }
 
 export function AdminConfiguracion() {

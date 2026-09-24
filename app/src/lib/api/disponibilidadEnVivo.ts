@@ -41,7 +41,7 @@ export async function obtenerSalonEnVivo(servicioId?: string | null): Promise<Sa
 // ---------------------------------------------------------------------------
 
 export async function listarZonas(): Promise<ZonaSalon[]> {
-  if (isDemoMode) return demoZonas
+  if (isDemoMode) return [...demoZonas].sort((a, b) => a.orden_visualizacion - b.orden_visualizacion)
   const { data, error } = await supabase!
     .from('zona_salon')
     .select('id, nombre, icono, orden_visualizacion, activa')
@@ -51,6 +51,19 @@ export async function listarZonas(): Promise<ZonaSalon[]> {
 }
 
 export async function crearZona(params: { nombre: string; icono?: string | null }): Promise<ZonaSalon> {
+  if (isDemoMode) {
+    demoContadorZona += 1
+    const nueva: ZonaSalon = {
+      id: `demo-zona-${demoContadorZona}`,
+      nombre: params.nombre,
+      icono: params.icono ?? null,
+      orden_visualizacion: demoZonas.length,
+      activa: true,
+    }
+    demoZonas = [...demoZonas, nueva]
+    emitirCambioDemo()
+    return nueva
+  }
   const client = supabaseRequerido()
   const { data, error } = await client
     .from('zona_salon')
@@ -65,12 +78,25 @@ export async function actualizarZona(
   zonaId: string,
   cambios: Partial<{ nombre: string; icono: string | null; orden_visualizacion: number; activa: boolean }>,
 ): Promise<void> {
+  if (isDemoMode) {
+    demoZonas = demoZonas.map((z) => (z.id === zonaId ? { ...z, ...cambios } : z))
+    emitirCambioDemo()
+    return
+  }
   const client = supabaseRequerido()
   const { error } = await client.from('zona_salon').update(cambios).eq('id', zonaId)
   if (error) throw error
 }
 
 export async function eliminarZona(zonaId: string): Promise<void> {
+  if (isDemoMode) {
+    demoZonas = demoZonas.filter((z) => z.id !== zonaId)
+    for (const profesionalId of Object.keys(demoAsignacionZonas)) {
+      demoAsignacionZonas[profesionalId] = demoAsignacionZonas[profesionalId].filter((z) => z !== zonaId)
+    }
+    emitirCambioDemo()
+    return
+  }
   const client = supabaseRequerido()
   const { error } = await client.from('zona_salon').delete().eq('id', zonaId)
   if (error) throw error
@@ -83,13 +109,35 @@ export async function listarZonasDeProfesional(profesionalId: string): Promise<s
   return (data ?? []).map((r) => r.zona_id)
 }
 
+// Todas las asignaciones profesional↔zona en una sola llamada (para el panel admin, que
+// necesita saber quién está en cada zona sin una consulta por profesional — sección 27).
+export async function listarTodasLasAsignacionesZona(): Promise<{ profesional_id: string; zona_id: string }[]> {
+  if (isDemoMode) {
+    return Object.entries(demoAsignacionZonas).flatMap(([profesional_id, zonas]) => zonas.map((zona_id) => ({ profesional_id, zona_id })))
+  }
+  const { data, error } = await supabase!.from('profesional_zona').select('profesional_id, zona_id')
+  if (error) throw error
+  return data ?? []
+}
+
 export async function asignarProfesionalAZona(profesionalId: string, zonaId: string): Promise<void> {
+  if (isDemoMode) {
+    const actuales = demoAsignacionZonas[profesionalId] ?? []
+    if (!actuales.includes(zonaId)) demoAsignacionZonas[profesionalId] = [...actuales, zonaId]
+    emitirCambioDemo()
+    return
+  }
   const client = supabaseRequerido()
   const { error } = await client.from('profesional_zona').insert({ profesional_id: profesionalId, zona_id: zonaId, local_id: LOCAL_ID })
   if (error) throw error
 }
 
 export async function quitarProfesionalDeZona(profesionalId: string, zonaId: string): Promise<void> {
+  if (isDemoMode) {
+    demoAsignacionZonas[profesionalId] = (demoAsignacionZonas[profesionalId] ?? []).filter((z) => z !== zonaId)
+    emitirCambioDemo()
+    return
+  }
   const client = supabaseRequerido()
   const { error } = await client.from('profesional_zona').delete().eq('profesional_id', profesionalId).eq('zona_id', zonaId)
   if (error) throw error
@@ -229,11 +277,12 @@ export async function obtenerSolicitudDisponibilidad(solicitudId: string): Promi
 // demoCanjesExtra/demoSaldoOverride en lib/api/fidelizacion.ts.
 // ---------------------------------------------------------------------------
 
-const demoZonas: ZonaSalon[] = [
+let demoZonas: ZonaSalon[] = [
   { id: 'demo-zona-cabello', nombre: 'Cabello', icono: null, orden_visualizacion: 1, activa: true },
   { id: 'demo-zona-cejas', nombre: 'Cejas y maquillaje', icono: null, orden_visualizacion: 2, activa: true },
   { id: 'demo-zona-unas', nombre: 'Manicura y pedicura', icono: null, orden_visualizacion: 3, activa: true },
 ]
+let demoContadorZona = 0
 
 const demoAsignacionZonas: Record<string, string[]> = {
   'demo-prof-claudia': ['demo-zona-cabello'],
@@ -304,7 +353,8 @@ function demoSalonEnVivo(servicioId?: string | null): SalonEnVivo {
   }))
   const disponibles = profesionales.filter((p) => p.estado.status === 'available' || p.estado.status === 'upcoming_appointment').length
   const demanda = disponibles / profesionales.length >= 0.5 ? 'tranquilo' : disponibles > 0 ? 'movimiento_medio' : 'alta_demanda'
-  return { activo: true, demanda, actualizado_en: new Date().toISOString(), zonas: demoZonas, profesionales }
+  const zonasActivas = demoZonas.filter((z) => z.activa).sort((a, b) => a.orden_visualizacion - b.orden_visualizacion)
+  return { activo: true, demanda, actualizado_en: new Date().toISOString(), zonas: zonasActivas, profesionales }
 }
 
 interface DemoSolicitud extends SolicitudDisponibilidad {
