@@ -63,6 +63,7 @@ export function EmpleadaDisponibilidad() {
 // prioridad 1), nunca bloquea ni cancela citas ya agendadas.
 
 const OPCIONES_ESTADO_MANUAL: { valor: Exclude<EstadoManualProfesional, 'disponible'>; etiqueta: string; emoji: string }[] = [
+  { valor: 'disponible_forzado', etiqueta: 'Disponible', emoji: '🟢' },
   { valor: 'descanso', etiqueta: 'Descanso', emoji: '☕' },
   { valor: 'almuerzo', etiqueta: 'Almuerzo', emoji: '🍽️' },
   { valor: 'no_disponible', etiqueta: 'No disponible', emoji: '🚫' },

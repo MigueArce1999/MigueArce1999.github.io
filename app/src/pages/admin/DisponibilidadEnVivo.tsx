@@ -60,6 +60,7 @@ export function AdminDisponibilidadEnVivo() {
 // depender de que ella misma abra la app en su celular. --------------------------------------
 
 const OPCIONES_ESTADO_EQUIPO: { valor: Exclude<EstadoManualProfesional, 'disponible'>; etiqueta: string; emoji: string }[] = [
+  { valor: 'disponible_forzado', etiqueta: 'Disponible', emoji: '🟢' },
   { valor: 'descanso', etiqueta: 'Descanso', emoji: '☕' },
   { valor: 'almuerzo', etiqueta: 'Almuerzo', emoji: '🍽️' },
   { valor: 'no_disponible', etiqueta: 'No disponible', emoji: '🚫' },
@@ -101,6 +102,9 @@ function PestanaEquipo() {
 
   return (
     <div className="flex flex-col gap-3">
+      <p className="text-xs text-carbon/50">
+        "Disponible" fuerza a alguien a aparecer como disponible aunque esté fuera de su horario o en un bloqueo/ausencia — nunca sobre una cita o atención real en curso.
+      </p>
       {error && <ErrorState mensaje={error} reintentar={recargar} />}
       {errorAccion && <ErrorState mensaje={errorAccion} />}
 
