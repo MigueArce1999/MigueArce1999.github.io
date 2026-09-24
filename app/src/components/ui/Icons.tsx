@@ -226,3 +226,16 @@ export function IconoHomepage(props: SVGProps<SVGSVGElement>) {
     </Svg>
   )
 }
+
+// Punto con ondas concéntricas ("en vivo" / señal en tiempo real) — usado por GlowDesk Live.
+export function IconoEnVivo(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M8.5 15.5a5 5 0 0 1 0-7" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M5.5 18.5a9 9 0 0 1 0-13" />
+      <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+    </Svg>
+  )
+}

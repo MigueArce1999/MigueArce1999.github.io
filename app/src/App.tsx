@@ -49,6 +49,7 @@ import { AdminHomepage } from './pages/admin/Homepage'
 import { AdminContenido } from './pages/admin/Contenido'
 import { AdminReportes } from './pages/admin/Reportes'
 import { AdminConfiguracion } from './pages/admin/Configuracion'
+import { AdminDisponibilidadEnVivo } from './pages/admin/DisponibilidadEnVivo'
 import {
   IconoAgenda,
   IconoAtender,
@@ -58,6 +59,7 @@ import {
   IconoConfiguracion,
   IconoContenido,
   IconoDashboard,
+  IconoEnVivo,
   IconoEquipo,
   IconoGastos,
   IconoHistorial,
@@ -106,6 +108,7 @@ const navAdmin: ItemNav[] = [
   { to: '/admin/homepage', label: 'Homepage', icono: IconoHomepage },
   { to: '/admin/contenido', label: 'Contenido', icono: IconoContenido },
   { to: '/admin/reportes', label: 'Reportes', icono: IconoReportes },
+  { to: '/admin/disponibilidad-en-vivo', label: 'GlowDesk Live', icono: IconoEnVivo },
   { to: '/admin/configuracion', label: 'Configuración', icono: IconoConfiguracion },
 ]
 
@@ -170,6 +173,7 @@ function App() {
             <Route path="/admin/homepage" element={<AdminHomepage />} />
             <Route path="/admin/contenido" element={<AdminContenido />} />
             <Route path="/admin/reportes" element={<AdminReportes />} />
+            <Route path="/admin/disponibilidad-en-vivo" element={<AdminDisponibilidadEnVivo />} />
             <Route path="/admin/configuracion" element={<AdminConfiguracion />} />
           </Route>
 
