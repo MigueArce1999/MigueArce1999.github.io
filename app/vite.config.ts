@@ -12,6 +12,11 @@ export default defineConfig({
       // autoUpdate reemplaza el service worker en la siguiente visita. Con `prompt` el
       // worker viejo se quedaba instalado y seguía sirviendo un JS que ya no existe.
       registerType: 'autoUpdate',
+      // El registro lo hace a mano src/main.tsx (virtual:pwa-register), para poder revisar
+      // activamente si hay una versión nueva (al volver del segundo plano y cada cierto rato) en
+      // vez de esperar a que el navegador lo note solo — con el acceso directo del celular
+      // guardado, eso podía tardar mucho o nunca pasar mientras la empleada no cerrara la app.
+      injectRegister: false,
       includeAssets: ['favicon.png', 'favicon.svg', 'logo-claudia-patricia.png', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'Claudia Patricia · Equipo',
