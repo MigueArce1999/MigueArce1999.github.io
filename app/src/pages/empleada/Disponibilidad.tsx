@@ -13,8 +13,11 @@ import {
   solicitarBloqueo,
   solicitarHorario,
 } from '../../lib/api/agenda'
+import { limpiarEstadoManual, marcarEstadoManual } from '../../lib/api/disponibilidadEnVivo'
+import { useMiEstadoEnVivo } from '../../lib/disponibilidadEnVivo/useMiEstadoEnVivo'
+import { textoMiEstadoAhora } from '../../lib/disponibilidadEnVivo/textoDisponibilidad'
 import { formatoFecha, formatoHora } from '../../lib/format'
-import type { BloqueoAusencia, IntervaloHorario, Reserva, TipoBloqueoAusencia } from '../../lib/types'
+import type { BloqueoAusencia, EstadoManualProfesional, IntervaloHorario, Reserva, TipoBloqueoAusencia } from '../../lib/types'
 
 const NOMBRES_DIA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
@@ -31,6 +34,9 @@ export function EmpleadaDisponibilidad() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="font-marca text-2xl font-semibold text-carbon">Mi disponibilidad</h1>
+
+      <MiEstadoAhora profesionalId={profesional.id} />
+
       <div className="flex gap-2">
         <button
           onClick={() => setTab('horario')}
@@ -47,6 +53,94 @@ export function EmpleadaDisponibilidad() {
       </div>
       {tab === 'horario' ? <HorarioHabitual profesionalId={profesional.id} /> : <AusenciasBloqueos profesionalId={profesional.id} />}
     </div>
+  )
+}
+
+// --- GlowDesk Live: "Mi disponibilidad ahora" (Fase 6) ----------------------------------------
+// Independiente del horario/ausencias de arriba (que son planificación a futuro): esto es un
+// interruptor rápido para el momento presente — "salgo a almorzar", "estoy en descanso 15
+// minutos" — que solo afecta lo que ve la clienta en /salon-en-vivo (fn_estado_profesional_ahora,
+// prioridad 1), nunca bloquea ni cancela citas ya agendadas.
+
+const OPCIONES_ESTADO_MANUAL: { valor: Exclude<EstadoManualProfesional, 'disponible'>; etiqueta: string; emoji: string }[] = [
+  { valor: 'descanso', etiqueta: 'Descanso', emoji: '☕' },
+  { valor: 'almuerzo', etiqueta: 'Almuerzo', emoji: '🍽️' },
+  { valor: 'no_disponible', etiqueta: 'No disponible', emoji: '🚫' },
+]
+
+const OPCIONES_MINUTOS = [15, 30, 45, 60]
+
+function MiEstadoAhora({ profesionalId }: { profesionalId: string }) {
+  const { estado, cargando, error, recargar } = useMiEstadoEnVivo(profesionalId)
+  const [estadoElegido, setEstadoElegido] = useState<Exclude<EstadoManualProfesional, 'disponible'>>('descanso')
+  const [minutos, setMinutos] = useState(15)
+  const [aplicando, setAplicando] = useState(false)
+  const [errorAccion, setErrorAccion] = useState<string | null>(null)
+
+  async function aplicar() {
+    setAplicando(true)
+    setErrorAccion(null)
+    try {
+      await marcarEstadoManual(estadoElegido, minutos)
+      recargar()
+    } catch (e: any) {
+      setErrorAccion(e.message)
+    } finally {
+      setAplicando(false)
+    }
+  }
+
+  async function volverADisponible() {
+    setAplicando(true)
+    setErrorAccion(null)
+    try {
+      await limpiarEstadoManual()
+      recargar()
+    } catch (e: any) {
+      setErrorAccion(e.message)
+    } finally {
+      setAplicando(false)
+    }
+  }
+
+  if (cargando && !estado) return <Card><Cargando filas={1} /></Card>
+
+  const texto = estado ? textoMiEstadoAhora(estado) : null
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40">Mi disponibilidad ahora (Salón en vivo)</p>
+      {error && <ErrorState mensaje={error} reintentar={recargar} />}
+      {errorAccion && <ErrorState mensaje={errorAccion} />}
+
+      {texto && (
+        <div className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 ${texto.clase}`}>
+          <p className="text-sm font-semibold">{texto.emoji} {texto.titulo}{texto.detalle ? ` · ${texto.detalle}` : ''}</p>
+          {texto.esManual && (
+            <button onClick={volverADisponible} disabled={aplicando} className="text-xs font-semibold underline underline-offset-2 disabled:opacity-50">
+              Ya estoy disponible
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-end gap-2">
+        <Select id="estadoManual" etiqueta="Marcarme como" value={estadoElegido} onChange={(e) => setEstadoElegido(e.target.value as typeof estadoElegido)}>
+          {OPCIONES_ESTADO_MANUAL.map((o) => (
+            <option key={o.valor} value={o.valor}>{o.emoji} {o.etiqueta}</option>
+          ))}
+        </Select>
+        <Select id="minutosManual" etiqueta="Por" value={minutos} onChange={(e) => setMinutos(Number(e.target.value))}>
+          {OPCIONES_MINUTOS.map((m) => (
+            <option key={m} value={m}>{m} min</option>
+          ))}
+        </Select>
+        <Button type="button" tamano="sm" onClick={aplicar} cargando={aplicando}>Aplicar</Button>
+      </div>
+      <p className="text-xs text-carbon/50">
+        Solo cambia lo que ve la clienta en "Salón en vivo" ahora mismo — no toca tu horario ni tus citas ya agendadas. Vuelve sola a "Disponible" al vencerse.
+      </p>
+    </Card>
   )
 }
 

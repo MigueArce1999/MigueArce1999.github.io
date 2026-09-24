@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { textoDemandaSalon, textoEstadoDisponibilidad } from './textoDisponibilidad'
+import { textoDemandaSalon, textoEstadoDisponibilidad, textoMiEstadoAhora } from './textoDisponibilidad'
 import type { EstadoProfesionalAhora } from '../types'
 
 function estado(overrides: Partial<EstadoProfesionalAhora> = {}): EstadoProfesionalAhora {
@@ -79,6 +79,42 @@ describe('textoEstadoDisponibilidad', () => {
     const t = textoEstadoDisponibilidad(estado({ status: 'unavailable', razon: 'ocupado_temporal', disponible_ahora: false }))
     expect(t.titulo).toBe('Ocupada temporalmente')
     expect(t.emoji).toBe('🟣')
+  })
+})
+
+describe('textoMiEstadoAhora', () => {
+  it('reusa el texto normal para los estados no manuales (disponible/atendiendo/etc)', () => {
+    const t = textoMiEstadoAhora(estado({ status: 'available', minutos_libres: 40 }))
+    expect(t.titulo).toBe('Disponible ahora')
+    expect(t.esManual).toBe(false)
+  })
+
+  it('un override manual (descanso) sí muestra el motivo real y la hora hasta la que dura', () => {
+    const t = textoMiEstadoAhora(
+      estado({ status: 'unavailable', razon: 'descanso', disponible_ahora: false, proxima_disponible_en: '2026-09-21T15:30:00.000Z' }),
+    )
+    expect(t.titulo).toBe('En descanso')
+    expect(t.detalle).toMatch(/^Hasta las/)
+    expect(t.esManual).toBe(true)
+  })
+
+  it('ocupado_temporal manual se distingue con su propio emoji, igual que en la vista de la clienta', () => {
+    const t = textoMiEstadoAhora(estado({ status: 'unavailable', razon: 'ocupado_temporal', disponible_ahora: false }))
+    expect(t.titulo).toBe('Ocupada temporalmente')
+    expect(t.emoji).toBe('🟣')
+    expect(t.esManual).toBe(true)
+  })
+
+  it('fuera de horario no es un override manual: la profesional no puede "quitarlo" ella misma', () => {
+    const t = textoMiEstadoAhora(estado({ status: 'unavailable', razon: 'fuera_de_horario', disponible_ahora: false }))
+    expect(t.titulo).toBe('Fuera de tu horario')
+    expect(t.esManual).toBe(false)
+  })
+
+  it('un día libre aprobado tampoco es un override manual editable desde este widget', () => {
+    const t = textoMiEstadoAhora(estado({ status: 'unavailable', razon: 'dia_libre', disponible_ahora: false }))
+    expect(t.titulo).toBe('Día libre')
+    expect(t.esManual).toBe(false)
   })
 })
 
