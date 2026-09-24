@@ -685,4 +685,9 @@ export interface SolicitudDisponibilidad {
   respondido_en: string | null
 }
 
-export type EstadoManualProfesional = 'disponible' | 'descanso' | 'almuerzo' | 'no_disponible' | 'ocupado_temporal'
+// 'disponible_forzado' (0070) es distinto de 'disponible': 'disponible' no es un override real
+// (fn_marcar_estado_manual lo rechaza, significa "quitar cualquier override"), mientras que
+// 'disponible_forzado' SÍ es un override real que hace que el motor la muestre disponible aunque
+// esté fuera de su horario o en un bloqueo/ausencia aprobados — nunca por encima de un servicio
+// o cita real en curso, eso siempre gana.
+export type EstadoManualProfesional = 'disponible' | 'descanso' | 'almuerzo' | 'no_disponible' | 'ocupado_temporal' | 'disponible_forzado'

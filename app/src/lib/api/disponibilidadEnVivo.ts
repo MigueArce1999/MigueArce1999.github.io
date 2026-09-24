@@ -325,15 +325,29 @@ const demoEstadosManuales: Record<string, { estado: EstadoManualProfesional; has
 
 function demoEstadoProfesional(profesionalId: string, servicioId?: string | null): EstadoProfesionalAhora {
   const manual = demoEstadosManuales[profesionalId]
-  if (manual && manual.estado !== 'disponible' && new Date(manual.hasta) > new Date()) {
-    return {
-      status: 'unavailable',
-      razon: manual.estado,
-      disponible_ahora: false,
-      disponible_hasta: null,
-      proxima_disponible_en: manual.hasta,
-      minutos_libres: null,
-      puede_atender_servicio: false,
+  if (manual && new Date(manual.hasta) > new Date()) {
+    if (manual.estado === 'disponible_forzado') {
+      const minutosRestantes = Math.max(0, Math.round((new Date(manual.hasta).getTime() - Date.now()) / 60_000))
+      return {
+        status: 'available',
+        razon: null,
+        disponible_ahora: true,
+        disponible_hasta: manual.hasta,
+        proxima_disponible_en: null,
+        minutos_libres: minutosRestantes,
+        puede_atender_servicio: true,
+      }
+    }
+    if (manual.estado !== 'disponible') {
+      return {
+        status: 'unavailable',
+        razon: manual.estado,
+        disponible_ahora: false,
+        disponible_hasta: null,
+        proxima_disponible_en: manual.hasta,
+        minutos_libres: null,
+        puede_atender_servicio: false,
+      }
     }
   }
 
