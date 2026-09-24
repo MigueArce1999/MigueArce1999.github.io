@@ -1,4 +1,4 @@
-import { isDemoMode, supabase, supabaseRequerido } from '../supabase'
+import { isDemoMode, LOCAL_ID, supabaseRequerido } from '../supabase'
 import { demoClientesAdmin } from '../demoData'
 import { soloDigitos } from '../telefono'
 import type { ClienteResumen } from '../types'
@@ -123,24 +123,22 @@ export async function buscarPosiblesDuplicados(telefono: string): Promise<Client
   return data
 }
 
-// Única puerta pública (sin sesión) hacia la tabla cliente — ver fn_registrar_cliente_publico
-// en supabase/migrations/0024. No existe un "modo demo" con persistencia real aquí: en demo no
-// hay proyecto Supabase conectado, así que solo se simula el éxito visual.
-export async function registrarClientePublico(datos: {
-  nombre: string
-  telefono: string
-  email?: string | null
-  aceptaMarketing: boolean
-}): Promise<void> {
+// Se usa justo después de que una clienta crea su propia cuenta (registrarCliente en
+// lib/api/auth.ts), para guardar que aceptó promociones en el mismo momento del registro.
+// La política cliente_local_privado (0056) ya permite que una clienta actualice su propia fila
+// (usuario_id = auth.uid()), así que no hace falta una función RPC aparte. Falla en silencio a
+// propósito: es un dato accesorio del registro, nunca debe bloquear la creación de la cuenta.
+export async function marcarConsentimientoMarketingPropio(): Promise<void> {
   if (isDemoMode) return
-  if (!supabase) throw new Error('No hay conexión a Supabase configurada.')
-  const { error } = await supabase.rpc('fn_registrar_cliente_publico', {
-    p_nombre: datos.nombre,
-    p_telefono: datos.telefono,
-    p_email: datos.email || null,
-    p_acepta_marketing: datos.aceptaMarketing,
-  })
-  if (error) throw error
+  const client = supabaseRequerido()
+  await client
+    .from('cliente')
+    .update({
+      consentimiento_marketing: true,
+      consentimiento_marketing_fecha: new Date().toISOString(),
+      consentimiento_marketing_version: 'registro-salon-v2',
+    })
+    .eq('local_id', LOCAL_ID)
 }
 
 // CSV protegido contra inyección de fórmulas (una celda que empiece con = + - @ se antepone
