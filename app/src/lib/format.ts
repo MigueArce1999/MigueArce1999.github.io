@@ -34,23 +34,35 @@ export function formatoEnteroCOP(valor: number): string {
   return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(valor)
 }
 
+// Estas dos se usan sobre todo dentro de listas (.map de reservas/atenciones/ventas) donde una
+// sola fila con una fecha nula o mal formada tumbaría toda la pantalla si se dejara reventar
+// Intl.DateTimeFormat — que lanza RangeError: Invalid time value ante una Date inválida, no
+// devuelve un texto de error como el resto de las funciones de este archivo.
 export function formatoFecha(iso: string, opciones: Intl.DateTimeFormatOptions = {}): string {
+  // `new Date(null)` da la época (1970), no NaN — hay que descartar los "vacíos" aparte de los
+  // que sí construyen una Date pero inválida (texto que no es una fecha).
+  if (!iso) return '—'
+  const fecha = new Date(iso)
+  if (Number.isNaN(fecha.getTime())) return '—'
   return new Intl.DateTimeFormat('es-CO', {
     timeZone: ZONA_HORARIA,
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     ...opciones,
-  }).format(new Date(iso))
+  }).format(fecha)
 }
 
 export function formatoHora(iso: string): string {
+  if (!iso) return '—'
+  const fecha = new Date(iso)
+  if (Number.isNaN(fecha.getTime())) return '—'
   return new Intl.DateTimeFormat('es-CO', {
     timeZone: ZONA_HORARIA,
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  }).format(new Date(iso))
+  }).format(fecha)
 }
 
 export function formatoFechaHora(iso: string): string {
