@@ -3,6 +3,7 @@
 // recalcula aquí — el motor SQL es la única fuente de verdad (sección 7 del pedido).
 import { isDemoMode, LOCAL_ID, supabase, supabaseRequerido } from '../supabase'
 import { demoProfesionales, demoServicios, demoClienteActual } from '../demoData'
+import { emitirCambioDemo } from '../disponibilidadEnVivo/eventosDemo'
 import type {
   EstadoManualProfesional,
   EstadoProfesionalAhora,
@@ -107,6 +108,7 @@ export async function marcarEstadoManual(
 ): Promise<void> {
   if (isDemoMode) {
     demoEstadoManual = { estado, hasta: new Date(Date.now() + minutos * 60_000).toISOString(), motivo: motivo ?? null }
+    emitirCambioDemo()
     return
   }
   const client = supabaseRequerido()
@@ -117,6 +119,7 @@ export async function marcarEstadoManual(
 export async function limpiarEstadoManual(): Promise<void> {
   if (isDemoMode) {
     demoEstadoManual = null
+    emitirCambioDemo()
     return
   }
   const client = supabaseRequerido()
@@ -135,7 +138,11 @@ export async function crearSolicitudDisponibilidad(params: {
   llegadaMinutos: number
   idempotencyKey: string
 }): Promise<SolicitudDisponibilidad> {
-  if (isDemoMode) return demoCrearSolicitud(params)
+  if (isDemoMode) {
+    const resultado = demoCrearSolicitud(params)
+    emitirCambioDemo()
+    return resultado
+  }
   const client = supabaseRequerido()
   const { data, error } = await client.rpc('fn_crear_solicitud_disponibilidad', {
     p_cliente_id: params.clienteId,
@@ -153,7 +160,11 @@ export async function responderSolicitudDisponibilidad(
   respuesta: 'aceptar' | 'rechazar' | 'mas_tarde',
   disponibleEnMinutos?: number,
 ): Promise<SolicitudDisponibilidad> {
-  if (isDemoMode) return demoResponderSolicitud(solicitudId, respuesta, disponibleEnMinutos)
+  if (isDemoMode) {
+    const resultado = demoResponderSolicitud(solicitudId, respuesta, disponibleEnMinutos)
+    emitirCambioDemo()
+    return resultado
+  }
   const client = supabaseRequerido()
   const { data, error } = await client.rpc('fn_responder_solicitud_disponibilidad', {
     p_solicitud_id: solicitudId,
@@ -165,7 +176,11 @@ export async function responderSolicitudDisponibilidad(
 }
 
 export async function marcarClienteEnCamino(solicitudId: string): Promise<SolicitudDisponibilidad> {
-  if (isDemoMode) return demoMarcarEnCamino(solicitudId)
+  if (isDemoMode) {
+    const resultado = demoMarcarEnCamino(solicitudId)
+    emitirCambioDemo()
+    return resultado
+  }
   const client = supabaseRequerido()
   const { data, error } = await client.rpc('fn_marcar_cliente_en_camino', { p_solicitud_id: solicitudId })
   if (error) throw error
@@ -173,7 +188,11 @@ export async function marcarClienteEnCamino(solicitudId: string): Promise<Solici
 }
 
 export async function cancelarSolicitudDisponibilidad(solicitudId: string): Promise<SolicitudDisponibilidad> {
-  if (isDemoMode) return demoCancelarSolicitud(solicitudId)
+  if (isDemoMode) {
+    const resultado = demoCancelarSolicitud(solicitudId)
+    emitirCambioDemo()
+    return resultado
+  }
   const client = supabaseRequerido()
   const { data, error } = await client.rpc('fn_cancelar_solicitud_disponibilidad', { p_solicitud_id: solicitudId })
   if (error) throw error
@@ -192,6 +211,17 @@ export async function listarMisSolicitudes(clienteId: string): Promise<Solicitud
   const { data, error } = await supabase!.rpc('fn_listar_mis_solicitudes', { p_cliente_id: clienteId })
   if (error) throw error
   return (data ?? []) as SolicitudDisponibilidad[]
+}
+
+// Lectura independiente de UNA solicitud (para el hook de Realtime de la clienta, que necesita
+// releer tras cada aviso del pulso sin depender de la lista completa). El servidor valida
+// pertenencia (fn_obtener_solicitud_disponibilidad, 0062) — nunca se confía en que el frontend
+// solo pida las suyas.
+export async function obtenerSolicitudDisponibilidad(solicitudId: string): Promise<SolicitudDisponibilidad> {
+  if (isDemoMode) return sinCampoDemo(demoBuscar(solicitudId))
+  const { data, error } = await supabase!.rpc('fn_obtener_solicitud_disponibilidad', { p_id: solicitudId })
+  if (error) throw error
+  return data as SolicitudDisponibilidad
 }
 
 // ---------------------------------------------------------------------------
