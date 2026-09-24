@@ -12,17 +12,21 @@ import {
   asignarProfesionalAZona,
   crearZona,
   eliminarZona,
+  limpiarEstadoManual,
   listarTodasLasAsignacionesZona,
   listarZonas,
+  marcarEstadoManual,
   quitarProfesionalDeZona,
 } from '../../lib/api/disponibilidadEnVivo'
+import { useEstadoEquipoEnVivo } from '../../lib/disponibilidadEnVivo/useEstadoEquipoEnVivo'
+import { textoMiEstadoAhora } from '../../lib/disponibilidadEnVivo/textoDisponibilidad'
 import { isDemoMode, LOCAL_ID, supabase } from '../../lib/supabase'
-import type { ConfiguracionNegocio, Profesional, ZonaSalon } from '../../lib/types'
+import type { ConfiguracionNegocio, EstadoEquipoItem, EstadoManualProfesional, Profesional, ZonaSalon } from '../../lib/types'
 
-type Pestana = 'zonas' | 'configuracion'
+type Pestana = 'equipo' | 'zonas' | 'configuracion'
 
 export function AdminDisponibilidadEnVivo() {
-  const [pestana, setPestana] = useState<Pestana>('zonas')
+  const [pestana, setPestana] = useState<Pestana>('equipo')
 
   return (
     <div className="flex flex-col gap-4">
@@ -32,7 +36,7 @@ export function AdminDisponibilidadEnVivo() {
       </div>
 
       <div className="flex gap-1 overflow-x-auto border-b border-piedra">
-        {([['zonas', 'Zonas'], ['configuracion', 'Configuración']] as [Pestana, string][]).map(([p, etiqueta]) => (
+        {([['equipo', 'Equipo'], ['zonas', 'Zonas'], ['configuracion', 'Configuración']] as [Pestana, string][]).map(([p, etiqueta]) => (
           <button
             key={p}
             onClick={() => setPestana(p)}
@@ -45,9 +49,122 @@ export function AdminDisponibilidadEnVivo() {
         ))}
       </div>
 
+      {pestana === 'equipo' && <PestanaEquipo />}
       {pestana === 'zonas' && <PestanaZonas />}
       {pestana === 'configuracion' && <PestanaConfiguracion />}
     </div>
+  )
+}
+
+// --- Equipo (0066): la admin ve y ajusta la disponibilidad de cualquier profesional, sin
+// depender de que ella misma abra la app en su celular. --------------------------------------
+
+const OPCIONES_ESTADO_EQUIPO: { valor: Exclude<EstadoManualProfesional, 'disponible'>; etiqueta: string; emoji: string }[] = [
+  { valor: 'descanso', etiqueta: 'Descanso', emoji: '☕' },
+  { valor: 'almuerzo', etiqueta: 'Almuerzo', emoji: '🍽️' },
+  { valor: 'no_disponible', etiqueta: 'No disponible', emoji: '🚫' },
+]
+const OPCIONES_MINUTOS_EQUIPO = [15, 30, 45, 60]
+
+function PestanaEquipo() {
+  const { equipo, cargando, error, recargar } = useEstadoEquipoEnVivo()
+  const [accionando, setAccionando] = useState<string | null>(null)
+  const [errorAccion, setErrorAccion] = useState<string | null>(null)
+
+  async function aplicar(profesionalId: string, estado: Exclude<EstadoManualProfesional, 'disponible'>, minutos: number) {
+    setAccionando(profesionalId)
+    setErrorAccion(null)
+    try {
+      await marcarEstadoManual(estado, minutos, profesionalId)
+      recargar()
+    } catch (e: any) {
+      setErrorAccion(e.message)
+    } finally {
+      setAccionando(null)
+    }
+  }
+
+  async function limpiar(profesionalId: string) {
+    setAccionando(profesionalId)
+    setErrorAccion(null)
+    try {
+      await limpiarEstadoManual(profesionalId)
+      recargar()
+    } catch (e: any) {
+      setErrorAccion(e.message)
+    } finally {
+      setAccionando(null)
+    }
+  }
+
+  if (cargando && !equipo) return <Cargando filas={3} />
+
+  return (
+    <div className="flex flex-col gap-3">
+      {error && <ErrorState mensaje={error} reintentar={recargar} />}
+      {errorAccion && <ErrorState mensaje={errorAccion} />}
+
+      {equipo && equipo.length === 0 ? (
+        <Card><p className="text-sm text-carbon/60">No hay profesionales activas en el equipo todavía.</p></Card>
+      ) : (
+        equipo?.map((item) => <FilaEquipo key={item.profesional_id} item={item} accionando={accionando === item.profesional_id} onAplicar={aplicar} onLimpiar={limpiar} />)
+      )}
+    </div>
+  )
+}
+
+function FilaEquipo({
+  item,
+  accionando,
+  onAplicar,
+  onLimpiar,
+}: {
+  item: EstadoEquipoItem
+  accionando: boolean
+  onAplicar: (profesionalId: string, estado: Exclude<EstadoManualProfesional, 'disponible'>, minutos: number) => void
+  onLimpiar: (profesionalId: string) => void
+}) {
+  const [estadoElegido, setEstadoElegido] = useState<Exclude<EstadoManualProfesional, 'disponible'>>('descanso')
+  const [minutos, setMinutos] = useState(15)
+  const texto = textoMiEstadoAhora(item.estado)
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold text-carbon">{item.nombre}</p>
+        <div className={`rounded-full px-3 py-1 text-sm font-semibold ${texto.clase}`}>
+          {texto.emoji} {texto.titulo}{texto.detalle ? ` · ${texto.detalle}` : ''}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <select
+          value={estadoElegido}
+          onChange={(e) => setEstadoElegido(e.target.value as typeof estadoElegido)}
+          aria-label={`Marcar a ${item.nombre} como`}
+          className="rounded-lg border border-piedra bg-blanco px-2 py-1.5 text-sm text-carbon"
+        >
+          {OPCIONES_ESTADO_EQUIPO.map((o) => (
+            <option key={o.valor} value={o.valor}>{o.emoji} {o.etiqueta}</option>
+          ))}
+        </select>
+        <select
+          value={minutos}
+          onChange={(e) => setMinutos(Number(e.target.value))}
+          aria-label={`Minutos para ${item.nombre}`}
+          className="rounded-lg border border-piedra bg-blanco px-2 py-1.5 text-sm text-carbon"
+        >
+          {OPCIONES_MINUTOS_EQUIPO.map((m) => (
+            <option key={m} value={m}>{m} min</option>
+          ))}
+        </select>
+        <Button type="button" tamano="sm" onClick={() => onAplicar(item.profesional_id, estadoElegido, minutos)} cargando={accionando}>Aplicar</Button>
+        {texto.esManual && (
+          <Button type="button" tamano="sm" variante="secondary" onClick={() => onLimpiar(item.profesional_id)} disabled={accionando}>
+            Poner disponible
+          </Button>
+        )}
+      </div>
+    </Card>
   )
 }
 

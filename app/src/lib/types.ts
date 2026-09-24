@@ -634,6 +634,16 @@ export interface ProfesionalEnVivo {
   estado: EstadoProfesionalAhora
 }
 
+// Devuelto por fn_estado_equipo_en_vivo (0066) — la vista de admin de "quién está disponible
+// ahora", igual que ProfesionalEnVivo pero sin `zonas` (no aplica en ese panel) y sin depender de
+// que live_disponibilidad_activo esté prendido, a diferencia de fn_salon_en_vivo.
+export interface EstadoEquipoItem {
+  profesional_id: string
+  nombre: string
+  foto_url: string | null
+  estado: EstadoProfesionalAhora
+}
+
 export type DemandaSalon = 'tranquilo' | 'movimiento_medio' | 'alta_demanda'
 
 // Devuelto por fn_salon_en_vivo. `activo: false` significa que el feature flag
