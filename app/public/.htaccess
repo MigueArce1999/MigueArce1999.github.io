@@ -17,3 +17,16 @@
   ExpiresByType image/webp "access plus 1 year"
   ExpiresByType font/woff2 "access plus 1 year"
 </IfModule>
+
+# index.html, el service worker y el manifest NO son de contenido con hash (a diferencia de
+# assets/*.js|css, que sí cambian de nombre en cada build): si un caché — el del navegador, el de
+# Hostinger o el de un proxy intermedio — retiene una copia vieja de estos tres archivos, cada
+# despliegue nuevo puede quedar invisible indefinidamente para quien ya visitó el sitio antes,
+# aunque los archivos con hash sí se hayan subido bien. `ExpiresByType application/javascript`
+# de arriba alcanzaba a sw.js por ser también un .js; esto lo saca de esa regla explícitamente.
+<IfModule mod_headers.c>
+  <FilesMatch "^(index\.html|sw\.js|registerSW\.js|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+  </FilesMatch>
+</IfModule>
