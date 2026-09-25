@@ -70,6 +70,12 @@ describe('textoEstadoDisponibilidad', () => {
     expect(t.detalle).toBeNull()
   })
 
+  it('unavailable genérico se muestra en rojo, como "ocupada", no en el gris neutro de antes', () => {
+    const t = textoEstadoDisponibilidad(estado({ status: 'unavailable', razon: 'no_disponible', disponible_ahora: false }))
+    expect(t.emoji).toBe('🔴')
+    expect(t.clase).toBe('bg-error/15 text-error')
+  })
+
   it('unavailable por dia_libre también se muestra genérico, no "día libre" literal', () => {
     const t = textoEstadoDisponibilidad(estado({ status: 'unavailable', razon: 'dia_libre', disponible_ahora: false }))
     expect(t.titulo).toBe('No disponible')
@@ -95,6 +101,14 @@ describe('textoMiEstadoAhora', () => {
     )
     expect(t.titulo).toBe('En descanso')
     expect(t.detalle).toMatch(/^Hasta las/)
+    expect(t.esManual).toBe(true)
+  })
+
+  it('marcada como ocupada (no_disponible) se distingue en rojo, igual que un servicio activo', () => {
+    const t = textoMiEstadoAhora(estado({ status: 'unavailable', razon: 'no_disponible', disponible_ahora: false }))
+    expect(t.titulo).toBe('Marcada como ocupada')
+    expect(t.emoji).toBe('🔴')
+    expect(t.clase).toBe('bg-error/15 text-error')
     expect(t.esManual).toBe(true)
   })
 

@@ -100,7 +100,7 @@ export function minutosDesdeMedianocheBogota(iso: string): number {
   return hora * 60 + minuto
 }
 
-export type PeriodoResumen = 'hoy' | 'semana' | 'mes'
+export type PeriodoResumen = 'hoy' | 'ayer' | 'semana' | 'mes'
 
 // Compartido por Resumen y Dashboard (ambos filtran por el mismo periodo con el mismo
 // criterio), para no repetir dos veces la aritmética de fechas.
@@ -108,6 +108,12 @@ export function rangoPeriodo(periodo: PeriodoResumen): { desde: string; hasta: s
   const hoy = new Date()
   if (periodo === 'hoy') {
     const d = fechaBogotaISO(hoy)
+    return { desde: `${d}T00:00:00`, hasta: `${d}T23:59:59` }
+  }
+  if (periodo === 'ayer') {
+    // Bogotá no tiene horario de verano, así que restar 24h en UTC siempre cae en el día
+    // calendario anterior visto desde allá.
+    const d = fechaBogotaISO(new Date(hoy.getTime() - 24 * 60 * 60 * 1000))
     return { desde: `${d}T00:00:00`, hasta: `${d}T23:59:59` }
   }
   if (periodo === 'semana') {

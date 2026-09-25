@@ -28,7 +28,7 @@ export function AdminDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-marca text-2xl font-semibold text-carbon">Dashboard</h1>
         <div className="flex gap-2">
-          {(['hoy', 'semana', 'mes'] as PeriodoResumen[]).map((p) => (
+          {(['hoy', 'ayer', 'semana', 'mes'] as PeriodoResumen[]).map((p) => (
             <button
               key={p}
               onClick={() => setPeriodo(p)}

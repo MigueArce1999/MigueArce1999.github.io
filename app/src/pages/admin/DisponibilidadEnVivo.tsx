@@ -63,7 +63,7 @@ const OPCIONES_ESTADO_EQUIPO: { valor: Exclude<EstadoManualProfesional, 'disponi
   { valor: 'disponible_forzado', etiqueta: 'Disponible', emoji: '🟢' },
   { valor: 'descanso', etiqueta: 'Descanso', emoji: '☕' },
   { valor: 'almuerzo', etiqueta: 'Almuerzo', emoji: '🍽️' },
-  { valor: 'no_disponible', etiqueta: 'No disponible', emoji: '🚫' },
+  { valor: 'no_disponible', etiqueta: 'Ocupada', emoji: '🚫' },
 ]
 const OPCIONES_MINUTOS_EQUIPO = [15, 30, 45, 60]
 

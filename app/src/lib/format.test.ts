@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatoFecha, formatoFechaHora, formatoHora, formatoMoneda } from './format'
+import { fechaBogotaISO, formatoFecha, formatoFechaHora, formatoHora, formatoMoneda, rangoPeriodo } from './format'
 
 describe('formatoHora / formatoFecha', () => {
   it('formatean una fecha válida sin problema', () => {
@@ -29,5 +29,18 @@ describe('formatoMoneda', () => {
   it('null/undefined muestran "—" en vez de "$NaN"', () => {
     expect(formatoMoneda(null)).toBe('—')
     expect(formatoMoneda(undefined)).toBe('—')
+  })
+})
+
+describe('rangoPeriodo', () => {
+  it('"ayer" cubre el día calendario anterior en Bogotá, un día completo antes que "hoy"', () => {
+    const hoy = rangoPeriodo('hoy')
+    const ayer = rangoPeriodo('ayer')
+    const diaAyer = ayer.desde.slice(0, 10)
+    const diaHoy = hoy.desde.slice(0, 10)
+    expect(diaAyer).toBe(fechaBogotaISO(new Date(Date.now() - 24 * 60 * 60 * 1000)))
+    expect(ayer.desde).toBe(`${diaAyer}T00:00:00`)
+    expect(ayer.hasta).toBe(`${diaAyer}T23:59:59`)
+    expect(diaAyer).not.toBe(diaHoy)
   })
 })
