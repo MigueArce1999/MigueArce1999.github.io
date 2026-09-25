@@ -81,7 +81,7 @@ export function AdminVentas() {
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </select>
-          {(['hoy', 'semana', 'mes'] as PeriodoResumen[]).map((p) => (
+          {(['hoy', 'ayer', 'semana', 'mes'] as PeriodoResumen[]).map((p) => (
             <button
               key={p}
               onClick={() => setPeriodo(p)}
