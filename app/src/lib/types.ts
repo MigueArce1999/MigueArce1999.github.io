@@ -691,3 +691,78 @@ export interface SolicitudDisponibilidad {
 // esté fuera de su horario o en un bloqueo/ausencia aprobados — nunca por encima de un servicio
 // o cita real en curso, eso siempre gana.
 export type EstadoManualProfesional = 'disponible' | 'descanso' | 'almuerzo' | 'no_disponible' | 'ocupado_temporal' | 'disponible_forzado'
+
+// --- Analytics (Dashboard admin) --------------------------------------------------------------
+// Refleja tal cual el jsonb que devuelve fn_analytics_resumen (0071_analytics_dashboard.sql):
+// una sola función SQL alimenta KPIs, gráfica, por profesional/servicio/producto/método de pago,
+// para que nunca haya una cifra calculada dos veces con reglas distintas en el cliente.
+
+export interface AnalyticsKpis {
+  ventas_totales: number
+  atenciones: number
+  clientes_atendidos: number
+  servicios_realizados: number
+  ticket_promedio: number
+  productos_valor: number
+  productos_unidades: number
+}
+
+export interface AnalyticsPorProfesional {
+  profesional_id: string
+  nombre: string
+  ventas: number
+  clientes: number
+  servicios: number
+  comision: number
+}
+
+export interface AnalyticsPorServicio {
+  servicio_id: string
+  nombre: string
+  cantidad: number
+  ingresos: number
+}
+
+export interface AnalyticsPorProducto {
+  nombre: string
+  categoria: string | null
+  cantidad: number
+  ingresos: number
+}
+
+export interface AnalyticsPorMetodoPago {
+  metodo: MetodoPago
+  valor: number
+}
+
+export interface AnalyticsSerieDia {
+  fecha: string // yyyy-mm-dd, día calendario en hora de Bogotá
+  ventas: number
+}
+
+export interface AnalyticsResumen {
+  kpis: AnalyticsKpis
+  por_profesional: AnalyticsPorProfesional[]
+  por_servicio: AnalyticsPorServicio[]
+  por_producto: AnalyticsPorProducto[]
+  por_metodo_pago: AnalyticsPorMetodoPago[]
+  serie_diaria: AnalyticsSerieDia[]
+}
+
+export type PresetRangoFecha = 'hoy' | 'ayer' | 'semana' | 'mes' | 'personalizado'
+
+export type ModoComparacion =
+  | 'ninguna'
+  | 'periodo_anterior'
+  | 'dia_anterior'
+  | 'semana_anterior'
+  | 'mes_anterior'
+  | 'mismo_dia_semana_anterior'
+  | 'personalizado'
+
+// Un rango siempre en instantes exactos (nunca strings ambiguos sin zona horaria — ver el bug
+// de rangoPeriodo en lib/format.ts que este módulo nuevo evita a propósito).
+export interface RangoFecha {
+  desde: Date
+  hasta: Date
+}
