@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './state/AuthContext'
 import { BrandingProvider } from './state/BrandingContext'
+import { DateRangeProvider } from './state/DateRangeContext'
 import { PantallaCarga } from './components/layout/PantallaCarga'
 import { PublicLayout } from './components/layout/PublicLayout'
 import { PortalLayout } from './components/layout/PortalLayout'
@@ -159,7 +160,14 @@ function App() {
 
           <Route element={<RutaProtegida rolRequerido="admin"><PortalLayout items={navAdmin} titulo="Administración" /></RutaProtegida>}>
             <Route path="/admin" element={<AdminResumen />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route
+              path="/admin/dashboard"
+              element={
+                <DateRangeProvider>
+                  <AdminDashboard />
+                </DateRangeProvider>
+              }
+            />
             <Route path="/admin/agenda" element={<AdminAgenda />} />
             <Route path="/admin/clientes" element={<AdminClientes />} />
             <Route path="/admin/clientes/:id" element={<ClientePerfilAdmin />} />

@@ -69,7 +69,7 @@ export interface SegmentoVentas {
   valor: number
 }
 
-const METODO_PAGO_ETIQUETA: Record<string, string> = {
+export const METODO_PAGO_ETIQUETA: Record<string, string> = {
   efectivo: 'Efectivo',
   transferencia: 'Transferencia',
   tarjeta: 'Tarjeta',

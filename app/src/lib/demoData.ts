@@ -507,6 +507,64 @@ export const demoMetricasVentas = {
   ],
 }
 
+// Analytics del Dashboard nuevo (modo demostración): a diferencia de demoResumenNegocio (fijo),
+// esta sí varía con el rango elegido — genera una fila por día del rango con una cifra
+// pseudoaleatoria pero determinista (mismo rango → mismos números, para que no "titile" entre
+// renders), así se puede probar el cambio de granularidad de la gráfica sin datos reales.
+export function demoAnalyticsResumen(desde: Date, hasta: Date) {
+  const dias: { fecha: string; ventas: number }[] = []
+  const cursor = new Date(desde)
+  let ventasTotales = 0
+  let semilla = desde.getTime() % 1000
+  while (cursor < hasta && dias.length < 400) {
+    semilla = (semilla * 9301 + 49297) % 233280
+    const ventasDia = 80000 + Math.round((semilla / 233280) * 420000)
+    dias.push({ fecha: cursor.toISOString().slice(0, 10), ventas: ventasDia })
+    ventasTotales += ventasDia
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  const diasCount = Math.max(1, dias.length)
+  const atenciones = Math.max(1, Math.round(diasCount * 2.4))
+  const servicios = Math.round(atenciones * 1.3)
+
+  return {
+    kpis: {
+      ventas_totales: ventasTotales,
+      atenciones,
+      clientes_atendidos: Math.round(atenciones * 0.85),
+      servicios_realizados: servicios,
+      ticket_promedio: Math.round(ventasTotales / atenciones),
+      productos_valor: Math.round(ventasTotales * 0.08),
+      productos_unidades: Math.round(atenciones * 0.3),
+    },
+    por_profesional: [
+      { profesional_id: 'demo-prof-claudia', nombre: 'Claudia', ventas: Math.round(ventasTotales * 0.38), clientes: Math.round(atenciones * 0.35), servicios: Math.round(servicios * 0.35), comision: Math.round(ventasTotales * 0.38 * 0.4) },
+      { profesional_id: 'demo-prof-valery', nombre: 'Valery', ventas: Math.round(ventasTotales * 0.28), clientes: Math.round(atenciones * 0.25), servicios: Math.round(servicios * 0.25), comision: Math.round(ventasTotales * 0.28 * 0.4) },
+      { profesional_id: 'demo-prof-naldi', nombre: 'Naldi', ventas: Math.round(ventasTotales * 0.2), clientes: Math.round(atenciones * 0.22), servicios: Math.round(servicios * 0.22), comision: Math.round(ventasTotales * 0.2 * 0.4) },
+      { profesional_id: 'demo-prof-ana', nombre: 'Ana', ventas: Math.round(ventasTotales * 0.14), clientes: Math.round(atenciones * 0.18), servicios: Math.round(servicios * 0.18), comision: Math.round(ventasTotales * 0.14 * 0.4) },
+    ],
+    // Los 4 porcentajes de "ingresos" suman 1.0 a propósito: igual que fn_analytics_resumen
+    // garantiza en real, la suma de "por servicio" debe cuadrar exactamente con "ventas totales".
+    por_servicio: [
+      { servicio_id: 'demo-serv-blower', nombre: 'Blower', cantidad: Math.round(servicios * 0.3), ingresos: Math.round(ventasTotales * 0.25) },
+      { servicio_id: 'demo-serv-color', nombre: 'Color Premium', cantidad: Math.round(servicios * 0.12), ingresos: Math.round(ventasTotales * 0.35) },
+      { servicio_id: 'demo-serv-rizos', nombre: 'Definición de rizos', cantidad: Math.round(servicios * 0.15), ingresos: Math.round(ventasTotales * 0.2) },
+      { servicio_id: 'demo-serv-corte', nombre: 'Corte de dama', cantidad: Math.round(servicios * 0.2), ingresos: Math.round(ventasTotales * 0.2) },
+    ],
+    por_producto: [
+      { nombre: 'Tratamiento capilar', categoria: 'Cuidado capilar', cantidad: Math.round(atenciones * 0.15), ingresos: Math.round(ventasTotales * 0.05) },
+      { nombre: 'Champú', categoria: 'Cuidado capilar', cantidad: Math.round(atenciones * 0.1), ingresos: Math.round(ventasTotales * 0.03) },
+    ],
+    // La suma cuadra con ventas + productos, igual que garantiza fn_analytics_resumen en real.
+    por_metodo_pago: [
+      { metodo: 'transferencia' as const, valor: Math.round((ventasTotales + Math.round(ventasTotales * 0.08)) * 0.45) },
+      { metodo: 'efectivo' as const, valor: Math.round((ventasTotales + Math.round(ventasTotales * 0.08)) * 0.35) },
+      { metodo: 'tarjeta' as const, valor: Math.round((ventasTotales + Math.round(ventasTotales * 0.08)) * 0.2) },
+    ],
+    serie_diaria: dias,
+  }
+}
+
 export const demoClientesAdmin: ClienteResumen[] = [
   { ...demoClienteActual, ultima_visita: '2026-09-10T15:00:00Z', ultimo_servicio_nombre: 'Corte de dama', ultimo_profesional_nombre: 'Naldi' },
   {
