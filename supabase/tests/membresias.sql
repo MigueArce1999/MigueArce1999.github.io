@@ -76,13 +76,22 @@ select pg_temp.afirmar(:'prof_b'::uuid = :MULTI::uuid, 'primera ficha de profesi
 select pg_temp.como(:MULTI, :C);
 select pg_temp.afirmar(fn_rol_actual() = 'admin' and fn_es_admin(), 'multi@ en C: admin');
 
+-- Sin header (Realtime / SQL): el local principal (donde se registró), aunque tenga 3 membresías.
+select pg_temp.como(:MULTI, null);
+select pg_temp.afirmar(fn_local_id() = :A::uuid, 'sin x-local-id (Realtime): local principal, no null');
+
 -- Salón sin membresía: nada.
 insert into local (id, nombre, slug) values ('d0000000-0000-0000-0000-00000000000d', 'Salón D', 'salon-d');
 select pg_temp.como(:MULTI, 'd0000000-0000-0000-0000-00000000000d');
 select pg_temp.afirmar(fn_rol_actual() is null and fn_local_id() is null and not fn_es_admin(),
   'multi@ en D (sin registro): sin rol');
+-- En la MISMA transacción (caché de fn_local_id): tras registrarse, ya cuenta como de D.
+begin;
+select pg_temp.afirmar(fn_local_id() is null, 'antes de registrarse en D: sin local (queda en caché)');
 select fn_asegurar_cliente_en_local() is not null as ok \gset
-select pg_temp.afirmar(fn_rol_actual() = 'cliente', 'al entrar a D queda registrada como clienta de D');
+select pg_temp.afirmar(fn_rol_actual() = 'cliente' and fn_local_id() = 'd0000000-0000-0000-0000-00000000000d'::uuid,
+  'al entrar a D queda registrada como clienta de D (la caché se invalida)');
+commit;
 
 -- ------------------------------------------------------------------ profesional en 2 locales
 -- Admin C (que es multi@ misma) la vincula como profesional de C: sigue siendo admin, nueva ficha.

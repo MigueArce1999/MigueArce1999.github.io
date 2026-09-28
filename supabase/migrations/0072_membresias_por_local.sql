@@ -70,7 +70,11 @@ update perfil set rol = 'cliente', actualizado_en = now() where rol = 'super_adm
 -- ---------------------------------------------------------------------------
 
 -- Local de la petición SOLO si la persona es miembro activo de él.
--- Sin header (SQL editor, pruebas, Edge Functions sin header): su única membresía, si tiene una.
+-- Sin header (Realtime, SQL editor, Edge Functions): el local "principal" de perfil.local_id si
+-- sigue siendo miembro (lo mismo que devolvía antes, así Realtime no cambia), si no su única
+-- membresía.
+-- Se evalúa en casi todas las políticas (por fila), así que se cachea por transacción; cualquier
+-- cambio en membresia/perfil limpia la caché (triggers más abajo).
 create or replace function fn_local_id() returns uuid
 language plpgsql stable security definer set search_path = public as $$
 declare
@@ -78,24 +82,52 @@ declare
   v_req uuid;
   v uuid;
   n int;
+  v_clave text;
+  v_cache text;
 begin
   if v_uid is null then
     return null;
   end if;
   v_req := fn_local_id_request();
+  v_clave := v_uid::text || '|' || coalesce(v_req::text, '-');
+  v_cache := current_setting('glowdesk.local_cache', true);
+  if v_cache is not null and v_cache <> '' and split_part(v_cache, '=', 1) = v_clave then
+    return nullif(split_part(v_cache, '=', 2), '')::uuid;
+  end if;
+
   if v_req is not null then
     select m.local_id into v from membresia m
     where m.usuario_id = v_uid and m.local_id = v_req and m.activo;
-    return v;
+  else
+    select m.local_id into v from membresia m
+    join perfil p on p.id = m.usuario_id and p.local_id = m.local_id
+    where m.usuario_id = v_uid and m.activo;
+    if v is null then
+      select count(*) into n from membresia m where m.usuario_id = v_uid and m.activo;
+      if n = 1 then
+        select m.local_id into v from membresia m where m.usuario_id = v_uid and m.activo;
+      end if;
+    end if;
   end if;
-  select count(*) into n from membresia m where m.usuario_id = v_uid and m.activo;
-  if n = 1 then
-    select m.local_id into v from membresia m where m.usuario_id = v_uid and m.activo;
-    return v;
-  end if;
+
+  perform set_config('glowdesk.local_cache', v_clave || '=' || coalesce(v::text, ''), true);
+  return v;
+end;
+$$;
+
+create or replace function fn_limpiar_cache_local() returns trigger
+language plpgsql as $$
+begin
+  perform set_config('glowdesk.local_cache', '', true);
   return null;
 end;
 $$;
+drop trigger if exists membresia_limpiar_cache on membresia;
+create trigger membresia_limpiar_cache after insert or update or delete on membresia
+  for each statement execute function fn_limpiar_cache_local();
+drop trigger if exists perfil_limpiar_cache on perfil;
+create trigger perfil_limpiar_cache after update of local_id on perfil
+  for each statement execute function fn_limpiar_cache_local();
 
 create or replace function fn_rol_actual() returns rol_usuario
 language sql stable security definer set search_path = public as $$
