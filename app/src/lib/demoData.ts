@@ -266,6 +266,7 @@ export const demoHistorialAtenciones: Atencion[] = [
 export const demoProductosVenta = [
   {
     id: 'demo-prod-1',
+    atencionId: 'demo-atencion-1',
     fecha: enHoras(-47),
     clienteNombre: 'Cliente Demo',
     categoria: 'Tratamiento',
@@ -275,6 +276,12 @@ export const demoProductosVenta = [
     subtotal: 12000,
   },
 ]
+
+// Método de pago de cada atención de demo, para la columna "Método de pago" de la tabla de
+// detalle del Dashboard (modo demostración) — ver listarProductosYPagosPorAtencion.
+export const demoMetodoPagoPorAtencion: Record<string, 'efectivo' | 'transferencia' | 'tarjeta' | 'otro'> = {
+  'demo-atencion-1': 'transferencia',
+}
 
 export const demoMovimientosPuntos: MovimientoPuntos[] = [
   {

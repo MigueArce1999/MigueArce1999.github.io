@@ -4,11 +4,12 @@ import {
   demoClientesAdmin,
   demoEquipoResumen,
   demoHistorialAtenciones,
+  demoMetodoPagoPorAtencion,
   demoMetricasVentas,
   demoProductosVenta,
   demoResumenNegocio,
 } from '../demoData'
-import type { Cliente, ReglaComision, VentaLinea } from '../types'
+import type { Cliente, MetodoPago, ReglaComision, VentaLinea } from '../types'
 
 // Fórmulas del resumen (ver docs/01-arquitectura-informacion.md y docs/03-flujos.md):
 // - ventas netas = suma de atencion_servicio (precio_snapshot - descuento) * cantidad de
@@ -189,6 +190,51 @@ export async function listarVentasDetalle(desdeISO: string, hastaISO: string, pr
   const { data, error } = await query.order('atencion_creado_en', { ascending: false }).limit(limite)
   if (error) throw error
   return data
+}
+
+export interface VentaExtraPorAtencion {
+  productos: { nombre: string; cantidad: number }[]
+  metodosPago: MetodoPago[]
+}
+
+// Complementa listarVentasDetalle (una fila por línea de servicio) con lo que esa vista no
+// trae: productos y métodos de pago, para la tabla de detalle del Dashboard. Se piden aparte y
+// se agrupan por atencion_id en el cliente, en vez de un join en SQL, porque una atención puede
+// tener varios productos y varios pagos — un join los multiplicaría (una atención con 2
+// productos y 2 pagos generaría 4 filas de servicio en vez de 1) y sería exactamente el bug de
+// fan-out que fn_analytics_resumen evita a propósito.
+export async function listarProductosYPagosPorAtencion(atencionIds: string[]): Promise<Record<string, VentaExtraPorAtencion>> {
+  const resultado: Record<string, VentaExtraPorAtencion> = {}
+  if (atencionIds.length === 0) return resultado
+  if (isDemoMode) {
+    for (const p of demoProductosVenta) {
+      const entry = (resultado[p.atencionId] ??= { productos: [], metodosPago: [] })
+      entry.productos.push({ nombre: p.nombre, cantidad: p.cantidad })
+    }
+    for (const [atencionId, metodo] of Object.entries(demoMetodoPagoPorAtencion)) {
+      const entry = (resultado[atencionId] ??= { productos: [], metodosPago: [] })
+      if (!entry.metodosPago.includes(metodo)) entry.metodosPago.push(metodo)
+    }
+    return resultado
+  }
+  const client = supabaseRequerido()
+  const [{ data: productos, error: e1 }, { data: pagos, error: e2 }] = await Promise.all([
+    client.from('vista_atencion_producto').select('atencion_id, nombre, cantidad').in('atencion_id', atencionIds),
+    // monto > 0 excluye devoluciones (monto negativo): no son un "método de pago" con el que se
+    // cobró, sino dinero que salió después.
+    client.from('pago').select('atencion_id, metodo, monto').in('atencion_id', atencionIds).gt('monto', 0),
+  ])
+  if (e1) throw e1
+  if (e2) throw e2
+  for (const p of productos ?? []) {
+    const entry = (resultado[p.atencion_id] ??= { productos: [], metodosPago: [] })
+    entry.productos.push({ nombre: p.nombre, cantidad: Number(p.cantidad) })
+  }
+  for (const p of pagos ?? []) {
+    const entry = (resultado[p.atencion_id] ??= { productos: [], metodosPago: [] })
+    if (!entry.metodosPago.includes(p.metodo)) entry.metodosPago.push(p.metodo)
+  }
+  return resultado
 }
 
 // Corrige una venta ya registrada: clienta, notas y, por línea, profesional/precio/descuento/
