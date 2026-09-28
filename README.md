@@ -40,8 +40,13 @@ El UUID semilla (Claudia Patricia) está en `supabase/migrations/0050_multi_loca
 Ver `docs/07-plan-implementacion.md` → "Cómo conectar un proyecto Supabase real" para los pasos
 exactos (aplicar migraciones, crear el primer admin, configurar variables de entorno).
 
-Límite: el email de Auth es único en todo el proyecto. La misma persona no puede tener dos
-cuentas con el mismo correo en dos locales.
+Cuentas y roles (migración `0072_membresias_por_local.sql`): una persona = una cuenta Auth
+(un correo, **una contraseña** para todos los salones). Esa cuenta puede pertenecer a varios
+locales con un rol distinto en cada uno (tabla `membresia`): clienta en A, empleada en B, admin en C.
+El rol que vale es el del local de la instalación (`VITE_LOCAL_ID` → header `x-local-id`); el
+frontend lo lee con `rpc('fn_mi_sesion')`. `perfil.rol` / `perfil.local_id` quedan como espejo legado.
+
+Para dar un rol desde el SQL editor: `select fn_conceder_rol_en_local('correo', '<local_id>', 'admin');`
 
 ## Probar el esquema de base de datos
 
@@ -70,7 +75,7 @@ Al terminar recuerda el patrón de **Redirect URL** de ese dominio. En el mismo 
 - **Site URL:** un origen vuestro (p. ej. `https://saladebellezaclaudiapatricia.com`). Es el fallback; no uses GitHub Pages.
 - **Redirect URLs:** una línea por dominio propio (`https://ese-dominio.com/**`) y, si hay white-label en subdominio, un wildcard (`https://*.tuplataforma.com/**`). También `http://localhost:5173/**` (salón) y `http://localhost:5174/**` (consola `adminpeluquerias`).
 
-La consola de locales y el landing del producto viven en el repo hermano `adminpeluquerias` (mismo Supabase, sin `VITE_LOCAL_ID`). Este salón redirige a `VITE_PLATAFORMA_URL` si entra un `super_admin`.
+La consola de locales y el landing del producto viven en el repo hermano `adminpeluquerias` (mismo Supabase, sin `VITE_LOCAL_ID`). El super admin vive en la tabla `plataforma_admin` y solo cuenta en esa consola (peticiones sin `x-local-id`); en un salón esa misma cuenta es solo lo que diga su membresía allí (normalmente clienta).
 - El correo de confirmación debe usar `{{ .ConfirmationURL }}`, no un enlace fijo a Site URL.
 
 Cada cliente: mismo Supabase, distinto `VITE_LOCAL_ID` (`select fn_provisionar_local('Nombre', 'slug');` en el SQL editor).

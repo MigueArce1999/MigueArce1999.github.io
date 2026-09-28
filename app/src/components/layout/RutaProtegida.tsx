@@ -8,8 +8,8 @@ import { Cargando } from '../ui/Estados'
 // Esta guarda solo mejora la experiencia (oculta pantallas que no aplican). La barrera real
 // de seguridad es la RLS de Postgres (ver docs/02-roles-y-permisos.md).
 //
-// En este salón puedes ser clienta aunque tu perfil.rol sea admin/empleada/super_admin
-// (otra instalación, o la plataforma). El equipo de ESTE local se reconoce por perfil.local_id.
+// perfil.rol y perfil.local_id vienen de fn_mi_sesion: son el rol de la persona EN ESTE salón
+// (tabla membresia). La misma cuenta puede ser admin en otro salón y aquí solo clienta.
 export function RutaProtegida({ rolRequerido, children }: { rolRequerido: Rol; children: ReactNode }) {
   const { perfil, cliente, profesional, cargando } = useAuth()
 

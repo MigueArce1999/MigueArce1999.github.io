@@ -8,7 +8,16 @@
 | `empleada` | Profesional del salón (Claudia, Naldi, Ana, Valery, futuras). |
 | `recepcion` | Permiso opcional, asignable a una `empleada`, para operar caja/agenda de otras profesionales sin ser administración plena. |
 | `admin` | Dueña / administración general del salón. Acceso global **de ese local**. |
-| `super_admin` | Plataforma: gestiona locales en el sitio `adminpeluquerias` (marca, empresa, colores). No opera el salón; si entra a esta SPA se redirige a `VITE_PLATAFORMA_URL`. |
+| `super_admin` | Plataforma (tabla `plataforma_admin`, no es un rol de salón): gestiona locales en la consola `glowdesk_admin`. Solo aplica en peticiones sin `x-local-id`; en cualquier salón esa cuenta es lo que diga su membresía allí. |
+
+### Una cuenta, varios salones (0072)
+
+- Una persona tiene **una** cuenta Auth (un correo, una contraseña) en toda la plataforma.
+- `membresia (usuario_id, local_id, rol)`: una fila por salón al que pertenece, con `rol` ∈ cliente/empleada/admin.
+- El rol efectivo es el de la membresía del local de la petición (`fn_rol_actual()` / `fn_local_id()` leen el header `x-local-id`).
+- `profesional` es por salón: `profesional.usuario_id` apunta a la persona y `profesional.id` es propio de ese salón (las fichas antiguas conservan `id = usuario_id`). `fn_mi_profesional_id()` reemplaza a `auth.uid()` cuando se pregunta "¿soy esta profesional?".
+- `permiso` es por (persona, salón).
+- RPCs: `fn_mi_sesion()`, `fn_vincular_empleada(email, slug, nombre)`, `fn_quitar_de_equipo(profesional_id)`, `fn_conceder_rol_en_local(email, local_id, rol)` (SQL editor / consola), `fn_conceder_super_admin(email)` (SQL editor).
 
 Los permisos finos (p. ej. "puede aplicar descuentos", "puede ver agenda de todo el equipo") se modelan como **flags en `perfil_permiso`**, no hardcodeados por rol, para que administración pueda ajustar sin desplegar código.
 

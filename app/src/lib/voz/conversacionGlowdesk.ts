@@ -305,7 +305,7 @@ export function esEcoAsistente(texto: string, ultimaFrase: string | null): boole
   return cabeza.length >= 12 && n.includes(cabeza)
 }
 
-export function puedeUsarGlowdesk(haySesion: boolean, perfil: { rol: string; activo: boolean; local_id?: string } | null): boolean {
+export function puedeUsarGlowdesk(haySesion: boolean, perfil: { rol: string; activo: boolean; local_id?: string | null } | null): boolean {
   if (!haySesion || !perfil?.activo) return false
   return perfil.rol === 'admin' || perfil.rol === 'empleada'
 }

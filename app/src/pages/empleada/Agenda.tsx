@@ -60,7 +60,7 @@ export function EmpleadaAgenda() {
     if (!profesional) return
     obtenerHorarioVigente(profesional.id, fechaBogotaISO(referencia)).then(setHorario)
     if (!isDemoMode) {
-      supabaseRequerido().from('permiso').select('puede_ver_agenda_equipo').eq('perfil_id', profesional.id).maybeSingle()
+      supabaseRequerido().from('permiso').select('puede_ver_agenda_equipo').eq('perfil_id', profesional.usuario_id ?? profesional.id).maybeSingle()
         .then(({ data }) => setPermisoAgendaEquipo(data?.puede_ver_agenda_equipo ?? false))
     }
   }, [profesional, referencia])

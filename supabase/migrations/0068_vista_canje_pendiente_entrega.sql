@@ -2,7 +2,9 @@
 -- versión ya estaba aplicada en remoto sin estos objetos. PostgREST responde 404
 -- (PGRST205) y el aviso de "canjes por entregar" no puede cargar.
 
-create or replace view vista_canje_pendiente_entrega with (security_invoker = true) as
+-- drop: en una base nueva 0049 ya la creó con otras columnas (cr.* sin local_id).
+drop view if exists vista_canje_pendiente_entrega;
+create view vista_canje_pendiente_entrega with (security_invoker = true) as
 select cr.*, c.nombre as cliente_nombre, c.telefono as cliente_telefono
 from canje_recompensa cr
 join cliente c on c.id = cr.cliente_id

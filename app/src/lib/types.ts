@@ -2,7 +2,10 @@
 // Mantener sincronizado a mano es aceptable para el alcance de la Fase 1;
 // en Fase 2 conviene generarlos con `supabase gen types typescript`.
 
-export type Rol = 'cliente' | 'empleada' | 'admin' | 'super_admin'
+// Rol de la persona EN ESTE SALÓN (membresia.rol del local de VITE_LOCAL_ID). La misma cuenta
+// puede ser clienta en un salón, empleada en otro y admin en un tercero. El super admin de la
+// plataforma no es un rol de salón: la base lo ignora (vive en glowdesk_admin).
+export type Rol = 'cliente' | 'empleada' | 'admin'
 
 export type EstadoReserva =
   | 'pendiente'
@@ -21,9 +24,13 @@ export interface Perfil {
   id: string
   nombre: string
   telefono: string | null
+  /** Rol en este salón (fn_mi_sesion). */
   rol: Rol
   activo: boolean
-  local_id?: string
+  /** Local de la membresía activa en este salón; null si la persona aún no pertenece a él. */
+  local_id?: string | null
+  /** Ficha de profesional de esta persona en este salón (profesional.id ≠ usuario en salones nuevos). */
+  profesional_id?: string | null
 }
 
 export interface LocalMarca {
@@ -96,6 +103,8 @@ export interface CampanaDestinatario {
 
 export interface Profesional {
   id: string
+  /** Cuenta de la persona (perfil.id). En fichas antiguas coincide con `id`. */
+  usuario_id?: string
   slug: string
   nombre: string
   especialidades: string[]

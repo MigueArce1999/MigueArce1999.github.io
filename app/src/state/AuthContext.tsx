@@ -83,9 +83,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setHaySesion(true)
       setMotivoRechazo(null)
-      const { data: perfilRow } = await supabase!.from('perfil').select('*').eq('id', usuarioId).maybeSingle()
+      // Primero quedar registrada como clienta de ESTE salón (crea la membresía si entra por
+      // primera vez con una cuenta de otro salón); luego leer el rol que tiene aquí.
+      try {
+        await asegurarClienteEnLocal()
+      } catch {
+        /* el SELECT de cliente puede devolver la fila si ya existía */
+      }
       if (!activo) return
-      if (!perfilRow) {
+      const { data: sesionRow } = await supabase!.rpc('fn_mi_sesion')
+      if (!activo) return
+      if (!sesionRow) {
         usuarioCargadoRef.current = null
         setPerfil(null)
         setCliente(null)
@@ -93,14 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCargando(false)
         return
       }
+      // es_super_admin es solo para la consola glowdesk_admin: en un salón no cambia nada.
+      const { es_super_admin: _ignorado, ...perfilRow } = sesionRow as Perfil & { es_super_admin?: boolean }
       setPerfil(perfilRow)
       usuarioCargadoRef.current = usuarioId
-      try {
-        await asegurarClienteEnLocal()
-      } catch {
-        /* el SELECT de cliente puede devolver la fila si ya existía */
-      }
-      if (!activo) return
       try {
         const c = await obtenerClientePorUsuario(usuarioId)
         if (activo) setCliente(c)
@@ -109,7 +113,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const esEquipoDeEsteSalon = Boolean(LOCAL_ID && perfilRow.local_id === LOCAL_ID)
       if (esEquipoDeEsteSalon && (perfilRow.rol === 'empleada' || perfilRow.rol === 'admin')) {
-        const { data: profRow } = await supabase!.from('vista_profesional').select('*').eq('id', usuarioId).eq('local_id', LOCAL_ID).maybeSingle()
+        // La ficha de profesional es por salón: se busca por la cuenta + este local.
+        const { data: profRow } = await supabase!
+          .from('vista_profesional')
+          .select('*')
+          .eq('usuario_id', usuarioId)
+          .eq('local_id', LOCAL_ID)
+          .maybeSingle()
         if (activo) setProfesional(profRow)
       } else if (activo) {
         setProfesional(null)

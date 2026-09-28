@@ -260,19 +260,13 @@ export async function listarEquipoConRendimiento() {
 
 // "Eliminar" una empleada NO borra la fila de profesional ni su historial: atencion_servicio,
 // comision, regla_comision y liquidacion tienen su profesional_id con "on delete restrict"
-// justamente para que un borrado real sea imposible sin perder ventas/comisiones ya cobradas
-// (ver supabase/migrations/0005_atencion_pagos.sql y 0006_comisiones_liquidaciones.sql). En
-// vez de eso: le quita el rol de empleada (perfil.rol -> 'cliente', que es lo que de verdad
-// le bloquea el acceso a /equipo-app, tanto en el frontend como en la RLS vía fn_rol_actual())
-// y la marca inactiva (profesional.activo = false, la oculta del sitio público y de nuevas
-// reservas). Su cuenta sigue existiendo como clienta normal.
+// justamente para que un borrado real sea imposible sin perder ventas/comisiones ya cobradas.
+// fn_quitar_de_equipo (0072) la deja como clienta EN ESTE SALÓN (membresia.rol) y marca su ficha
+// inactiva. Si trabaja en otro salón, allá no cambia nada.
 export async function eliminarEmpleada(profesionalId: string): Promise<void> {
   if (isDemoMode) return
-  const client = supabaseRequerido()
-  const { error: errRol } = await client.from('perfil').update({ rol: 'cliente' }).eq('id', profesionalId)
-  if (errRol) throw errRol
-  const { error: errProf } = await client.from('profesional').update({ activo: false }).eq('id', profesionalId)
-  if (errProf) throw errProf
+  const { error } = await supabaseRequerido().rpc('fn_quitar_de_equipo', { p_profesional_id: profesionalId })
+  if (error) throw error
 }
 
 // Borrado real de la fila de `profesional` (no solo desactivarla): solo para cuentas de
@@ -298,7 +292,16 @@ export async function eliminarProfesionalDefinitivo(profesionalId: string): Prom
 export async function actualizarNombreProfesional(profesionalId: string, nombre: string): Promise<void> {
   if (isDemoMode) return
   const client = supabaseRequerido()
-  const { error } = await client.from('perfil').update({ nombre }).eq('id', profesionalId)
+  // El nombre es de la persona (perfil), y la ficha de profesional apunta a ella por usuario_id.
+  const { data: prof, error: errProf } = await client
+    .from('vista_profesional')
+    .select('usuario_id')
+    .eq('id', profesionalId)
+    .eq('local_id', LOCAL_ID)
+    .maybeSingle()
+  if (errProf) throw errProf
+  const usuarioId = (prof?.usuario_id as string | undefined) ?? profesionalId
+  const { error } = await client.from('perfil').update({ nombre }).eq('id', usuarioId)
   if (error) throw error
 }
 
@@ -426,34 +429,39 @@ export async function invitarEmpleada(
   const correoLimitado = !!errInvitar && /rate limit/i.test(errInvitar.message)
   if (errInvitar && !correoLimitado) throw errInvitar
 
-  const { data: candidatos, error: errBuscar } = await client
-    .from('cliente')
-    .select('usuario_id')
-    .ilike('email', params.email)
-    .not('usuario_id', 'is', null)
-    .order('creado_en', { ascending: false })
-    .limit(1)
-  if (errBuscar) throw errBuscar
-  const usuarioId = candidatos?.[0]?.usuario_id
-  if (!usuarioId) {
-    if (correoLimitado) {
+  // La cuenta puede ser nueva o de otro salón (una sola cuenta por correo en toda la plataforma).
+  // fn_vincular_empleada la busca por correo, le da el rol de empleada EN ESTE SALÓN y le crea su
+  // ficha de profesional aquí. El perfil lo crea el trigger de Auth: se reintenta unos segundos.
+  let resultado: { estado: string } | null = null
+  let ultimoError: { message?: string } | null = null
+  for (let intento = 0; intento < 4 && !resultado; intento++) {
+    if (intento > 0) await new Promise((r) => setTimeout(r, 1500))
+    const { data, error } = await client.rpc('fn_vincular_empleada', {
+      p_email: params.email,
+      p_slug: params.slug,
+      p_nombre: params.nombre,
+    })
+    if (!error) resultado = data as { estado: string }
+    else {
+      ultimoError = error
+      if (!/no existe una cuenta|perfil aún no/i.test(error.message ?? '')) break
+    }
+  }
+  if (!resultado) {
+    const sinCuenta = /no existe una cuenta|perfil aún no/i.test(ultimoError?.message ?? '')
+    if (sinCuenta && correoLimitado) {
       throw new Error(
         'Se alcanzó el límite de correos del proyecto y la cuenta tampoco llegó a crearse. Espera unos minutos y vuelve a ' +
           'intentarlo, o configura un proveedor de correo propio en Supabase (Authentication → Settings → SMTP Settings) ' +
           'para dejar de depender de esa cuota compartida.',
       )
     }
-    throw new Error('La invitación se envió, pero el perfil todavía no aparece. Espera unos segundos y vuelve a intentarlo.')
+    if (sinCuenta) {
+      throw new Error('La invitación se envió, pero la cuenta todavía no aparece. Espera unos segundos y vuelve a intentarlo.')
+    }
+    throw ultimoError ?? new Error('No se pudo vincular a la empleada.')
   }
-
-  const { data: yaProfesional, error: errRevisar } = await client.from('profesional').select('id').eq('id', usuarioId).maybeSingle()
-  if (errRevisar) throw errRevisar
-  if (yaProfesional) return 'ya_era_empleada'
-
-  const { error: errRol } = await client.from('perfil').update({ rol: 'empleada', local_id: LOCAL_ID }).eq('id', usuarioId)
-  if (errRol) throw errRol
-  const { error: errProf } = await client.from('profesional').insert({ id: usuarioId, slug: params.slug, local_id: LOCAL_ID })
-  if (errProf) throw errProf
+  if (resultado.estado === 'ya_era_empleada') return 'ya_era_empleada'
   // La cuenta y el rol quedaron listos, pero si el correo de acceso nunca salió (límite de envíos),
   // la empleada no tiene forma de entrar por su cuenta todavía — se lo dejamos claro a quien invita
   // para que pueda avisarle por otro medio o pedir que se le asigne una contraseña manualmente.

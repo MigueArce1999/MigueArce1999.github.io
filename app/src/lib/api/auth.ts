@@ -67,7 +67,7 @@ export async function registrarCliente(email: string, password: string, nombre: 
     }
     if (pareceExistente) {
       throw new Error(
-        'Ese correo ya tiene cuenta. Entra con la misma contraseña en todos los salones (el correo es único en la plataforma).',
+        'Ese correo ya tiene cuenta en GlowDesk. Entra con tu contraseña de siempre: es la misma en todos los salones.',
       )
     }
     if (!error && !data.session) {
@@ -84,12 +84,14 @@ export async function cerrarSesion() {
   await supabase!.auth.signOut()
 }
 
+// Perfil con el rol de ESTE salón (membresía del local de x-local-id), no el perfil.rol legado.
 export async function obtenerPerfilActual(): Promise<Perfil | null> {
   if (isDemoMode) return null
   const { data: sesion } = await supabase!.auth.getSession()
-  const uid = sesion.session?.user.id
-  if (!uid) return null
-  const { data, error } = await supabase!.from('perfil').select('*').eq('id', uid).maybeSingle()
+  if (!sesion.session?.user.id) return null
+  const { data, error } = await supabase!.rpc('fn_mi_sesion')
   if (error) throw error
-  return data
+  if (!data) return null
+  const { es_super_admin: _ignorado, ...perfil } = data as Perfil & { es_super_admin?: boolean }
+  return perfil
 }

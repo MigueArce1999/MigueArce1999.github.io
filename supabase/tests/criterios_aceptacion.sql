@@ -46,9 +46,10 @@ insert into regla_comision (profesional_id, servicio_id, tipo, valor) values
 
 insert into regla_puntos (tasa, activa) values (0.02, true);
 
--- 2. Probar disponibilidad para un lunes futuro conocido: 2026-09-21 es lunes
+-- 2. Probar disponibilidad para el próximo lunes (siempre dentro del horizonte de reservas).
+select set_config('test.lunes', (current_date + (8 - extract(isodow from current_date)::int))::text, false);
 select count(*) as slots_disponibles from fn_disponibilidad(
-  '5e120000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', '2026-09-21'
+  '5e120000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', current_setting('test.lunes')::date
 );
 
 -- 3. Cliente 1 reserva 10:00-11:00 del lunes
@@ -59,7 +60,7 @@ select * from fn_crear_reserva(
   'c1111111-1111-1111-1111-111111111111',
   '5e120000-0000-0000-0000-000000000001',
   '22222222-2222-2222-2222-222222222222',
-  '2026-09-21 10:00:00-05'::timestamptz
+  (current_setting('test.lunes') || ' 10:00:00-05')::timestamptz
 ) \gset r1_
 
 \echo '--- Reserva 1 creada, estado:'
@@ -74,7 +75,7 @@ begin
       'c2222222-2222-2222-2222-222222222222',
       '5e120000-0000-0000-0000-000000000001',
       '22222222-2222-2222-2222-222222222222',
-      '2026-09-21 10:00:00-05'::timestamptz
+      (current_setting('test.lunes') || ' 10:00:00-05')::timestamptz
     );
     raise exception 'FALLO DE PRUEBA: se permitió doble reserva del mismo horario';
   exception when others then
@@ -87,7 +88,7 @@ select * from fn_crear_reserva(
   'c2222222-2222-2222-2222-222222222222',
   '5e120000-0000-0000-0000-000000000001',
   '22222222-2222-2222-2222-222222222222',
-  '2026-09-21 11:00:00-05'::timestamptz
+  (current_setting('test.lunes') || ' 11:00:00-05')::timestamptz
 ) \gset r2_
 \echo '--- Reserva 2 (horario distinto) creada, estado:'
 select :'r2_estado' as reserva2_estado;
@@ -142,17 +143,18 @@ select * from fn_completar_y_cobrar_atencion(
   :'at_id'::uuid,
   jsonb_build_array(jsonb_build_object('metodo','efectivo','monto',50000)),
   'test-idem-key-1'
-) \gset done_
+) as done \gset done_
 
-\echo '--- Atención completada, estado:'
-select :'done_estado' as atencion_estado_final, :'done_completado_en' as completado_en;
+\echo '--- Atención completada, resultado:'
+select :'done_done'::jsonb as resultado_cobro;
+select estado as atencion_estado_final from atencion where id = :'at_id'::uuid;
 
 -- CRITERIO: reintentar con la MISMA idempotency key no debe duplicar pago/comision/puntos
 select * from fn_completar_y_cobrar_atencion(
   :'at_id'::uuid,
   jsonb_build_array(jsonb_build_object('metodo','efectivo','monto',50000)),
   'test-idem-key-1'
-) \gset retry_
+) as retry \gset retry_
 
 \echo '--- CRITERIO idempotencia: debe haber exactamente 1 pago, 1 comisión, y puntos = 1000 (2% de 50000)'
 select count(*) as pagos_totales from pago where atencion_id = :'at_id'::uuid;
@@ -161,7 +163,7 @@ select sum(puntos) as puntos_cliente1 from movimiento_puntos where cliente_id = 
 
 -- CRITERIO: reprogramar libera el horario anterior y ocupa el nuevo
 select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', false);
-select * from fn_reprogramar_reserva(:'r2_id'::uuid, '2026-09-21 13:00:00-05'::timestamptz) \gset reprog_
+select * from fn_reprogramar_reserva(:'r2_id'::uuid, (current_setting('test.lunes') || ' 13:00:00-05')::timestamptz) \gset reprog_
 \echo '--- Reserva 2 reprogramada a las 13:00, rango:'
 select :'reprog_rango' as nuevo_rango;
 
@@ -171,7 +173,7 @@ select estado as reserva_en_horario_liberado from fn_crear_reserva(
   'c1111111-1111-1111-1111-111111111111',
   '5e120000-0000-0000-0000-000000000001',
   '22222222-2222-2222-2222-222222222222',
-  '2026-09-21 11:00:00-05'::timestamptz
+  (current_setting('test.lunes') || ' 11:00:00-05')::timestamptz
 );
 
 -- CRITERIO: devolución deja trazabilidad y corrige comisión/puntos
