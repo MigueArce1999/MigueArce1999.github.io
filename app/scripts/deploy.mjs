@@ -159,11 +159,15 @@ async function resolverDestino(client, pedido) {
   }
 }
 
-async function subirDist(client, baseRemoto) {
+// `yaSubidos` se comparte entre reintentos (ver el bucle en el flujo principal): si la conexión
+// se corta a mitad de la subida, el reintento retoma desde el siguiente archivo en vez de volver
+// a subir desde cero los que ya llegaron bien.
+async function subirDist(client, baseRemoto, yaSubidos) {
   const archivos = listarArchivos(distDir)
   if (archivos.length === 0) throw new Error('dist/ está vacío. El build no generó archivos.')
   for (const local of archivos) {
     const rel = relative(distDir, local).replaceAll('\\', '/')
+    if (yaSubidos.has(rel)) continue
     const partes = rel.split('/')
     const archivo = partes.pop()
     await client.cd(baseRemoto)
@@ -172,6 +176,7 @@ async function subirDist(client, baseRemoto) {
     }
     await client.uploadFrom(local, archivo)
     output.write(`  ↑ ${rel}\n`)
+    yaSubidos.add(rel)
   }
 }
 
@@ -243,19 +248,42 @@ try {
   }
 
   output.write('\nSubiendo archivos (incluye .htaccess)…\n')
-  const client = new Client(60_000)
-  client.ftp.verbose = false
-  try {
-    await client.access({
-      host: ftpHost,
-      user: ftpUser,
-      password: ftpPass,
-      port: 21,
-    })
-    const destino = await resolverDestino(client, remotoPedido)
-    await subirDist(client, destino)
-  } finally {
-    client.close()
+  // FTP a veces corta la conexión a mitad de la subida (red inestable, o el servidor cierra la
+  // conexión de control por inactividad) — en vez de que todo el despliegue falle y haya que
+  // volver a subir los archivos que ya llegaron bien, se reintenta con una conexión nueva,
+  // retomando justo donde se quedó (yaSubidos).
+  const yaSubidos = new Set()
+  const INTENTOS_MAX = 4
+  for (let intento = 1; intento <= INTENTOS_MAX; intento++) {
+    const client = new Client(120_000)
+    client.ftp.verbose = false
+    try {
+      await client.access({
+        host: ftpHost,
+        user: ftpUser,
+        password: ftpPass,
+        port: 21,
+      })
+      const destino = await resolverDestino(client, remotoPedido)
+      await subirDist(client, destino, yaSubidos)
+      client.close()
+      break
+    } catch (err) {
+      client.close()
+      if (intento === INTENTOS_MAX) {
+        throw new Error(
+          `La conexión FTP se cortó ${INTENTOS_MAX} veces seguidas (${err.message}). ` +
+            `Ya se subieron ${yaSubidos.size} archivo(s) antes del corte. Revisa tu conexión a internet ` +
+            `(o si tienes una VPN/firewall activo) y vuelve a correr el despliegue — retomará desde donde quedó.`,
+        )
+      }
+      const esperaMs = intento * 3000
+      output.write(
+        `\nSe cortó la conexión FTP (${err.message}). Reintentando en ${esperaMs / 1000}s ` +
+          `(intento ${intento + 1}/${INTENTOS_MAX})…\n`,
+      )
+      await new Promise((resolve) => setTimeout(resolve, esperaMs))
+    }
   }
 
   const urlFinal = /^https?:\/\//i.test(sitio) ? sitio : `https://${sitio}`
