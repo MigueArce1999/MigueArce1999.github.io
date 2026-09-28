@@ -28,14 +28,23 @@ export function elegirVoz(genero: GeneroVozAsistente): SpeechSynthesisVoice | nu
   return preferidas[0] ?? voces.find((v) => v.lang.toLowerCase().startsWith('es-co') || v.lang.toLowerCase().startsWith('es-mx')) ?? voces[0]
 }
 
+// Chrome recolecta la utterance si nadie la referencia y entonces NUNCA dispara onend: el
+// asistente se quedaba "hablando" (micrófono pausado) hasta el tope de tiempo. Se guarda aquí.
+let utteranceViva: SpeechSynthesisUtterance | null = null
+
 export function hablar(texto: string, genero: GeneroVozAsistente): Promise<void> {
   if (!sintesisDisponible() || !texto.trim()) return Promise.resolve()
-  window.speechSynthesis.cancel()
+  const synth = window.speechSynthesis
+  const habiaAlgo = synth.speaking || synth.pending
+  synth.cancel()
   return new Promise((resolve) => {
     let listo = false
+    let tope: number | null = null
     const terminar = () => {
       if (listo) return
       listo = true
+      if (tope != null) window.clearTimeout(tope)
+      if (utteranceViva === u) utteranceViva = null
       resolve()
     }
     const u = new SpeechSynthesisUtterance(texto)
@@ -45,15 +54,16 @@ export function hablar(texto: string, genero: GeneroVozAsistente): Promise<void>
     if (voz && voz.lang.toLowerCase().startsWith('es')) u.voice = voz
     u.onend = terminar
     u.onerror = terminar
-    window.speechSynthesis.speak(u)
-    // Chrome a veces no dispara onend; un toque pause/resume y un tope de tiempo despegan el turno.
+    utteranceViva = u
+    // speak() justo después de cancel() a veces se pierde en Chrome: un respiro si había audio.
+    // (Antes se hacía pause()/resume() a los 40 ms; en Android eso la dejaba muda.)
     window.setTimeout(() => {
-      try {
-        window.speechSynthesis.pause()
-        window.speechSynthesis.resume()
-      } catch { /* ignore */ }
-    }, 40)
-    window.setTimeout(terminar, Math.min(10_000, Math.max(1600, texto.length * 65)))
+      if (listo) return
+      synth.speak(u)
+      // Tope por si onend nunca llega: generoso, porque al vencer se reabre el micrófono y si
+      // la voz sigue sonando el asistente se oiría a sí mismo.
+      tope = window.setTimeout(terminar, Math.min(15_000, Math.max(2500, texto.length * 85)))
+    }, habiaAlgo ? 60 : 0)
   })
 }
 

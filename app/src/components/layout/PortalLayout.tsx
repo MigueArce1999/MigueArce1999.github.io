@@ -8,6 +8,7 @@ import { cerrarSesion } from '../../lib/api/auth'
 import { useDialogAccesible } from '../ui/Modal'
 import { IconoChevronIzquierda, IconoMenu, IconoX } from '../ui/Icons'
 import { InstalarAppBanner } from '../pwa/InstalarApp'
+import { GlowdeskAsistente } from '../voz/GlowdeskAsistente'
 import { useContadorCanjesPendientes } from '../../lib/fidelizacion/useContadorCanjesPendientes'
 export interface ItemNav {
   to: string
@@ -233,6 +234,8 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
         onSalir={salir}
         enlacesOtrosPortales={enlacesOtrosPortales}
       />
+      {/* Asistente por voz ("hola Glowdesk"): solo equipo del salón (lo filtra el propio componente). */}
+      {titulo !== 'Portal cliente' && <GlowdeskAsistente />}
     </div>
   )
 }

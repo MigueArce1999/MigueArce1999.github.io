@@ -37,6 +37,8 @@ export function useGlowdeskAsistente() {
   const atencionIdRef = useRef<string | null>(null)
   const generoRef = useRef(genero)
   useEffect(() => { generoRef.current = genero })
+  const modoRef = useRef(modo)
+  useEffect(() => { modoRef.current = modo })
 
   useEffect(() => {
     void obtenerConfiguracionNegocio()
@@ -116,7 +118,12 @@ export function useGlowdeskAsistente() {
     } else if (esEcoAsistente(texto, ultimaFraseRef.current)) {
       return
     }
-    if (!contieneWakeWord(texto) && (hablandoRef.current || ocupadoRef.current)) {
+    if (!contieneWakeWord(texto) && hablandoRef.current) {
+      // Llegó mientras Glowdesk hablaba: casi seguro es su propio eco. No se encola.
+      return
+    }
+    if (!contieneWakeWord(texto) && ocupadoRef.current) {
+      // Respuesta rápida mientras consulta la base: se atiende al terminar.
       if (esComandoCorto(texto) && !esEcoAsistente(texto, ultimaFraseRef.current)) pendienteRef.current = texto
       return
     }
@@ -174,6 +181,9 @@ export function useGlowdeskAsistente() {
     mantenerEscucha: modo === 'silencio' || (abierto && modo !== 'apagado'),
     anticipar: (texto) => esRespuestaRapida(estadoRef.current, texto),
     turnosCortos: abierto && modo !== 'silencio' && modo !== 'apagado',
+    // Half-duplex: mientras Glowdesk habla el micrófono se corta; si no, se oye a sí mismo
+    // ("¿atención o clienta?" → "atención") y responde su propia pregunta.
+    pausado: modo === 'hablando',
   })
   micIniciarRef.current = mic.iniciar
   micDetenerRef.current = mic.detener
@@ -229,30 +239,21 @@ export function useGlowdeskAsistente() {
     setDialogo([])
     setProvisional('')
     setModo('silencio')
-    window.setTimeout(() => {
-      if (abiertoRef.current) return
-      micIniciarRef.current?.()
-    }, 250)
+    micIniciarRef.current?.()
   }, [])
 
+  // Chrome corta el reconocimiento con la pestaña oculta. Al volver se pide de nuevo (iniciar es
+  // idempotente: si ya escucha no hace nada). El controlador se encarga solo de reanudar tras
+  // silencios o cortes; ya no hace falta un vigilante que reinicie cada 1.2 s.
   useEffect(() => {
     const alVolver = () => {
       if (document.visibilityState !== 'visible') return
-      window.setTimeout(() => micIniciarRef.current?.(), 250)
+      if (modoRef.current === 'apagado') return
+      micIniciarRef.current?.()
     }
     document.addEventListener('visibilitychange', alVolver)
     return () => document.removeEventListener('visibilitychange', alVolver)
   }, [])
-
-  useEffect(() => {
-    if (abierto || modo !== 'silencio') return
-    if (mic.estado === 'escuchando') return
-    const t = window.setTimeout(() => {
-      if (abiertoRef.current) return
-      micIniciarRef.current?.()
-    }, 1200)
-    return () => window.clearTimeout(t)
-  }, [abierto, modo, mic.estado])
 
   return {
     genero,
