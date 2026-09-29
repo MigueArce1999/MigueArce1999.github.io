@@ -8,7 +8,7 @@ import { useAuth } from '../../state/AuthContext'
 import { isDemoMode, supabase } from '../../lib/supabase'
 import { crearServicioRapido, listarProfesionales, listarServicios } from '../../lib/api/catalogo'
 import { buscarClientes, completarYCobrarAtencion, crearClienteRapido, listarClientesRecientes, registrarAtencion } from '../../lib/api/empleada'
-import { obtenerClienteAdmin } from '../../lib/api/clientes'
+import { crearNotaCliente, obtenerClienteAdmin } from '../../lib/api/clientes'
 import { obtenerReservaPorId } from '../../lib/api/reservas'
 import { estimarComision, type EstimacionComision } from '../../lib/api/comisiones'
 import { useMiFidelizacion } from '../../lib/fidelizacion/useMiFidelizacion'
@@ -465,6 +465,12 @@ export function EmpleadaAtender({
         })
         idAtencion = id
         atencionIdRef.current = id
+        // La nota del Paso 4 ahora es la misma que ve la clienta en su Diario de belleza (0072):
+        // además de quedar en la atención (arriba), se duplica como cliente_nota. Nunca bloquea
+        // el cobro si falla — la atención ya quedó registrada.
+        if (notas.trim()) {
+          crearNotaCliente(cliente!.id, id, notas.trim()).catch(() => {})
+        }
       }
       const resultado = await completarYCobrarAtencion({
         atencionId: idAtencion,
@@ -783,7 +789,7 @@ export function EmpleadaAtender({
             <button onClick={() => setNotasAbiertas((v) => !v)} className="flex w-full items-center justify-between text-left">
               <span className="flex items-center gap-2">
                 <PasoBadge numero={4} />
-                <span className="font-semibold text-carbon">Paso 4 · Nota adicional <span className="font-normal text-carbon/50">· Opcional</span></span>
+                <span className="font-semibold text-carbon">Paso 4 · Nota para la clienta <span className="font-normal text-carbon/50">· Opcional</span></span>
               </span>
               <span className="text-carbon/50">{notasAbiertas ? '−' : '+'}</span>
             </button>
@@ -795,7 +801,7 @@ export function EmpleadaAtender({
                   value={notas}
                   onChange={(e) => setNotas(e.target.value)}
                   placeholder="Tratamiento realizado, observaciones y recomendaciones para la próxima visita"
-                  ayuda="Es interna: no aparece en el comprobante de la clienta ni genera recordatorios."
+                  ayuda="La clienta podrá leerla en su Diario de belleza. No aparece en el comprobante ni genera recordatorios."
                 />
               </div>
             )}
