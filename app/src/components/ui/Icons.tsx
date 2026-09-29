@@ -72,6 +72,16 @@ export function IconoHistorial(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+// Libro abierto: "Diario de belleza" en el portal de la clienta.
+export function IconoDiario(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M4 5.5c2-1 5-1 8 .5v13c-3-1.5-6-1.5-8-.5v-13Z" />
+      <path d="M20 5.5c-2-1-5-1-8 .5v13c3-1.5 6-1.5 8-.5v-13Z" />
+    </Svg>
+  )
+}
+
 export function IconoPuntos(props: SVGProps<SVGSVGElement>) {
   return (
     <Svg {...props}>
@@ -223,6 +233,26 @@ export function IconoHomepage(props: SVGProps<SVGSVGElement>) {
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <path d="M3 8h18" />
       <path d="M7 12h4M7 15h7" />
+    </Svg>
+  )
+}
+
+// Ojo abierto / ojo tachado: mostrar u ocultar el texto de una contraseña.
+export function IconoOjo(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Svg>
+  )
+}
+
+export function IconoOjoCerrado(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c7 0 10.5 7 10.5 7a13.8 13.8 0 0 1-3.1 4.1M6.4 6.6C3.6 8.3 1.5 12 1.5 12s3.5 7 10.5 7a10.4 10.4 0 0 0 4-.8" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
     </Svg>
   )
 }

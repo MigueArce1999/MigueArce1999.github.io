@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Campos'
 import { ErrorState } from '../../components/ui/Estados'
+import { IconoOjo, IconoOjoCerrado } from '../../components/ui/Icons'
 import { registrarCliente } from '../../lib/api/auth'
 import { marcarConsentimientoMarketingPropio } from '../../lib/api/clientes'
 import { isDemoMode } from '../../lib/supabase'
@@ -21,6 +22,7 @@ export function RegistroSalon() {
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [mostrarPassword, setMostrarPassword] = useState(false)
   const [aceptaMarketing, setAceptaMarketing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
@@ -78,22 +80,58 @@ export function RegistroSalon() {
         {error && <div className="mb-4"><ErrorState mensaje={error} /></div>}
 
         <form onSubmit={enviar} className="flex flex-col gap-5">
-          <Input id="nombrePublico" etiqueta="Nombre completo" required value={nombre} onChange={(e) => setNombre(e.target.value)} className="py-3 text-base" />
-          <Input id="emailPublico" etiqueta="Correo" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="py-3 text-base" />
           <Input
-            id="passwordPublico"
-            etiqueta="Contraseña"
-            type="password"
-            minLength={6}
+            id="nombrePublico"
+            etiqueta="Nombre completo"
             required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            autoFocus
+            autoComplete="name"
+            autoCapitalize="words"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
             className="py-3 text-base"
           />
+          <Input
+            id="emailPublico"
+            etiqueta="Correo"
+            type="email"
+            required
+            autoComplete="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="py-3 text-base"
+          />
+          <div className="relative">
+            <Input
+              id="passwordPublico"
+              etiqueta="Contraseña"
+              type={mostrarPassword ? 'text' : 'password'}
+              minLength={6}
+              required
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="py-3 pr-11 text-base"
+            />
+            <button
+              type="button"
+              onClick={() => setMostrarPassword((v) => !v)}
+              className="absolute right-3 top-9 text-carbon/40 hover:text-carbon/70"
+              aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            >
+              {mostrarPassword ? <IconoOjoCerrado className="h-5 w-5" /> : <IconoOjo className="h-5 w-5" />}
+            </button>
+          </div>
           <Input
             id="telefonoPublico"
             etiqueta="WhatsApp (opcional, con indicativo si no eres de Colombia)"
             type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             placeholder="300 123 4567"
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}

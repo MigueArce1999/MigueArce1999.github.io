@@ -24,6 +24,7 @@ import { Reservar } from './pages/public/Reservar'
 import { ClienteInicio } from './pages/cliente/Inicio'
 import { ClienteReservas } from './pages/cliente/Reservas'
 import { ClienteHistorial } from './pages/cliente/Historial'
+import { ClienteDiarioBelleza } from './pages/cliente/DiarioBelleza'
 import { ClientePuntos } from './pages/cliente/Puntos'
 import { ClientePerfil } from './pages/cliente/Perfil'
 
@@ -61,6 +62,7 @@ import {
   IconoConfiguracion,
   IconoContenido,
   IconoDashboard,
+  IconoDiario,
   IconoEnVivo,
   IconoEquipo,
   IconoGastos,
@@ -80,6 +82,7 @@ const navCliente: ItemNav[] = [
   { to: '/cliente', label: 'Inicio', icono: IconoInicio },
   { to: '/cliente/reservas', label: 'Reservas', icono: IconoAgenda },
   { to: '/cliente/historial', label: 'Historial', icono: IconoHistorial },
+  { to: '/cliente/diario', label: 'Diario de belleza', icono: IconoDiario },
   { to: '/cliente/puntos', label: 'Mis recompensas', icono: IconoPuntos },
   { to: '/cliente/perfil', label: 'Perfil', icono: IconoPerfil },
 ]
@@ -145,6 +148,7 @@ function App() {
             <Route path="/cliente" element={<ClienteInicio />} />
             <Route path="/cliente/reservas" element={<ClienteReservas />} />
             <Route path="/cliente/historial" element={<ClienteHistorial />} />
+            <Route path="/cliente/diario" element={<ClienteDiarioBelleza />} />
             <Route path="/cliente/puntos" element={<ClientePuntos />} />
             <Route path="/cliente/perfil" element={<ClientePerfil />} />
           </Route>
