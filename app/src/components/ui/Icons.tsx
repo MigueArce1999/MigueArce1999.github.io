@@ -72,6 +72,16 @@ export function IconoHistorial(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+// Libro abierto: "Diario de belleza" en el portal de la clienta.
+export function IconoDiario(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M4 5.5c2-1 5-1 8 .5v13c-3-1.5-6-1.5-8-.5v-13Z" />
+      <path d="M20 5.5c-2-1-5-1-8 .5v13c3-1.5 6-1.5 8-.5v-13Z" />
+    </Svg>
+  )
+}
+
 export function IconoPuntos(props: SVGProps<SVGSVGElement>) {
   return (
     <Svg {...props}>
