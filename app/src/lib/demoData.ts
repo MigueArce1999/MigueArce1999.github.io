@@ -7,6 +7,8 @@ import type {
   CategoriaGasto,
   CategoriaServicio,
   Cliente,
+  ClienteNota,
+  ClienteRecomendacion,
   ClienteResumen,
   ComisionResumen,
   ConfiguracionFidelizacion,
@@ -22,6 +24,7 @@ import type {
   Recompensa,
   ReglaPuntos,
   Reserva,
+  SeguimientoPendiente,
   Servicio,
 } from './types'
 
@@ -573,7 +576,16 @@ export function demoAnalyticsResumen(desde: Date, hasta: Date) {
 }
 
 export const demoClientesAdmin: ClienteResumen[] = [
-  { ...demoClienteActual, ultima_visita: '2026-09-10T15:00:00Z', ultimo_servicio_nombre: 'Corte de dama', ultimo_profesional_nombre: 'Naldi' },
+  {
+    ...demoClienteActual,
+    ultima_visita: '2026-09-10T15:00:00Z',
+    ultimo_servicio_nombre: 'Corte de dama',
+    ultimo_profesional_nombre: 'Naldi',
+    saldo_puntos: 120,
+    proxima_cita_inicio: null,
+    proximo_seguimiento_fecha: null,
+    proximo_seguimiento_descripcion: null,
+  },
   {
     id: 'demo-cliente-2',
     usuario_id: null,
@@ -592,6 +604,10 @@ export const demoClientesAdmin: ClienteResumen[] = [
     ultima_visita: '2026-08-20T18:00:00Z',
     ultimo_servicio_nombre: 'Color y tinte',
     ultimo_profesional_nombre: 'Claudia',
+    saldo_puntos: 450,
+    proxima_cita_inicio: enHoras(72),
+    proximo_seguimiento_fecha: null,
+    proximo_seguimiento_descripcion: null,
   },
   {
     id: 'demo-cliente-3',
@@ -608,9 +624,13 @@ export const demoClientesAdmin: ClienteResumen[] = [
     resena_google_confirmada: false,
     meta_recompensa_id: null,
     creado_en: enHoras(-900),
-    ultima_visita: null,
-    ultimo_servicio_nombre: null,
-    ultimo_profesional_nombre: null,
+    ultima_visita: enHoras(-240),
+    ultimo_servicio_nombre: 'Tratamiento capilar',
+    ultimo_profesional_nombre: 'Valery',
+    saldo_puntos: 60,
+    proxima_cita_inicio: null,
+    proximo_seguimiento_fecha: enHoras(24 * 3).slice(0, 10),
+    proximo_seguimiento_descripcion: 'Hidratación profunda',
   },
   {
     id: 'demo-cliente-4',
@@ -630,6 +650,58 @@ export const demoClientesAdmin: ClienteResumen[] = [
     ultima_visita: null,
     ultimo_servicio_nombre: null,
     ultimo_profesional_nombre: null,
+    saldo_puntos: 0,
+    proxima_cita_inicio: null,
+    proximo_seguimiento_fecha: null,
+    proximo_seguimiento_descripcion: null,
+  },
+]
+
+// --- Clientas 360°: notas, recomendaciones y seguimiento (modo demostración) ----------------
+
+export const demoNotasCliente: Record<string, ClienteNota[]> = {
+  'demo-cliente-1': [
+    {
+      id: 'demo-nota-1',
+      cliente_id: 'demo-cliente-1',
+      atencion_id: 'demo-atencion-1',
+      creado_por: 'demo-prof-valery',
+      nota: 'Cabello reseco, principalmente en las puntas.',
+      creado_en: enHoras(-47),
+    },
+  ],
+}
+
+export const demoRecomendacionesCliente: Record<string, ClienteRecomendacion[]> = {
+  'demo-cliente-3': [
+    {
+      id: 'demo-recomendacion-1',
+      cliente_id: 'demo-cliente-3',
+      atencion_id: null,
+      servicio_recomendado_id: null,
+      creado_por: 'demo-prof-valery',
+      descripcion: 'Hidratación profunda',
+      fecha_recomendada_regreso: enHoras(24 * 3).slice(0, 10),
+      estado: 'pendiente',
+      creado_en: enHoras(-240),
+      completado_en: null,
+    },
+  ],
+}
+
+export const demoSeguimientosPendientes: SeguimientoPendiente[] = [
+  {
+    id: 'demo-recomendacion-1',
+    cliente_id: 'demo-cliente-3',
+    cliente_nombre: 'Daniela Restrepo',
+    cliente_telefono: '3004445566',
+    descripcion: 'Hidratación profunda',
+    fecha_recomendada_regreso: enHoras(24 * 3).slice(0, 10),
+    servicio_recomendado_id: null,
+    servicio_recomendado_nombre: null,
+    creado_por: 'demo-prof-valery',
+    creado_por_nombre: 'Valery',
+    creado_en: enHoras(-240),
   },
 ]
 

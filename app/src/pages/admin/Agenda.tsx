@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Card, Cargando, EmptyState, ErrorState } from '../../components/ui/Estados'
 import { Input, Select, Textarea } from '../../components/ui/Campos'
@@ -8,7 +8,7 @@ import { EstadoPagoBadge, EstadoReservaBadge } from '../../components/ui/StatusB
 import { HorarioHabitual, AusenciasBloqueos } from '../empleada/Disponibilidad'
 import { listarProfesionales, listarServicios } from '../../lib/api/catalogo'
 import { buscarClientes, listarClientesRecientes } from '../../lib/api/empleada'
-import { crearClienteAdmin } from '../../lib/api/clientes'
+import { crearClienteAdmin, obtenerClienteAdmin } from '../../lib/api/clientes'
 import {
   cancelarReserva,
   confirmarReservaPendiente,
@@ -36,23 +36,44 @@ function inicioSemana(fecha: Date) {
 export function AdminAgenda() {
   const [equipo, setEquipo] = useState<Profesional[]>([])
   const [servicios, setServicios] = useState<Servicio[]>([])
+  const [searchParams] = useSearchParams()
+  const clienteIdParam = searchParams.get('nuevaCitaClienteId')
+  const servicioIdParam = searchParams.get('servicioId')
+  const [clientePreseleccionado, setClientePreseleccionado] = useState<Cliente | null>(null)
 
   useEffect(() => {
     listarProfesionales().then(setEquipo)
     listarServicios().then(setServicios)
   }, [])
 
+  // Deep-link desde "Agendar cita" en el perfil de la clienta o desde una recomendación
+  // pendiente (mismo patrón que ?reservaId= en Atender.tsx): precarga clienta/servicio en el
+  // modal de "Nueva cita" en vez de reconstruir el flujo de Agenda.
+  useEffect(() => {
+    if (clienteIdParam) obtenerClienteAdmin(clienteIdParam).then(setClientePreseleccionado).catch(() => {})
+  }, [clienteIdParam])
+
   return (
     <div className="flex flex-col gap-4">
       <h1 className="font-marca text-2xl font-semibold text-carbon">Agenda</h1>
-      <PanelAgenda equipo={equipo} servicios={servicios} />
+      <PanelAgenda equipo={equipo} servicios={servicios} clientePreseleccionado={clientePreseleccionado} servicioIdPreseleccionado={servicioIdParam} />
     </div>
   )
 }
 
 // --- Agenda ----------------------------------------------------------------------------------
 
-function PanelAgenda({ equipo, servicios }: { equipo: Profesional[]; servicios: Servicio[] }) {
+function PanelAgenda({
+  equipo,
+  servicios,
+  clientePreseleccionado,
+  servicioIdPreseleccionado,
+}: {
+  equipo: Profesional[]
+  servicios: Servicio[]
+  clientePreseleccionado?: Cliente | null
+  servicioIdPreseleccionado?: string | null
+}) {
   const [vista, setVista] = useState<Vista>('dia')
   const [referencia, setReferencia] = useState(new Date())
   const [profesionalFiltro, setProfesionalFiltro] = useState('todas')
@@ -62,6 +83,10 @@ function PanelAgenda({ equipo, servicios }: { equipo: Profesional[]; servicios: 
   const [seleccionada, setSeleccionada] = useState<Reserva | null>(null)
   const [modalNueva, setModalNueva] = useState(false)
   const [gestionarHorarioDe, setGestionarHorarioDe] = useState<Profesional | null>(null)
+
+  useEffect(() => {
+    if (clientePreseleccionado) setModalNueva(true)
+  }, [clientePreseleccionado])
 
   const desde = vista === 'dia' ? new Date(referencia) : inicioSemana(referencia)
   if (vista === 'dia') desde.setHours(0, 0, 0, 0)
@@ -156,7 +181,13 @@ function PanelAgenda({ equipo, servicios }: { equipo: Profesional[]; servicios: 
       )}
 
       <Modal abierto={modalNueva} onCerrar={() => setModalNueva(false)} titulo="Nueva cita">
-        <FormularioNuevaCita servicios={servicios} equipo={equipo} onCreada={() => { setModalNueva(false); recargar() }} />
+        <FormularioNuevaCita
+          servicios={servicios}
+          equipo={equipo}
+          clienteInicial={clientePreseleccionado}
+          servicioIdInicial={servicioIdPreseleccionado}
+          onCreada={() => { setModalNueva(false); recargar() }}
+        />
       </Modal>
 
       <Modal abierto={gestionarHorarioDe !== null} onCerrar={() => setGestionarHorarioDe(null)} titulo={`Horario de ${gestionarHorarioDe?.nombre ?? ''}`}>
@@ -408,14 +439,26 @@ function DetalleCitaAdmin({ reserva, equipo, onCerrar, onCambio }: { reserva: Re
   )
 }
 
-function FormularioNuevaCita({ servicios, equipo, onCreada }: { servicios: Servicio[]; equipo: Profesional[]; onCreada: () => void }) {
+function FormularioNuevaCita({
+  servicios,
+  equipo,
+  clienteInicial,
+  servicioIdInicial,
+  onCreada,
+}: {
+  servicios: Servicio[]
+  equipo: Profesional[]
+  clienteInicial?: Cliente | null
+  servicioIdInicial?: string | null
+  onCreada: () => void
+}) {
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState<Cliente[]>([])
-  const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [cliente, setCliente] = useState<Cliente | null>(clienteInicial ?? null)
   const [creandoCliente, setCreandoCliente] = useState(false)
   const [nombreNuevo, setNombreNuevo] = useState('')
   const [telefonoNuevo, setTelefonoNuevo] = useState('')
-  const [servicioId, setServicioId] = useState('')
+  const [servicioId, setServicioId] = useState(servicioIdInicial ?? '')
   const [profesionalId, setProfesionalId] = useState('')
   const [fecha, setFecha] = useState(fechaBogotaISO())
   const [slots, setSlots] = useState<SlotDisponible[] | null>(null)

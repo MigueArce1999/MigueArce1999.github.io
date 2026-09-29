@@ -69,6 +69,19 @@ export function formatoFechaHora(iso: string): string {
   return `${formatoFecha(iso)} · ${formatoHora(iso)}`
 }
 
+// Para un día CALENDARIO plano ("yyyy-MM-dd", nunca un instante real — p. ej.
+// cliente_recomendacion.fecha_recomendada_regreso): nunca reinterpretar vía timeZone
+// America/Bogota como hace formatoFecha, porque un date-only reconstruido así puede correr el
+// día hacia atrás (mismo bug ya documentado y evitado en lib/analytics/rangoFecha.ts). Se
+// construye como fecha LOCAL (sin sufijo "Z") y se formatea leyendo esos mismos campos, sin
+// conversión de zona horaria — la construcción y el formateo se cancelan entre sí.
+export function formatoFechaCorta(fechaISO: string | null): string {
+  if (!fechaISO) return '—'
+  const fecha = new Date(`${fechaISO}T00:00:00`)
+  if (Number.isNaN(fecha.getTime())) return '—'
+  return new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }).format(fecha)
+}
+
 export function fechaBogotaISO(fecha: Date = new Date()): string {
   // yyyy-mm-dd tal como se ve en Bogotá, para usar como parámetro de fecha en RPCs.
   const partes = new Intl.DateTimeFormat('en-CA', {

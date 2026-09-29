@@ -2,6 +2,7 @@
 // asignación de profesionales a cada zona. Reutiliza las funciones de la Fase 3
 // (lib/api/disponibilidadEnVivo.ts) sin tocar el motor ni el esquema.
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Campos'
 import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
@@ -136,8 +137,15 @@ function FilaEquipo({
     <Card className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-semibold text-carbon">{item.nombre}</p>
-        <div className={`rounded-full px-3 py-1 text-sm font-semibold ${texto.clase}`}>
-          {texto.emoji} {texto.titulo}{texto.detalle ? ` · ${texto.detalle}` : ''}
+        <div className="flex items-center gap-2">
+          {item.cliente_id && (
+            <Link to={`/admin/clientes/${item.cliente_id}`} className="text-xs font-semibold text-oliva hover:underline">
+              Ver clienta ({item.cliente_nombre})
+            </Link>
+          )}
+          <div className={`rounded-full px-3 py-1 text-sm font-semibold ${texto.clase}`}>
+            {texto.emoji} {texto.titulo}{texto.detalle ? ` · ${texto.detalle}` : ''}
+          </div>
         </div>
       </div>
       <div className="flex flex-wrap items-end gap-2">

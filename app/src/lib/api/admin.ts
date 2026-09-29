@@ -285,7 +285,32 @@ export async function obtenerNotasVenta(atencionId: string): Promise<string | nu
 }
 
 export async function listarVentasDeCliente(clienteId: string): Promise<VentaLinea[]> {
-  if (isDemoMode) return []
+  if (isDemoMode) {
+    return demoHistorialAtenciones
+      .filter((a) => a.cliente_id === clienteId)
+      .flatMap((a) =>
+        a.lineas.map((l) => ({
+          id: l.id,
+          atencion_id: a.id,
+          servicio_id: l.servicio_id,
+          nombre_snapshot: l.nombre_snapshot,
+          precio_snapshot: l.precio_snapshot,
+          descuento: l.descuento,
+          cantidad: l.cantidad,
+          profesional_id: l.profesional_id,
+          profesional_nombre: l.profesional_nombre,
+          reserva_id: a.reserva_id,
+          atencion_estado: a.estado,
+          atencion_creado_en: a.creado_en,
+          atencion_completado_en: a.completado_en,
+          cliente_id: a.cliente_id,
+          cliente_nombre: a.cliente_nombre ?? '',
+          comision_total: Math.round(l.precio_snapshot * 0.4),
+          es_colaboracion: false,
+        })),
+      )
+      .sort((a, b) => b.atencion_creado_en.localeCompare(a.atencion_creado_en))
+  }
   const client = supabaseRequerido()
   const { data, error } = await client
     .from('vista_atencion_servicio')
