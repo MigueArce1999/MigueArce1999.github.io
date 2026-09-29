@@ -237,6 +237,26 @@ export function IconoHomepage(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+// Ojo abierto / ojo tachado: mostrar u ocultar el texto de una contraseña.
+export function IconoOjo(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Svg>
+  )
+}
+
+export function IconoOjoCerrado(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c7 0 10.5 7 10.5 7a13.8 13.8 0 0 1-3.1 4.1M6.4 6.6C3.6 8.3 1.5 12 1.5 12s3.5 7 10.5 7a10.4 10.4 0 0 0 4-.8" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </Svg>
+  )
+}
+
 // Punto con ondas concéntricas ("en vivo" / señal en tiempo real) — usado por GlowDesk Live.
 export function IconoEnVivo(props: SVGProps<SVGSVGElement>) {
   return (
