@@ -63,12 +63,71 @@ export interface Cliente {
   creado_en: string
 }
 
-// vista_cliente_resumen (ver supabase/migrations/0024): agrega a Cliente lo que no es una
-// columna real sino derivado del historial de atenciones — nunca confundir con creado_en.
+// vista_cliente_resumen (ver supabase/migrations/0024, extendida en 0072): agrega a Cliente lo
+// que no es una columna real sino derivado del historial de atenciones/citas/puntos/seguimientos
+// — nunca confundir con creado_en. visitas_completadas/gasto_acumulado SÍ son columnas reales de
+// `cliente` (0012), llegan tal cual vía Cliente.
 export interface ClienteResumen extends Cliente {
   ultima_visita: string | null
   ultimo_servicio_nombre: string | null
   ultimo_profesional_nombre: string | null
+  saldo_puntos: number
+  proxima_cita_inicio: string | null
+  proximo_seguimiento_fecha: string | null
+  proximo_seguimiento_descripcion: string | null
+}
+
+// --- Clientas 360°: notas, recomendaciones y seguimiento (ver 0072_clientas_360.sql) ---------
+
+export interface ClienteNota {
+  id: string
+  cliente_id: string
+  atencion_id: string | null
+  creado_por: string | null
+  nota: string
+  creado_en: string
+}
+
+export type EstadoRecomendacion = 'pendiente' | 'completada' | 'cancelada'
+
+export interface ClienteRecomendacion {
+  id: string
+  cliente_id: string
+  atencion_id: string | null
+  servicio_recomendado_id: string | null
+  creado_por: string | null
+  descripcion: string
+  fecha_recomendada_regreso: string | null
+  estado: EstadoRecomendacion
+  creado_en: string
+  completado_en: string | null
+}
+
+// Fila de vista_seguimiento_pendiente: una fila plana por recomendación pendiente, con nombres ya
+// resueltos — la misma que alimenta la card "Seguimientos pendientes" y el badge del menú.
+export interface SeguimientoPendiente {
+  id: string
+  cliente_id: string
+  cliente_nombre: string
+  cliente_telefono: string | null
+  descripcion: string
+  fecha_recomendada_regreso: string | null
+  servicio_recomendado_id: string | null
+  servicio_recomendado_nombre: string | null
+  creado_por: string | null
+  creado_por_nombre: string | null
+  creado_en: string
+}
+
+// Devuelto por fn_estado_en_vivo_cliente. A diferencia de EstadoProfesionalAhora (que nunca
+// revela el cliente, pensado para la vista pública), esto es sobre la propia clienta — no hay
+// nada que ocultar.
+export interface EstadoEnVivoCliente {
+  en_salon: boolean
+  atencion_id?: string | null
+  servicio_nombre?: string | null
+  profesional_nombre?: string | null
+  inicio?: string | null
 }
 
 export type CampanaTipo = 'general' | 'promocional'
@@ -637,11 +696,17 @@ export interface ProfesionalEnVivo {
 // Devuelto por fn_estado_equipo_en_vivo (0066) — la vista de admin de "quién está disponible
 // ahora", igual que ProfesionalEnVivo pero sin `zonas` (no aplica en ese panel) y sin depender de
 // que live_disponibilidad_activo esté prendido, a diferencia de fn_salon_en_vivo.
+// cliente_id/cliente_nombre (0072): solo se pueblan cuando la razón es 'servicio_activo' — a
+// diferencia de EstadoProfesionalAhora (usado también en la vista pública y por la propia
+// profesional), esta función SIEMPRE fue exclusiva de administración, así que exponer aquí qué
+// clienta está siendo atendida no viola la regla de privacidad de Peluquería en Vivo.
 export interface EstadoEquipoItem {
   profesional_id: string
   nombre: string
   foto_url: string | null
   estado: EstadoProfesionalAhora
+  cliente_id?: string | null
+  cliente_nombre?: string | null
 }
 
 export type DemandaSalon = 'tranquilo' | 'movimiento_medio' | 'alta_demanda'

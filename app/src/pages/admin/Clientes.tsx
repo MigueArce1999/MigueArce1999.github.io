@@ -7,6 +7,7 @@ import { Card, Cargando, EmptyState, ErrorState } from '../../components/ui/Esta
 import { Drawer, Modal } from '../../components/ui/Modal'
 import { isDemoMode } from '../../lib/supabase'
 import {
+  actualizarEstadoRecomendacion,
   archivarCliente,
   buscarPosiblesDuplicados,
   crearClienteAdmin,
@@ -14,13 +15,14 @@ import {
   eliminarClienteAdmin,
   exportarClientesCSV,
   listarClientesAdmin,
+  listarSeguimientosPendientes,
   marcarResenaGoogle,
   type DatosCliente,
 } from '../../lib/api/clientes'
-import { formatoFecha } from '../../lib/format'
+import { formatoFecha, formatoFechaCorta } from '../../lib/format'
 import { telefonosEquivalentes } from '../../lib/telefono'
 import { ENLACE_RESENA_GOOGLE } from '../../lib/constantes'
-import type { ClienteResumen } from '../../lib/types'
+import type { ClienteResumen, SeguimientoPendiente } from '../../lib/types'
 
 function enlaceWhatsapp(telefono: string, mensaje?: string): string {
   const digitos = telefono.replace(/\D/g, '')
@@ -39,6 +41,20 @@ type FiltroEstado = 'todos' | 'activos' | 'archivados'
 type FiltroPromos = 'todos' | 'si' | 'no'
 type FiltroVisita = 'todos' | '30dias' | 'sin_visitas'
 
+type FiltroRapido = 'todas' | 'nuevas' | 'frecuentes' | 'con_cita' | 'con_seguimiento' | 'inactivas'
+
+const OPCIONES_FILTRO_RAPIDO: { valor: FiltroRapido; etiqueta: string }[] = [
+  { valor: 'todas', etiqueta: 'Todas' },
+  { valor: 'nuevas', etiqueta: 'Nuevas' },
+  { valor: 'frecuentes', etiqueta: 'Frecuentes' },
+  { valor: 'con_cita', etiqueta: 'Con cita próxima' },
+  { valor: 'con_seguimiento', etiqueta: 'Con seguimiento pendiente' },
+  { valor: 'inactivas', etiqueta: 'Inactivas' },
+]
+
+const DIAS_INACTIVA = 90
+const VISITAS_FRECUENTE = 5
+
 export function AdminClientes() {
   const navigate = useNavigate()
   const [clientes, setClientes] = useState<ClienteResumen[] | null>(null)
@@ -47,6 +63,7 @@ export function AdminClientes() {
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('activos')
   const [filtroPromos, setFiltroPromos] = useState<FiltroPromos>('todos')
   const [filtroVisita, setFiltroVisita] = useState<FiltroVisita>('todos')
+  const [filtroRapido, setFiltroRapido] = useState<FiltroRapido>('todas')
   const [pagina, setPagina] = useState(1)
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set())
   const [panelAbierto, setPanelAbierto] = useState<'nuevo' | ClienteResumen | null>(null)
@@ -56,9 +73,10 @@ export function AdminClientes() {
     listarClientesAdmin().then(setClientes).catch((e) => setError(e.message))
   }
   useEffect(recargar, [])
-  useEffect(() => setPagina(1), [busqueda, filtroEstado, filtroPromos, filtroVisita])
+  useEffect(() => setPagina(1), [busqueda, filtroEstado, filtroPromos, filtroVisita, filtroRapido])
 
   const hace30Dias = useMemo(() => Date.now() - 30 * 24 * 60 * 60 * 1000, [])
+  const haceNDiasInactiva = useMemo(() => Date.now() - DIAS_INACTIVA * 24 * 60 * 60 * 1000, [])
 
   const indicadores = useMemo(() => {
     const lista = clientes ?? []
@@ -79,9 +97,14 @@ export function AdminClientes() {
       if (filtroPromos === 'no' && c.consentimiento_marketing) return false
       if (filtroVisita === '30dias' && !(c.ultima_visita && new Date(c.ultima_visita).getTime() >= hace30Dias)) return false
       if (filtroVisita === 'sin_visitas' && c.ultima_visita) return false
+      if (filtroRapido === 'nuevas' && c.visitas_completadas > 1) return false
+      if (filtroRapido === 'frecuentes' && c.visitas_completadas < VISITAS_FRECUENTE) return false
+      if (filtroRapido === 'con_cita' && !c.proxima_cita_inicio) return false
+      if (filtroRapido === 'con_seguimiento' && !c.proximo_seguimiento_fecha) return false
+      if (filtroRapido === 'inactivas' && !(c.activo && (!c.ultima_visita || new Date(c.ultima_visita).getTime() < haceNDiasInactiva))) return false
       return true
     })
-  }, [clientes, busqueda, filtroEstado, filtroPromos, filtroVisita, hace30Dias])
+  }, [clientes, busqueda, filtroEstado, filtroPromos, filtroVisita, filtroRapido, hace30Dias, haceNDiasInactiva])
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginados = filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
@@ -129,6 +152,22 @@ export function AdminClientes() {
         <Card className="text-center"><p className="text-xs text-carbon/50">Clientes activos</p><p className="mt-1 font-marca text-3xl font-semibold text-carbon">{clientes ? indicadores.activos : '—'}</p></Card>
         <Card className="text-center"><p className="text-xs text-carbon/50">Autorizan promociones</p><p className="mt-1 font-marca text-3xl font-semibold text-carbon">{clientes ? indicadores.autorizanPromos : '—'}</p></Card>
         <Card className="text-center"><p className="text-xs text-carbon/50">Visitaron en los últimos 30 días</p><p className="mt-1 font-marca text-3xl font-semibold text-carbon">{clientes ? indicadores.visitasRecientes : '—'}</p></Card>
+      </div>
+
+      <SeguimientosPendientes />
+
+      <div className="flex flex-wrap gap-2">
+        {OPCIONES_FILTRO_RAPIDO.map((o) => (
+          <button
+            key={o.valor}
+            onClick={() => setFiltroRapido(o.valor)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              filtroRapido === o.valor ? 'bg-oliva text-blanco' : 'bg-piedra/40 text-carbon hover:bg-piedra/60'
+            }`}
+          >
+            {o.etiqueta}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -222,6 +261,63 @@ export function AdminClientes() {
   )
 }
 
+// Mismo patrón que "Canjes por entregar" en Fidelización (vista + card + badge en el menú): una
+// cola de "sería conveniente que esta clienta regrese" sin construir un sistema de
+// notificaciones aparte (sección 14 del pedido).
+function SeguimientosPendientes() {
+  const [pendientes, setPendientes] = useState<SeguimientoPendiente[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [actualizando, setActualizando] = useState<string | null>(null)
+  const navigate = useNavigate()
+
+  function cargar() {
+    setError(null)
+    listarSeguimientosPendientes().then(setPendientes).catch((e) => setError(e.message))
+  }
+  useEffect(cargar, [])
+
+  async function completar(id: string) {
+    setActualizando(id)
+    try {
+      await actualizarEstadoRecomendacion(id, 'completada')
+      cargar()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setActualizando(null)
+    }
+  }
+
+  if (error) return <ErrorState mensaje={error} reintentar={cargar} />
+  if (!pendientes || pendientes.length === 0) return null
+
+  return (
+    <Card className="flex flex-col gap-3 border-champan/60 bg-champan/10">
+      <p className="font-semibold text-carbon">Seguimientos pendientes</p>
+      <div className="flex flex-col gap-2">
+        {pendientes.map((s) => (
+          <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-blanco px-3 py-2">
+            <div>
+              <p className="text-sm font-medium text-carbon">{s.cliente_nombre} <span className="font-normal text-carbon/50">· {s.descripcion}</span></p>
+              <p className="text-xs text-carbon/50">
+                {s.fecha_recomendada_regreso ? formatoFechaCorta(s.fecha_recomendada_regreso) : 'Sin fecha'}
+                {s.creado_por_nombre && ` · Recomendado por ${s.creado_por_nombre}`}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => navigate(`/admin/clientes/${s.cliente_id}`)} className="text-xs font-semibold text-oliva hover:underline">Ver clienta</button>
+              <button onClick={() => navigate(`/admin/agenda?nuevaCitaClienteId=${s.cliente_id}${s.servicio_recomendado_id ? `&servicioId=${s.servicio_recomendado_id}` : ''}`)} className="text-xs font-semibold text-oliva hover:underline">
+                Agendar
+              </button>
+              <Button tamano="sm" variante="ghost" onClick={() => completar(s.id)} cargando={actualizando === s.id}>Marcar completado</Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
 function FilaCliente({
   cliente,
   seleccionado,
@@ -278,6 +374,12 @@ function FilaCliente({
           {!cliente.activo && <span className="rounded-full bg-carbon/10 px-2 py-0.5 text-xs text-carbon/50">Archivado</span>}
           {!cliente.ultima_visita && (
             <span className="rounded-full bg-champan/25 px-2 py-0.5 text-xs font-semibold text-carbon">Nuevo</span>
+          )}
+          {cliente.proxima_cita_inicio && (
+            <span className="rounded-full bg-oliva/15 px-2 py-0.5 text-xs font-semibold text-oliva">Cita próxima</span>
+          )}
+          {cliente.proximo_seguimiento_fecha && (
+            <span className="rounded-full bg-advertencia/15 px-2 py-0.5 text-xs font-semibold text-advertencia">Seguimiento</span>
           )}
           {!cliente.ultima_visita && cliente.telefono && (
             <a

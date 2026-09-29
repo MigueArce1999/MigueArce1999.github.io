@@ -9,6 +9,7 @@ import { useDialogAccesible } from '../ui/Modal'
 import { IconoChevronIzquierda, IconoMenu, IconoX } from '../ui/Icons'
 import { InstalarAppBanner } from '../pwa/InstalarApp'
 import { useContadorCanjesPendientes } from '../../lib/fidelizacion/useContadorCanjesPendientes'
+import { useContadorSeguimientosPendientes } from '../../lib/clientes/useContadorSeguimientosPendientes'
 export interface ItemNav {
   to: string
   label: string
@@ -64,9 +65,12 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
   // vez de un toast en vivo (ver useContadorCanjesPendientes) — reutiliza la misma consulta que
   // ya usa la pestaña "Canjes por entregar", solo la asoma también en el menú.
   const contadorCanjesPendientes = useContadorCanjesPendientes(perfil?.rol === 'admin')
-  const itemsConBadge = items.map((item) =>
-    item.to === '/admin/fidelizacion' ? { ...item, contador: contadorCanjesPendientes } : item,
-  )
+  const contadorSeguimientosPendientes = useContadorSeguimientosPendientes(perfil?.rol === 'admin')
+  const itemsConBadge = items.map((item) => {
+    if (item.to === '/admin/fidelizacion') return { ...item, contador: contadorCanjesPendientes }
+    if (item.to === '/admin/clientes') return { ...item, contador: contadorSeguimientosPendientes }
+    return item
+  })
   const contadorOculto =
     itemsConBadge.length > 5 ? itemsConBadge.slice(4).reduce((acc, item) => acc + (item.contador ?? 0), 0) : 0
 

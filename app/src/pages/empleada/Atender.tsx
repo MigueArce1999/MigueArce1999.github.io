@@ -20,6 +20,7 @@ import type { VoiceExecutionDeps } from '../../lib/voz/VoiceExecutionService'
 import type { AttentionDraft, Producto } from '../../lib/voz/schema'
 import { crearProductoRapido as crearProductoRapidoVoz, listarProductos } from '../../lib/voz/voiceApi'
 import { VoiceRegistrationPanel } from '../../components/voz/VoiceRegistrationPanel'
+import { FormularioObservacionSeguimiento } from '../../components/clientes/FormularioObservacionSeguimiento'
 
 // --- Tipos del borrador (solo viven en el navegador hasta el clic final en "Confirmar
 // cobro"; ver fn_registrar_atencion en supabase/migrations/0020_colaborador_como_servicio.sql
@@ -186,6 +187,8 @@ export function EmpleadaAtender({
   const [productosCatalogo, setProductosCatalogo] = useState<Producto[]>([])
   const [cargandoCatalogo, setCargandoCatalogo] = useState(true)
   const [panelVozAbierto, setPanelVozAbierto] = useState(false)
+  const [mostrarObservacionFinal, setMostrarObservacionFinal] = useState(false)
+  const [observacionFinalGuardada, setObservacionFinalGuardada] = useState(false)
   const [cargandoReserva, setCargandoReserva] = useState(!!reservaIdParam)
   const [citaOrigen, setCitaOrigen] = useState<{ inicio: string; servicioNombre?: string } | null>(null)
 
@@ -511,8 +514,32 @@ export function EmpleadaAtender({
               )}
             </div>
           )}
-          <Button onClick={() => navigate(rutaFinalizar)}>{etiquetaFinalizar}</Button>
         </Card>
+
+        {/* Opcional, nunca bloquea el cobro (sección 13 del pedido): "Agregar observaciones y
+            seguimiento" aparece DESPUÉS de que la atención ya quedó cobrada. */}
+        {cliente && atencionIdRef.current && !observacionFinalGuardada && (
+          <Card className="mt-3">
+            {mostrarObservacionFinal ? (
+              <FormularioObservacionSeguimiento
+                clienteId={cliente.id}
+                atencionId={atencionIdRef.current}
+                servicios={servicios}
+                onCancelar={() => setMostrarObservacionFinal(false)}
+                onGuardado={() => setObservacionFinalGuardada(true)}
+              />
+            ) : (
+              <button onClick={() => setMostrarObservacionFinal(true)} className="w-full text-center text-sm font-semibold text-oliva hover:underline">
+                + Agregar observaciones y seguimiento
+              </button>
+            )}
+          </Card>
+        )}
+        {observacionFinalGuardada && (
+          <p className="mt-3 text-center text-sm font-semibold text-exito">✓ Observación guardada en el perfil de la clienta.</p>
+        )}
+
+        <Button onClick={() => navigate(rutaFinalizar)} className="mt-3 w-full">{etiquetaFinalizar}</Button>
       </div>
     )
   }

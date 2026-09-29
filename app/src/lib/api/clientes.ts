@@ -1,7 +1,7 @@
 import { isDemoMode, LOCAL_ID, supabaseRequerido } from '../supabase'
-import { demoClientesAdmin } from '../demoData'
+import { demoClientesAdmin, demoNotasCliente, demoRecomendacionesCliente, demoSeguimientosPendientes } from '../demoData'
 import { soloDigitos } from '../telefono'
-import type { ClienteResumen } from '../types'
+import type { ClienteNota, ClienteRecomendacion, ClienteResumen, EstadoEnVivoCliente, EstadoRecomendacion, SeguimientoPendiente } from '../types'
 
 // Fecha "más reciente" de una clienta para ordenar la lista: su última visita si ya tuvo
 // alguna, o su fecha de registro si todavía no — así una clienta recién registrada (sin
@@ -148,6 +148,85 @@ function celdaCSV(valor: string | number | null | undefined): string {
   const texto = valor === null || valor === undefined ? '' : String(valor)
   const protegida = /^[=+\-@]/.test(texto) ? `'${texto}` : texto
   return `"${protegida.replace(/"/g, '""')}"`
+}
+
+// --- Clientas 360°: notas, recomendaciones y seguimiento (ver 0072_clientas_360.sql) ---------
+//
+// Escritura siempre vía RPC (fn_crear_nota_cliente / fn_crear_recomendacion_cliente /
+// fn_actualizar_estado_recomendacion): validan que la atención citada sea de esa clienta y que
+// quien llama sea admin o empleada — nunca un insert/update directo a la tabla.
+
+export async function listarNotasCliente(clienteId: string): Promise<ClienteNota[]> {
+  if (isDemoMode) return demoNotasCliente[clienteId] ?? []
+  const client = supabaseRequerido()
+  const { data, error } = await client.from('cliente_nota').select('*').eq('cliente_id', clienteId).order('creado_en', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function crearNotaCliente(clienteId: string, atencionId: string | null, nota: string): Promise<ClienteNota> {
+  if (isDemoMode) throw new Error('En modo demostración no se pueden guardar notas.')
+  const client = supabaseRequerido()
+  const { data, error } = await client.rpc('fn_crear_nota_cliente', { p_cliente_id: clienteId, p_atencion_id: atencionId, p_nota: nota })
+  if (error) throw error
+  return data
+}
+
+export async function listarRecomendacionesCliente(clienteId: string): Promise<ClienteRecomendacion[]> {
+  if (isDemoMode) return demoRecomendacionesCliente[clienteId] ?? []
+  const client = supabaseRequerido()
+  const { data, error } = await client.from('cliente_recomendacion').select('*').eq('cliente_id', clienteId).order('creado_en', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function crearRecomendacionCliente(params: {
+  clienteId: string
+  atencionId: string | null
+  servicioId: string | null
+  descripcion: string
+  fechaRegreso: string | null
+}): Promise<ClienteRecomendacion> {
+  if (isDemoMode) throw new Error('En modo demostración no se pueden guardar recomendaciones.')
+  const client = supabaseRequerido()
+  const { data, error } = await client.rpc('fn_crear_recomendacion_cliente', {
+    p_cliente_id: params.clienteId,
+    p_atencion_id: params.atencionId,
+    p_servicio_id: params.servicioId,
+    p_descripcion: params.descripcion,
+    p_fecha_regreso: params.fechaRegreso,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function actualizarEstadoRecomendacion(id: string, estado: EstadoRecomendacion): Promise<ClienteRecomendacion> {
+  if (isDemoMode) throw new Error('En modo demostración no se pueden actualizar seguimientos.')
+  const client = supabaseRequerido()
+  const { data, error } = await client.rpc('fn_actualizar_estado_recomendacion', { p_id: id, p_estado: estado })
+  if (error) throw error
+  return data
+}
+
+// Cola de "sería conveniente que esta clienta regrese" (vista_seguimiento_pendiente) — mismo
+// patrón ya usado para "canjes por entregar" en Fidelización: card en el listado + badge en el
+// menú lateral, sin un módulo de notificaciones aparte.
+export async function listarSeguimientosPendientes(): Promise<SeguimientoPendiente[]> {
+  if (isDemoMode) return demoSeguimientosPendientes
+  const client = supabaseRequerido()
+  const { data, error } = await client.from('vista_seguimiento_pendiente').select('*')
+  if (error) throw error
+  return data
+}
+
+// ¿Esta clienta está siendo atendida ahora mismo? A diferencia del motor de Peluquería en Vivo
+// (que nunca revela el cliente por privacidad de cara al público), esto es sobre sí misma.
+export async function obtenerEstadoEnVivoCliente(clienteId: string): Promise<EstadoEnVivoCliente> {
+  if (isDemoMode) return { en_salon: false }
+  const client = supabaseRequerido()
+  const { data, error } = await client.rpc('fn_estado_en_vivo_cliente', { p_cliente_id: clienteId })
+  if (error) throw error
+  return data
 }
 
 export function exportarClientesCSV(clientes: ClienteResumen[]): void {
