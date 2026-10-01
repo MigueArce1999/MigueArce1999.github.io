@@ -22,8 +22,9 @@
     <meta name="apple-mobile-web-app-title" content="CP Equipo" />
 
     <style>
-      /* Visible desde el primer byte. La URL sale de localStorage (visita anterior) o del
-         logo por defecto. React la sostiene exactamente 3 segundos y luego la retira. */
+      /* Visible desde el primer byte. Si el salón tiene logo/splash (guardado en localStorage
+         desde la visita anterior) se muestra solo esa imagen o video, sin spinner. Si no, va la
+         marca GlowDesk con su spinner (.modo-glowdesk). React ajusta y la retira a los 3 s. */
       #pantalla-carga {
         position: fixed;
         inset: 0;
@@ -32,46 +33,68 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 16px;
+        gap: 28px;
         background: #e6e1d7;
         transition: opacity 0.25s ease;
       }
-      #pantalla-carga img,
-      #pantalla-carga video {
+      #pantalla-carga-media > img,
+      #pantalla-carga-media > video {
+        display: block;
         width: min(280px, 70vw);
         max-height: 50vh;
         height: auto;
-        border-radius: 16px;
         object-fit: contain;
+        /* El blanco de logos/videos subidos se funde con el fondo: sin "tarjeta" blanca. */
+        mix-blend-mode: multiply;
       }
-      #pantalla-carga .aro {
-        width: 28px;
-        height: 28px;
-        border-radius: 999px;
-        border: 3px solid #39463833;
-        border-top-color: #394638;
-        animation: girar 0.8s linear infinite;
+      #pantalla-carga .gd-marca {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
       }
+      #pantalla-carga .gd-simbolo { width: 72px; height: 72px; object-fit: contain; }
+      #pantalla-carga .gd-nombre { width: 150px; height: auto; }
+      /* Spinner con los colores del símbolo de GlowDesk (verde menta → turquesa → petróleo). */
+      #pantalla-carga .gd-aro {
+        display: none;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: conic-gradient(from 90deg, rgba(0, 209, 178, 0) 0deg, #9ff4b9 120deg, #13cfb7 250deg, #03302d 350deg, rgba(3, 48, 45, 0) 360deg);
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+        mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+        animation: girar 0.9s linear infinite;
+      }
+      #pantalla-carga.modo-glowdesk .gd-aro { display: block; }
       @keyframes girar { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        #pantalla-carga .gd-aro { animation-duration: 2.4s; }
+      }
       #pantalla-carga.oculta { opacity: 0; pointer-events: none; }
     </style>
   </head>
   <body>
-    <div id="pantalla-carga" aria-hidden="true">
+    <div id="pantalla-carga" class="modo-glowdesk" aria-hidden="true">
       <div id="pantalla-carga-media">
-        <img src="/logo-claudia-patricia.png" alt="" />
+        <span class="gd-marca">
+          <img class="gd-simbolo" src="/glowdesk/simbolo.png" alt="" />
+          <img class="gd-nombre" src="/glowdesk/glowdesk.svg" alt="GlowDesk" />
+        </span>
       </div>
-      <div class="aro"></div>
+      <div class="gd-aro"></div>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       (function () {
-        var def = '/logo-claudia-patricia.png'
-        var url = def
-        try { url = localStorage.getItem('glowdesk-splash-url') || def } catch (e) {}
+        // Logo/splash del salón guardado en la visita anterior; 'glowdesk' o vacío = marca GlowDesk.
+        var url = null
+        try { url = localStorage.getItem('glowdesk-splash-url') } catch (e) {}
+        if (!url || url === 'glowdesk') return
+        var pantalla = document.getElementById('pantalla-carga')
         var box = document.getElementById('pantalla-carga-media')
-        if (!box || url === def) return
+        if (!pantalla || !box) return
         var video = /\.(mp4|webm|mov)(\?|#|$)/i.test(url)
         var el
         if (video) {
@@ -86,6 +109,7 @@
           el.alt = ''
         }
         box.replaceChildren(el)
+        pantalla.classList.remove('modo-glowdesk')
       })()
     </script>
   </body>
