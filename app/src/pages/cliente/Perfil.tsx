@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Campos'
 import { Card } from '../../components/ui/Estados'
+import { BotonInstalarApp } from '../../components/pwa/InstalarApp'
 import { useAuth } from '../../state/AuthContext'
 import { actualizarPerfilCliente } from '../../lib/api/cliente'
 import { isDemoMode } from '../../lib/supabase'
@@ -52,6 +53,13 @@ export function ClientePerfil() {
           <Button type="submit" cargando={guardando}>Guardar cambios</Button>
           {guardado && <p className="text-sm font-medium text-exito">Cambios guardados.</p>}
         </form>
+      </Card>
+      <Card className="flex flex-col items-start gap-3">
+        <div>
+          <p className="mb-1 font-semibold text-carbon">App en tu teléfono</p>
+          <p className="text-sm text-carbon/60">Agrégala a tu pantalla de inicio para abrirla como cualquier otra app, sin el navegador de por medio.</p>
+        </div>
+        <BotonInstalarApp />
       </Card>
     </div>
   )
