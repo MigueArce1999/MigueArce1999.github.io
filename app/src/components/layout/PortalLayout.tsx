@@ -183,7 +183,7 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
             <button onClick={salir} className="text-sm font-medium text-carbon/70 md:hidden">Salir</button>
           </header>
           <div className="flex flex-col gap-4 p-4 sm:p-6 md:p-8">
-            {(titulo === 'Portal de empleadas' || titulo === 'Administración') && <InstalarAppBanner />}
+            {(titulo === 'Portal cliente' || titulo === 'Portal de empleadas' || titulo === 'Administración') && <InstalarAppBanner />}
             <Outlet />
           </div>
         </div>

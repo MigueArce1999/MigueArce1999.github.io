@@ -7,7 +7,9 @@
     <title>Claudia Patricia · Salón de belleza</title>
     <meta name="description" content="Reserva tu cita en Claudia Patricia, salón de belleza en Cartagena, Colombia." />
 
-    <!-- PWA: instalable en el portal de empleadas (ver vite.config.ts → VitePWA). -->
+    <!-- PWA: instalable en los 3 portales —admin, empleadas y clientas— (ver vite.config.ts →
+         VitePWA). Un solo manifest compartido, así que su nombre/ícono deben ser genéricos y no
+         de un portal en particular. -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#394638" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
@@ -19,7 +21,9 @@
          que el botón de menú del header quedaba tapado/pegado ahí arriba y era imposible de
          tocar — con la opaca, iOS reserva su propio espacio y el header nunca queda debajo. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="CP Equipo" />
+    <!-- Valor por defecto antes de que BrandingContext lo reemplace por el nombre corto real del
+         salón (aplicarFaviconYTitulo) — nunca debe quedar un nombre de un portal específico. -->
+    <meta name="apple-mobile-web-app-title" content="Claudia Patricia" />
 
     <style>
       /* Visible desde el primer byte. La URL sale de localStorage (visita anterior) o del

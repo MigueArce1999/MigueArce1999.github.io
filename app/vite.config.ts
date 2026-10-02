@@ -19,13 +19,16 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['favicon.png', 'favicon.svg', 'logo-claudia-patricia.png', 'icons/apple-touch-icon.png'],
       manifest: {
-        name: 'Claudia Patricia · Equipo',
-        short_name: 'CP Equipo',
-        description: 'Portal de empleadas de Claudia Patricia: agenda, atención, ventas y disponibilidad desde el celular.',
+        // Un solo manifest para los 3 portales (admin, empleadas y clientas comparten el mismo
+        // SPA/scope) — nombre y descripción genéricos, nunca de un portal en particular, para que
+        // el ícono que queda en la pantalla de inicio tenga sentido sin importar quién instaló.
+        name: 'Claudia Patricia',
+        short_name: 'C. Patricia',
+        description: 'Agenda tu cita, consulta tus puntos y tu Diario de belleza, o atiende el salón, todo desde el celular.',
         // Con HashRouter, cualquier URL real del sitio es "/" — start_url cae ahí y la propia
         // Home.tsx redirige de una a la ruta del rol de quien ya tiene sesión iniciada
-        // (ver useEffect en pages/public/Home.tsx), así que cada empleada aterriza directo en
-        // su "Mi día" sin necesitar lógica de redirección extra aquí.
+        // (ver useEffect en pages/public/Home.tsx), así que cada persona aterriza directo en su
+        // portal (clienta, empleada o admin) sin necesitar lógica de redirección extra aquí.
         start_url: '/',
         scope: '/',
         display: 'standalone',
