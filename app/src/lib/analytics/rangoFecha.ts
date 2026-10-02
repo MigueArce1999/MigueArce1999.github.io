@@ -67,6 +67,48 @@ export function calcularRangoPreset(preset: Exclude<PresetRangoFecha, 'personali
   return { desde: new Date(`${anio}-${mes}-01T00:00:00${OFFSET_BOGOTA}`), hasta: ahora }
 }
 
+// Año y mes calendario (1-12) de HOY en Bogotá, como par de enteros — base para la aritmética de
+// mes en calcularRangoMes/etiquetaMes (nunca Date.setMonth/addMonths de date-fns sobre un Date ya
+// construido: esas operaciones leen el mes en la zona horaria del entorno donde corra el código,
+// no en Bogotá, con el mismo riesgo de desfase que ya evita el resto de este archivo).
+function anioMesHoyBogota(ahora: Date): { anio: number; mes: number } {
+  const [anio, mes] = fechaBogotaISO(ahora).split('-').map(Number)
+  return { anio, mes }
+}
+
+// Rango del mes calendario en Bogotá, desplazado `offsetMeses` meses desde el actual (0 = mes en
+// curso, -1 = el mes pasado, …) — para el ranking de puntos ("clienta del mes"), que necesita
+// navegar entre meses sin la UI de comparación de periodos del Dashboard. `ahora` solo existe
+// para que las pruebas puedan fijar "hoy"; el llamador real nunca lo pasa.
+export function calcularRangoMes(offsetMeses: number, ahora: Date = new Date()): RangoFecha {
+  const { anio, mes } = anioMesHoyBogota(ahora)
+  const totalMeses = anio * 12 + (mes - 1) + offsetMeses
+  const anioDesde = Math.floor(totalMeses / 12)
+  const mesDesde = (totalMeses % 12) + 1
+  const totalMesesSiguiente = totalMeses + 1
+  const anioHasta = Math.floor(totalMesesSiguiente / 12)
+  const mesHasta = (totalMesesSiguiente % 12) + 1
+  return {
+    desde: new Date(`${anioDesde}-${String(mesDesde).padStart(2, '0')}-01T00:00:00${OFFSET_BOGOTA}`),
+    hasta: new Date(`${anioHasta}-${String(mesHasta).padStart(2, '0')}-01T00:00:00${OFFSET_BOGOTA}`),
+  }
+}
+
+// "Octubre 2026" — mismo offset que calcularRangoMes, para rotular el mes que se está mirando.
+export function etiquetaMes(offsetMeses: number, ahora: Date = new Date()): string {
+  const { anio, mes } = anioMesHoyBogota(ahora)
+  const totalMeses = anio * 12 + (mes - 1) + offsetMeses
+  const anioMes = Math.floor(totalMeses / 12)
+  const mesMes = (totalMeses % 12) + 1
+  const fecha = new Date(`${anioMes}-${String(mesMes).padStart(2, '0')}-01T00:00:00${OFFSET_BOGOTA}`)
+  // Por separado y unidos con un espacio (no { month: 'long', year: 'numeric' } junto, que en
+  // es-CO intercala "de": "septiembre de 2026") — más corto, para cuadrar en el navegador de mes
+  // angosto del ranking.
+  const mesNombre = new Intl.DateTimeFormat('es-CO', { month: 'long', timeZone: 'America/Bogota' }).format(fecha)
+  const anioTexto = new Intl.DateTimeFormat('es-CO', { year: 'numeric', timeZone: 'America/Bogota' }).format(fecha)
+  return `${mesNombre.charAt(0).toUpperCase()}${mesNombre.slice(1)} ${anioTexto}`
+}
+
 // Mismo número de días siempre — nunca compara un rango de 7 días contra uno de 8.
 export function calcularPeriodoAnterior(rango: RangoFecha, modo: ModoComparacion): RangoFecha | null {
   if (modo === 'ninguna' || modo === 'personalizado') return null

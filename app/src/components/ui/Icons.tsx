@@ -257,6 +257,17 @@ export function IconoOjoCerrado(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+// Trofeo: ranking de puntos del mes / "clienta del mes".
+export function IconoTrofeo(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+      <path d="M7 5H4a3 3 0 0 0 3 5M17 5h3a3 3 0 0 1-3 5" />
+      <path d="M12 14v3M9 21h6M8.5 21c0-2 1-3.5 1-4M15.5 21c0-2-1-3.5-1-4" />
+    </Svg>
+  )
+}
+
 // Punto con ondas concéntricas ("en vivo" / señal en tiempo real) — usado por GlowDesk Live.
 export function IconoEnVivo(props: SVGProps<SVGSVGElement>) {
   return (

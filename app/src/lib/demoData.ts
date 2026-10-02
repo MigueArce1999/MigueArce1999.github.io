@@ -21,6 +21,7 @@ import type {
   Profesional,
   Promocion,
   Proveedor,
+  PuestoRankingPuntos,
   Recompensa,
   ReglaPuntos,
   Reserva,
@@ -299,6 +300,24 @@ export const demoMovimientosPuntos: MovimientoPuntos[] = [
     regla_aplicada: { monto_por_bloque: 1000, puntos_por_bloque: 1, monto_elegible_neto: 240000 },
     creado_en: enHoras(-47),
   },
+]
+
+// Ranking de puntos del mes ("clienta del mes"): lista fija, no depende de demoMovimientosPuntos
+// (que solo tiene un movimiento, de demoClienteActual) — simula un salón con varias clientas
+// activas para que el vistazo en demo se parezca a cómo se ve con datos reales. Cliente Demo
+// aparece dentro del top para que la demo muestre el caso normal; fn_ranking_puntos_mes real
+// agrega la fila de quien pregunta aparte cuando queda fuera del límite pedido.
+export const demoRankingPuntosMes: PuestoRankingPuntos[] = [
+  { posicion: 1, cliente_id: 'demo-cliente-2', nombre: 'Valentina Restrepo', puntos_ganados: 820, soy_yo: false, dentro_del_top: true },
+  { posicion: 2, cliente_id: 'demo-cliente-3', nombre: 'Camila Herrera', puntos_ganados: 760, soy_yo: false, dentro_del_top: true },
+  { posicion: 3, cliente_id: 'demo-cliente-4', nombre: 'Daniela Ospina', puntos_ganados: 690, soy_yo: false, dentro_del_top: true },
+  { posicion: 4, cliente_id: demoClienteActual.id, nombre: demoClienteActual.nombre, puntos_ganados: 640, soy_yo: true, dentro_del_top: true },
+  { posicion: 5, cliente_id: 'demo-cliente-5', nombre: 'Juliana Vélez', puntos_ganados: 510, soy_yo: false, dentro_del_top: true },
+  { posicion: 6, cliente_id: 'demo-cliente-6', nombre: 'Mariana Cárdenas', puntos_ganados: 470, soy_yo: false, dentro_del_top: true },
+  { posicion: 7, cliente_id: 'demo-cliente-7', nombre: 'Laura Jiménez', puntos_ganados: 430, soy_yo: false, dentro_del_top: true },
+  { posicion: 8, cliente_id: 'demo-cliente-8', nombre: 'Sofía Ramírez', puntos_ganados: 390, soy_yo: false, dentro_del_top: true },
+  { posicion: 9, cliente_id: 'demo-cliente-9', nombre: 'Carolina Duarte', puntos_ganados: 350, soy_yo: false, dentro_del_top: true },
+  { posicion: 10, cliente_id: 'demo-cliente-10', nombre: 'Isabella Moreno', puntos_ganados: 300, soy_yo: false, dentro_del_top: true },
 ]
 
 // --- Fidelización: datos de demostración ("Tu belleza florece") ----------------------------

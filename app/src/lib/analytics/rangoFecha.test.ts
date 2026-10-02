@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   calcularPeriodoAnterior,
+  calcularRangoMes,
   calcularRangoPersonalizado,
   calcularRangoPreset,
   calcularVariacion,
   elegirGranularidad,
+  etiquetaMes,
   finDiaBogota,
   inicioDiaBogota,
 } from './rangoFecha'
@@ -124,5 +126,41 @@ describe('calcularVariacion', () => {
   it('nunca da NaN', () => {
     const v = calcularVariacion(0, 100)!
     expect(Number.isNaN(v.valor)).toBe(false)
+  })
+})
+
+describe('calcularRangoMes / etiquetaMes', () => {
+  // 2026-09-26 15:00 UTC = 2026-09-26 10:00 Bogotá -> "hoy" en Bogotá es 26-sep-2026.
+  const hoyBogota = new Date('2026-09-26T15:00:00.000Z')
+
+  it('offset 0: el mes en curso va del 1 al 1 del mes siguiente, ambos a medianoche Bogotá', () => {
+    const r = calcularRangoMes(0, hoyBogota)
+    expect(r.desde.toISOString()).toBe('2026-09-01T05:00:00.000Z')
+    expect(r.hasta.toISOString()).toBe('2026-10-01T05:00:00.000Z')
+  })
+
+  it('offset -1: el mes anterior', () => {
+    const r = calcularRangoMes(-1, hoyBogota)
+    expect(r.desde.toISOString()).toBe('2026-08-01T05:00:00.000Z')
+    expect(r.hasta.toISOString()).toBe('2026-09-01T05:00:00.000Z')
+  })
+
+  it('cruza el fin de año sin romperse (diciembre -> enero del año siguiente)', () => {
+    const diciembre = new Date('2026-12-15T15:00:00.000Z')
+    const r = calcularRangoMes(1, diciembre)
+    expect(r.desde.toISOString()).toBe('2027-01-01T05:00:00.000Z')
+    expect(r.hasta.toISOString()).toBe('2027-02-01T05:00:00.000Z')
+  })
+
+  it('cruza el inicio de año hacia atrás (enero -> diciembre del año anterior)', () => {
+    const enero = new Date('2027-01-10T15:00:00.000Z')
+    const r = calcularRangoMes(-1, enero)
+    expect(r.desde.toISOString()).toBe('2026-12-01T05:00:00.000Z')
+    expect(r.hasta.toISOString()).toBe('2027-01-01T05:00:00.000Z')
+  })
+
+  it('etiquetaMes nombra el mes en español, con mayúscula inicial', () => {
+    expect(etiquetaMes(0, hoyBogota)).toBe('Septiembre 2026')
+    expect(etiquetaMes(-1, hoyBogota)).toBe('Agosto 2026')
   })
 })
