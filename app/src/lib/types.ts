@@ -642,6 +642,21 @@ export interface ResultadoCobro {
   recompensa_aplicada: { canje_id: string; nombre: string; tipo: TipoRecompensa } | null
 }
 
+// Fila de fn_ranking_puntos_mes (0074): puntos GANADOS en un período, nunca el saldo disponible
+// (un canje a mitad de mes no baja a nadie del ranking). `nombre` ya viene formateado por el
+// servidor según quién pregunta — completo para admin/empleada, abreviado ("María G.") si quien
+// pregunta es una clienta. `dentro_del_top` es false solo para la fila extra de la propia
+// clienta cuando su posición real queda fuera del límite pedido (para poder mostrarle "vas en el
+// puesto #N" aunque no esté entre las primeras).
+export interface PuestoRankingPuntos {
+  posicion: number
+  cliente_id: string
+  nombre: string
+  puntos_ganados: number
+  soy_yo: boolean
+  dentro_del_top: boolean
+}
+
 // --- GlowDesk Live: disponibilidad en tiempo real -------------------------------------------
 // Los tipos de esta sección reflejan exactamente el jsonb que devuelven las funciones de
 // supabase/migrations/0061_glowdesk_live_motor.sql — no hay transformación de forma entre el

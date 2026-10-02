@@ -13,6 +13,10 @@ import { useContadorSeguimientosPendientes } from '../../lib/clientes/useContado
 export interface ItemNav {
   to: string
   label: string
+  // Solo para la barra inferior en móvil, donde 5 pestañas comparten el ancho de la pantalla y
+  // una etiqueta larga ("Diario de belleza") se parte en dos líneas; el menú lateral y el overlay
+  // de "Más" tienen espacio de sobra y siempre usan `label` completo.
+  labelCorto?: string
   icono: ComponentType<SVGProps<SVGSVGElement>>
   contador?: number
 }
@@ -208,7 +212,7 @@ export function PortalLayout({ items, titulo }: { items: ItemNav[]; titulo: stri
             }
           >
             <item.icono className="h-[22px] w-[22px]" />
-            {item.label}
+            {item.labelCorto ?? item.label}
             {!!item.contador && (
               <span className="absolute right-3 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-[10px] font-semibold text-blanco">
                 {item.contador > 99 ? '99+' : item.contador}

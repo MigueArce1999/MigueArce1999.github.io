@@ -2,20 +2,23 @@ import { useEffect, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { Card, Cargando, EmptyState, ErrorState } from '../../components/ui/Estados'
+import { IconoTrofeo } from '../../components/ui/Icons'
 import { TarjetaFidelizacion } from '../../components/fidelizacion/TarjetaFidelizacion'
 import { CanjeCelebracion } from '../../components/fidelizacion/CanjeCelebracion'
 import { useAuth } from '../../state/AuthContext'
 import { useMiFidelizacion } from '../../lib/fidelizacion/useMiFidelizacion'
 import { useCelebracionCanje } from '../../lib/fidelizacion/useCelebracionCanje'
+import { calcularRangoMes, etiquetaMes } from '../../lib/analytics/rangoFecha'
 import {
   autocanjearRecompensa,
   elegirMetaRecompensa,
   listarMisCanjes,
   listarMovimientosPuntosPagina,
   listarRecompensasActivas,
+  obtenerRankingPuntosMes,
 } from '../../lib/api/fidelizacion'
 import { formatoEnteroCOP, formatoFecha } from '../../lib/format'
-import type { CanjeRecompensa, MovimientoPuntos, Recompensa } from '../../lib/types'
+import type { CanjeRecompensa, MovimientoPuntos, PuestoRankingPuntos, Recompensa } from '../../lib/types'
 
 const etiquetasMovimiento: Record<string, string> = {
   abono: 'Ganaste puntos',
@@ -104,6 +107,8 @@ export function ClientePuntos() {
         onReintentar={recargar}
       />
 
+      <RankingPuntosMes />
+
       {ultimoCanje && <TarjetaUltimoCanje canje={ultimoCanje} saldoActual={fidelizacion?.saldo ?? null} />}
 
       {celebracionActiva && (
@@ -160,6 +165,62 @@ export function ClientePuntos() {
         onCanjear={autocanjear}
       />
     </div>
+  )
+}
+
+// "Clienta del mes": motiva mostrando quién va ganando más puntos este mes (nunca el saldo
+// disponible — un canje a mitad de mes no baja a nadie del ranking). Si falla, se oculta sola en
+// vez de romper el resto de la página — es un extra motivacional, no algo crítico para cobrar o
+// canjear. Los nombres de las demás clientas ya vienen abreviados desde el servidor
+// (fn_ranking_puntos_mes, 0074); nunca se le pide o recorta nada acá.
+function RankingPuntosMes() {
+  const [ranking, setRanking] = useState<PuestoRankingPuntos[] | null>(null)
+
+  useEffect(() => {
+    setRanking(null)
+    const { desde, hasta } = calcularRangoMes(0)
+    obtenerRankingPuntosMes(desde.toISOString(), hasta.toISOString(), 5)
+      .then(setRanking)
+      .catch(() => setRanking([]))
+  }, [])
+
+  if (ranking === null) return <Cargando filas={2} />
+  if (ranking.length === 0) return null
+
+  const top = ranking.filter((f) => f.dentro_del_top)
+  const miFila = ranking.find((f) => f.soy_yo && !f.dentro_del_top)
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <IconoTrofeo className="h-5 w-5 text-oliva" />
+        <p className="font-semibold text-carbon">Clienta del mes · {etiquetaMes(0)}</p>
+      </div>
+      <p className="text-xs text-carbon/60">Quién más puntos ha ganado este mes — ¡gánate el premio siendo la número 1!</p>
+      <div className="flex flex-col gap-1.5">
+        {top.map((fila) => (
+          <div key={fila.cliente_id} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${fila.soy_yo ? 'bg-oliva/10' : ''}`}>
+            <span
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                fila.posicion === 1 ? 'bg-oliva text-blanco' : 'bg-piedra/50 text-carbon/70'
+              }`}
+            >
+              {fila.posicion}
+            </span>
+            <p className={`flex-1 text-sm ${fila.soy_yo ? 'font-semibold text-carbon' : 'text-carbon/80'}`}>
+              {fila.nombre}
+              {fila.soy_yo ? ' (tú)' : ''}
+            </p>
+            <p className="text-sm font-semibold text-oliva">{formatoEnteroCOP(fila.puntos_ganados)} pts</p>
+          </div>
+        ))}
+      </div>
+      {miFila && (
+        <p className="border-t border-piedra pt-2 text-sm text-carbon/70">
+          Vas en el puesto <span className="font-semibold text-carbon">#{miFila.posicion}</span> con {formatoEnteroCOP(miFila.puntos_ganados)} puntos este mes.
+        </p>
+      )}
+    </Card>
   )
 }
 

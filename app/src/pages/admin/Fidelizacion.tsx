@@ -3,8 +3,10 @@ import { Button } from '../../components/ui/Button'
 import { CampoMoneda, Input, Select, Textarea } from '../../components/ui/Campos'
 import { Card, Cargando, EmptyState, ErrorState } from '../../components/ui/Estados'
 import { Modal } from '../../components/ui/Modal'
+import { IconoChevronIzquierda, IconoChevronDerecha, IconoTrofeo } from '../../components/ui/Icons'
 import { listarCategorias, listarServiciosAdmin } from '../../lib/api/catalogo'
 import { formatoEnteroCOP, formatoFecha } from '../../lib/format'
+import { calcularRangoMes, etiquetaMes } from '../../lib/analytics/rangoFecha'
 import {
   ajustarPuntosManual,
   actualizarConfiguracionFidelizacion,
@@ -18,6 +20,7 @@ import {
   listarRecompensasAdmin,
   marcarCanjeEntregado,
   obtenerConfiguracionFidelizacion,
+  obtenerRankingPuntosMes,
   obtenerReglaPuntosVigente,
   obtenerResumenFidelizacion,
   guardarReglaPuntos,
@@ -26,9 +29,9 @@ import {
   type RecompensaFormulario,
   type ResumenFidelizacionPeriodo,
 } from '../../lib/api/fidelizacion'
-import type { CanjeRecompensa, CategoriaServicio, ConfiguracionFidelizacion, MovimientoPuntos, Recompensa, Servicio, TipoRecompensa } from '../../lib/types'
+import type { CanjeRecompensa, CategoriaServicio, ConfiguracionFidelizacion, MovimientoPuntos, PuestoRankingPuntos, Recompensa, Servicio, TipoRecompensa } from '../../lib/types'
 
-type Pestana = 'resumen' | 'recompensas' | 'configuracion' | 'clientas'
+type Pestana = 'resumen' | 'ranking' | 'recompensas' | 'configuracion' | 'clientas'
 
 export function AdminFidelizacion() {
   const [pestana, setPestana] = useState<Pestana>('resumen')
@@ -42,7 +45,7 @@ export function AdminFidelizacion() {
 
       <div className="flex gap-1 overflow-x-auto border-b border-piedra">
         {([
-          ['resumen', 'Resumen'], ['recompensas', 'Recompensas'], ['configuracion', 'Configuración'], ['clientas', 'Clientas'],
+          ['resumen', 'Resumen'], ['ranking', 'Ranking'], ['recompensas', 'Recompensas'], ['configuracion', 'Configuración'], ['clientas', 'Clientas'],
         ] as [Pestana, string][]).map(([p, etiqueta]) => (
           <button
             key={p}
@@ -57,6 +60,7 @@ export function AdminFidelizacion() {
       </div>
 
       {pestana === 'resumen' && <PestanaResumen />}
+      {pestana === 'ranking' && <PestanaRanking />}
       {pestana === 'recompensas' && <PestanaRecompensas />}
       {pestana === 'configuracion' && <PestanaConfiguracion />}
       {pestana === 'clientas' && <PestanaClientas />}
@@ -180,6 +184,75 @@ function MetricaCard({ titulo, valor }: { titulo: string; valor: string | number
       <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">{titulo}</p>
       <p className="mt-1 font-marca text-2xl font-semibold text-oliva">{valor}</p>
     </Card>
+  )
+}
+
+// --- Ranking ("clienta del mes") -----------------------------------------------------------
+// offsetMeses: 0 = mes en curso, -1 = el anterior, … — para que el admin pueda revisar un mes ya
+// cerrado antes de entregar el premio sin tener que esperar a que termine el mes en curso.
+function PestanaRanking() {
+  const [offsetMeses, setOffsetMeses] = useState(0)
+  const [ranking, setRanking] = useState<PuestoRankingPuntos[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  function cargar() {
+    setError(null)
+    setRanking(null)
+    const { desde, hasta } = calcularRangoMes(offsetMeses)
+    obtenerRankingPuntosMes(desde.toISOString(), hasta.toISOString(), 10)
+      .then((filas) => setRanking(filas.filter((f) => f.dentro_del_top)))
+      .catch((e) => setError(e.message))
+  }
+
+  useEffect(cargar, [offsetMeses])
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <p className="font-semibold text-carbon">Clienta del mes</p>
+        <p className="text-sm text-carbon/60">Quién más puntos ganó en el período — nunca el saldo disponible: un canje a mitad de mes no la baja del ranking.</p>
+      </div>
+
+      <div className="flex items-center justify-center gap-3">
+        <button onClick={() => setOffsetMeses((o) => o - 1)} aria-label="Mes anterior" className="rounded-lg p-1.5 text-carbon/60 hover:bg-piedra/40">
+          <IconoChevronIzquierda className="h-5 w-5" />
+        </button>
+        <p className="w-40 text-center font-semibold text-carbon">{etiquetaMes(offsetMeses)}</p>
+        <button
+          onClick={() => setOffsetMeses((o) => o + 1)}
+          disabled={offsetMeses >= 0}
+          aria-label="Mes siguiente"
+          className="rounded-lg p-1.5 text-carbon/60 hover:bg-piedra/40 disabled:opacity-30"
+        >
+          <IconoChevronDerecha className="h-5 w-5" />
+        </button>
+      </div>
+
+      {error && <ErrorState mensaje={error} reintentar={cargar} />}
+      {!ranking && !error ? (
+        <Cargando filas={5} />
+      ) : ranking && ranking.length === 0 ? (
+        <EmptyState titulo="Nadie ganó puntos en este mes todavía" />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {ranking?.map((fila) => (
+            <Card
+              key={fila.cliente_id}
+              className={`flex items-center gap-3 ${fila.posicion === 1 ? 'border-oliva bg-oliva/5' : ''}`}
+            >
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                fila.posicion === 1 ? 'bg-oliva text-blanco' : 'bg-piedra/50 text-carbon/70'
+              }`}>
+                {fila.posicion}
+              </span>
+              {fila.posicion === 1 && <IconoTrofeo className="h-6 w-6 shrink-0 text-oliva" />}
+              <p className="flex-1 font-medium text-carbon">{fila.nombre}</p>
+              <p className="font-semibold text-oliva">{formatoEnteroCOP(fila.puntos_ganados)} pts</p>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

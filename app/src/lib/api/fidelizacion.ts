@@ -10,6 +10,7 @@ import {
   demoMiFidelizacion,
   demoMovimientosPuntos,
   demoNotificacionesFidelizacion,
+  demoRankingPuntosMes,
   demoReglaPuntos,
   demoRecompensas,
 } from '../demoData'
@@ -19,6 +20,7 @@ import type {
   MiFidelizacion,
   MovimientoPuntos,
   NotificacionFidelizacion,
+  PuestoRankingPuntos,
   Recompensa,
   ReglaPuntos,
   TipoRecompensa,
@@ -379,6 +381,18 @@ export async function obtenerResumenFidelizacion(desdeISO: string, hastaISO: str
     .gte('creado_en', desdeISO)
     .lt('creado_en', hastaISO)
   return { clientas_con_movimientos: clientasUnicas.size, puntos_otorgados: otorgados, puntos_utilizados: utilizados, recompensas_canjeadas: recompensasCanjeadas ?? 0 }
+}
+
+// --- Ranking de puntos del mes ("clienta del mes") ------------------------------------------
+// Una sola función (fn_ranking_puntos_mes, 0074) para admin/empleada y clienta: el servidor ya
+// decide qué tanto nombre mostrar según quién pregunta (completo vs. "María G.") — nunca se hace
+// esa reducción acá, para no depender de que el frontend "se acuerde" de ocultar el apellido.
+export async function obtenerRankingPuntosMes(desdeISO: string, hastaISO: string, limite = 10): Promise<PuestoRankingPuntos[]> {
+  if (isDemoMode) return demoRankingPuntosMes
+  const client = supabaseRequerido()
+  const { data, error } = await client.rpc('fn_ranking_puntos_mes', { p_desde: desdeISO, p_hasta: hastaISO, p_limite: limite })
+  if (error) throw error
+  return data as PuestoRankingPuntos[]
 }
 
 export async function ajustarPuntosManual(clienteId: string, puntos: number, motivo: string): Promise<MovimientoPuntos> {
