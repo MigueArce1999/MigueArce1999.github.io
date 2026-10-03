@@ -46,11 +46,11 @@ export function ServicioDetalle() {
         </p>
       )}
 
-      {servicio.profesionales && servicio.profesionales.length > 0 && (
+      {servicio.profesionales && servicio.profesionales.filter((p) => p.activo).length > 0 && (
         <div className="mt-8">
           <p className="mb-3 font-semibold text-carbon">Profesionales que lo realizan</p>
           <div className="flex flex-wrap gap-3">
-            {servicio.profesionales.map((p) => (
+            {servicio.profesionales.filter((p) => p.activo).map((p) => (
               <Link key={p.id} to={`/equipo/${p.slug}`} className="rounded-full bg-piedra/40 px-4 py-1.5 text-sm font-medium text-carbon">
                 {p.nombre}
               </Link>
