@@ -440,6 +440,7 @@ export async function eliminarExcepcionComision(profesionalId: string, servicioI
 export interface ProductoVenta {
   id: string
   fecha: string
+  clienteId: string
   clienteNombre: string
   categoria: string
   nombre: string
@@ -462,6 +463,7 @@ export async function listarProductosVendidos(desdeISO: string, hastaISO: string
   return (data ?? []).map((r: any) => ({
     id: r.id,
     fecha: r.atencion_completado_en ?? r.atencion_creado_en,
+    clienteId: r.cliente_id,
     clienteNombre: r.cliente_nombre,
     categoria: r.categoria,
     nombre: r.nombre,
