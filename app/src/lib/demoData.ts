@@ -272,6 +272,7 @@ export const demoProductosVenta = [
     id: 'demo-prod-1',
     atencionId: 'demo-atencion-1',
     fecha: enHoras(-47),
+    clienteId: 'demo-cliente-1',
     clienteNombre: 'Cliente Demo',
     categoria: 'Tratamiento',
     nombre: 'Aceite de cutícula',

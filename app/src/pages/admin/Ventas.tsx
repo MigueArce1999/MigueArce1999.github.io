@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { CampoMoneda, Input, Select, Textarea } from '../../components/ui/Campos'
 import { Cargando, EmptyState, ErrorState } from '../../components/ui/Estados'
@@ -16,6 +17,7 @@ const TODAS = 'todas'
 export function AdminVentas() {
   const [periodo, setPeriodo] = useState<PeriodoResumen>('mes')
   const [profesionalFiltro, setProfesionalFiltro] = useState(TODAS)
+  const [busquedaCliente, setBusquedaCliente] = useState('')
   const [ventas, setVentas] = useState<VentaLinea[] | null>(null)
   const [productos, setProductos] = useState<ProductoVenta[] | null>(null)
   const [equipo, setEquipo] = useState<Profesional[]>([])
@@ -42,9 +44,26 @@ export function AdminVentas() {
     listarProfesionales().then(setEquipo).catch(() => {})
   }, [])
 
-  const totalVendido = ventas?.reduce((acc, v) => acc + (v.precio_snapshot - v.descuento) * v.cantidad, 0) ?? 0
-  const totalComision = ventas?.reduce((acc, v) => acc + v.comision_total, 0) ?? 0
-  const totalProductos = productos?.reduce((acc, p) => acc + p.subtotal, 0) ?? 0
+  // Buscador por nombre de clienta (0076): filtro en el cliente sobre lo ya cargado para este
+  // periodo — el nombre ya viene en cada fila (v.cliente_nombre/p.clienteNombre), así que no
+  // hace falta una consulta nueva. Igual que el buscador de Clientes.tsx (toLowerCase + includes).
+  const qCliente = busquedaCliente.trim().toLowerCase()
+  const ventasFiltradas = qCliente ? (ventas ?? []).filter((v) => v.cliente_nombre.toLowerCase().includes(qCliente)) : ventas
+  const productosFiltrados = qCliente ? (productos ?? []).filter((p) => p.clienteNombre.toLowerCase().includes(qCliente)) : productos
+
+  // Clientas distintas que coinciden con la búsqueda, para enlazar directo a su perfil (pestaña
+  // "Historial" ahí ya agrupa todas sus visitas y "Resumen" ya tiene el gasto acumulado
+  // histórico real — no se duplica esa suma aquí, el total de abajo es solo de este periodo).
+  const clientesCoincidentes = qCliente
+    ? [...new Map(
+        [...(ventasFiltradas ?? []).map((v) => [v.cliente_id, v.cliente_nombre] as const),
+         ...(productosFiltrados ?? []).map((p) => [p.clienteId, p.clienteNombre] as const)],
+      )].map(([id, nombre]) => ({ id, nombre }))
+    : []
+
+  const totalVendido = ventasFiltradas?.reduce((acc, v) => acc + (v.precio_snapshot - v.descuento) * v.cantidad, 0) ?? 0
+  const totalComision = ventasFiltradas?.reduce((acc, v) => acc + v.comision_total, 0) ?? 0
+  const totalProductos = productosFiltrados?.reduce((acc, p) => acc + p.subtotal, 0) ?? 0
 
   async function borrarVenta(atencionId: string) {
     if (!confirm('¿Borrar esta venta por completo? Se eliminan sus servicios, el pago registrado, su comisión y los puntos que generó. Esto no se puede deshacer.')) return
@@ -70,6 +89,13 @@ export function AdminVentas() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-marca text-2xl font-semibold text-carbon">Ventas y cobros</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={busquedaCliente}
+            onChange={(e) => setBusquedaCliente(e.target.value)}
+            placeholder="Buscar clienta por nombre…"
+            aria-label="Buscar clienta por nombre"
+            className="min-w-0 flex-1 rounded-lg border border-piedra px-3 py-1.5 text-sm sm:max-w-xs"
+          />
           <select
             value={profesionalFiltro}
             onChange={(e) => setProfesionalFiltro(e.target.value)}
@@ -99,12 +125,33 @@ export function AdminVentas() {
         efectivo es un módulo de Fase 2.
       </p>
 
+      {qCliente && (
+        clientesCoincidentes.length === 0 ? (
+          <p className="rounded-lg bg-piedra/20 px-4 py-3 text-sm text-carbon/60">
+            Ninguna clienta con ese nombre tiene servicios o productos en este periodo. Cambia el periodo de arriba o revisa su perfil completo en Clientas.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2 rounded-lg bg-oliva/10 px-4 py-3">
+            {clientesCoincidentes.map((c) => (
+              <div key={c.id} className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-carbon">
+                  <span className="font-semibold">{c.nombre}</span> — en este periodo: {formatoMoneda(totalVendido + totalProductos)} gastado
+                </p>
+                <Link to={`/admin/clientes/${c.id}`} className="text-xs font-semibold text-oliva hover:underline">
+                  Ver perfil completo (historial y gasto acumulado real) →
+                </Link>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
       {error && <ErrorState mensaje={error} />}
       {errorAccion && <ErrorState mensaje={errorAccion} />}
-      {!ventas ? (
+      {!ventasFiltradas ? (
         <Cargando />
-      ) : ventas.length === 0 ? (
-        <EmptyState titulo="No hay ventas registradas en este periodo" />
+      ) : ventasFiltradas.length === 0 ? (
+        <EmptyState titulo={qCliente ? 'Sin servicios para esa búsqueda en este periodo' : 'No hay ventas registradas en este periodo'} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-piedra">
           <table className="w-full min-w-[820px] text-sm">
@@ -122,7 +169,7 @@ export function AdminVentas() {
               </tr>
             </thead>
             <tbody>
-              {ventas.map((v) => {
+              {ventasFiltradas.map((v) => {
                 const vendido = (v.precio_snapshot - v.descuento) * v.cantidad
                 const negocio = vendido - v.comision_total
                 const mostrarAcciones = !yaConAcciones.has(v.atencion_id)
@@ -176,10 +223,10 @@ export function AdminVentas() {
       )}
 
       <h2 className="mt-2 font-marca text-lg font-semibold text-carbon">Productos vendidos</h2>
-      {!productos ? (
+      {!productosFiltrados ? (
         <Cargando filas={2} />
-      ) : productos.length === 0 ? (
-        <EmptyState titulo="No hay productos vendidos en este periodo" />
+      ) : productosFiltrados.length === 0 ? (
+        <EmptyState titulo={qCliente ? 'Sin productos para esa búsqueda en este periodo' : 'No hay productos vendidos en este periodo'} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-piedra">
           <table className="w-full min-w-[560px] text-sm">
@@ -194,7 +241,7 @@ export function AdminVentas() {
               </tr>
             </thead>
             <tbody>
-              {productos.map((p) => (
+              {productosFiltrados.map((p) => (
                 <tr key={p.id} className="border-t border-piedra/60">
                   <td className="px-3 py-2 text-carbon/70">{formatoFecha(p.fecha)}</td>
                   <td className="px-3 py-2 font-medium text-carbon">{p.clienteNombre}</td>
