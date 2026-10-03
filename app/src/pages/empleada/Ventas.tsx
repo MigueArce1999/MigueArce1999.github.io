@@ -9,6 +9,12 @@ import type { ComisionResumen } from '../../lib/types'
 
 type Filtro = 'hoy' | 'semana' | 'mes' | 'rango'
 
+// Una comisión viene de un servicio O de una venta de Tienda (0075), nunca de ambos — ver
+// vista_comision. "Venta:" distingue de un vistazo el origen sin agregar otra columna/filtro.
+function nombreOrigen(c: ComisionResumen): string {
+  return c.servicio_nombre ?? `Venta: ${c.producto_nombre}`
+}
+
 function rangoDeFiltro(filtro: Filtro, desdeManual: string, hastaManual: string) {
   const hoy = new Date()
   if (filtro === 'hoy') {
@@ -93,7 +99,7 @@ export function EmpleadaVentas() {
           {[...generadas, ...devoluciones].map((c) => (
             <Card key={c.id} className="flex items-center justify-between py-3">
               <div>
-                <p className="font-medium text-carbon">{c.servicio_nombre} · {c.cliente_nombre}</p>
+                <p className="font-medium text-carbon">{nombreOrigen(c)} · {c.cliente_nombre}</p>
                 <p className="text-xs text-carbon/50">
                   {formatoFecha(c.creado_en)} · base {formatoMoneda(c.base_calculo)} · {c.estado === 'liquidada' ? 'liquidada' : 'pendiente de liquidar'}
                 </p>
@@ -174,7 +180,7 @@ function ModalLiquidar({
           {pendientes.map((c) => (
             <div key={c.id} className="flex items-center justify-between border-b border-piedra/60 py-2 text-sm last:border-0">
               <div>
-                <p className="font-medium text-carbon">{c.servicio_nombre} · {c.cliente_nombre}</p>
+                <p className="font-medium text-carbon">{nombreOrigen(c)} · {c.cliente_nombre}</p>
                 <p className="text-xs text-carbon/50">{formatoFecha(c.creado_en)}</p>
               </div>
               <span className={`font-semibold ${c.valor >= 0 ? 'text-exito' : 'text-error'}`}>{formatoMoneda(c.valor)}</span>

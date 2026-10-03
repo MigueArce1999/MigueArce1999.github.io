@@ -48,7 +48,10 @@ export function Reservar() {
   // definitivo para poder meterlo en el flujo.
   const serviciosReservables = servicios?.filter((s) => s.duracion_minutos != null) ?? null
   const serviciosNoReservables = servicios?.filter((s) => s.duracion_minutos == null) ?? []
-  const profesionalesDelServicio = servicio?.profesionales ?? []
+  // servicio.profesionales viene del join servicio_profesional->profesional (catalogo.ts), que
+  // no filtra por activo (a diferencia de listarProfesionales): una profesional desactivada
+  // (ver eliminarEmpleada) seguía ofreciéndose aquí para reservar aunque ya no trabaje más.
+  const profesionalesDelServicio = (servicio?.profesionales ?? []).filter((p) => p.activo)
 
   const sesionActiva = Boolean(perfil && (cliente || demoRol === 'cliente'))
 

@@ -23,6 +23,7 @@ const configuracionDemo: ConfiguracionNegocio = {
   live_expiracion_solicitud_minutos: 3,
   live_hold_minutos: 20,
   voz_asistente_genero: 'femenina',
+  comision_tienda_porcentaje: 10,
 }
 
 // Solo los campos que le importan al flujo público de reserva (política de cancelación, modo

@@ -10,6 +10,9 @@ import { fechaBogotaISO, formatoMoneda } from '../../lib/format'
 export function AdminComisiones() {
   const [equipo, setEquipo] = useState<any[]>([])
   const [pendientes, setPendientes] = useState<Record<string, number>>({})
+  // Desglose Servicios/Tienda (0075) — pendientes[] sigue siendo el total combinado, sin tocar
+  // nada de lo que ya lo usa (liquidar, "Liquidar periodo").
+  const [pendientesTienda, setPendientesTienda] = useState<Record<string, number>>({})
   const [reglas, setReglas] = useState<Record<string, { tipo: string; valor: number }>>({})
   const [error, setError] = useState<string | null>(null)
   const [liquidando, setLiquidando] = useState<string | null>(null)
@@ -45,12 +48,17 @@ export function AdminComisiones() {
     const client = supabaseRequerido()
     client
       .from('comision')
-      .select('profesional_id, valor, estado')
+      .select('profesional_id, valor, estado, atencion_producto_id')
       .eq('estado', 'generada')
       .then(({ data }) => {
         const acc: Record<string, number> = {}
-        for (const c of data ?? []) acc[c.profesional_id] = (acc[c.profesional_id] ?? 0) + Number(c.valor)
+        const accTienda: Record<string, number> = {}
+        for (const c of data ?? []) {
+          acc[c.profesional_id] = (acc[c.profesional_id] ?? 0) + Number(c.valor)
+          if (c.atencion_producto_id) accTienda[c.profesional_id] = (accTienda[c.profesional_id] ?? 0) + Number(c.valor)
+        }
         setPendientes(acc)
+        setPendientesTienda(accTienda)
       })
   }, [equipo])
 
@@ -105,7 +113,14 @@ export function AdminComisiones() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-semibold text-oliva">{formatoMoneda(pendientes[p.id] ?? p.comisionPendiente ?? 0)}</span>
+                  <div className="text-right">
+                    <span className="font-semibold text-oliva">{formatoMoneda(pendientes[p.id] ?? p.comisionPendiente ?? 0)}</span>
+                    {!!pendientesTienda[p.id] && (
+                      <p className="text-xs text-carbon/50">
+                        Servicios {formatoMoneda((pendientes[p.id] ?? 0) - pendientesTienda[p.id])} · Tienda {formatoMoneda(pendientesTienda[p.id])}
+                      </p>
+                    )}
+                  </div>
                   <Button variante="secondary" tamano="sm" onClick={() => setEditandoRegla(p.id)}>
                     {reglas[p.id] ? 'Editar regla' : 'Definir regla'}
                   </Button>

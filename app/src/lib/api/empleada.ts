@@ -65,7 +65,17 @@ export async function registrarAtencion(params: {
     // precio es la ganancia completa (100%) de esa persona, sin regla de comisión encima.
     esColaboracion?: boolean
   }[]
-  productos?: { categoria: string; nombre: string; cantidad?: number; precioUnitario: number }[]
+  productos?: {
+    categoria: string
+    nombre: string
+    cantidad?: number
+    precioUnitario: number
+    // Venta de "Tienda" (0075): genera comisión automática para quien la vendió — NO
+    // necesariamente la profesional del servicio de esta misma atención. El servidor rechaza
+    // esVentaTienda=true sin vendedoraId, nunca confía solo en la validación del formulario.
+    esVentaTienda?: boolean
+    vendedoraId?: string | null
+  }[]
   notas?: string | null
   // Clave estable generada UNA vez por intento de registro (ver Atender.tsx): si la petición
   // se reintenta por un error de red, evita crear una segunda atención duplicada.
@@ -88,6 +98,8 @@ export async function registrarAtencion(params: {
       nombre: p.nombre,
       cantidad: p.cantidad ?? 1,
       precio_unitario: p.precioUnitario,
+      es_venta_tienda: p.esVentaTienda ?? false,
+      vendedora_id: p.vendedoraId ?? null,
     })),
     p_notas: params.notas ?? null,
     p_borrador_key: params.borradorKey,
