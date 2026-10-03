@@ -21,6 +21,7 @@ const configDemo: ConfiguracionNegocio = {
   live_expiracion_solicitud_minutos: 3,
   live_hold_minutos: 20,
   voz_asistente_genero: 'femenina',
+  comision_tienda_porcentaje: 10,
 }
 
 export function AdminConfiguracion() {
@@ -107,6 +108,16 @@ export function AdminConfiguracion() {
             value={config.margen_entre_citas_minutos}
             onChange={(e) => setConfig({ ...config, margen_entre_citas_minutos: Number(e.target.value) })}
             ayuda="Tiempo libre que se reserva automáticamente antes y después de cada cita, para que dos citas seguidas nunca queden pegadas."
+          />
+          <Input
+            id="comisionTienda"
+            etiqueta="Comisión por venta de Tienda (%)"
+            type="number"
+            min={0}
+            max={100}
+            value={config.comision_tienda_porcentaje}
+            onChange={(e) => setConfig({ ...config, comision_tienda_porcentaje: Number(e.target.value) })}
+            ayuda="Cuando una colaboradora vende un producto marcado como Tienda en el Paso 3 de Atender, gana este porcentaje del valor vendido. Un cambio aquí solo aplica a ventas nuevas — las comisiones ya generadas conservan el porcentaje con el que se calcularon."
           />
           <Select
             id="voz-glowdesk"

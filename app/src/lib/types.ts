@@ -308,12 +308,15 @@ export interface MovimientoPuntos {
 
 export interface ComisionResumen {
   id: string
-  atencion_servicio_id: string
+  // Exactamente uno de los dos (0075: comisión de servicio o de venta de Tienda, nunca ambos).
+  atencion_servicio_id?: string
+  atencion_producto_id?: string
   base_calculo: number
   valor: number
   estado: 'generada' | 'liquidada'
   creado_en: string
   servicio_nombre?: string
+  producto_nombre?: string
   cliente_nombre?: string
 }
 
@@ -339,6 +342,8 @@ export interface ConfiguracionNegocio {
   anticipacion_minima_reserva_minutos: number
   horizonte_reservas_dias: number
   margen_entre_citas_minutos: number
+  // Comisión por venta de "Tienda" en el Paso 3 de Atender (0075) — nunca hardcodeada en la UI.
+  comision_tienda_porcentaje: number
   // GlowDesk Live (0060_glowdesk_live_esquema.sql) — sección 22 del pedido.
   live_disponibilidad_activo: boolean
   live_umbral_termina_pronto_minutos: number

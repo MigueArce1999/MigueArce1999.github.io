@@ -6,7 +6,7 @@ import { Card, Cargando, ErrorState } from '../../components/ui/Estados'
 import { Modal } from '../../components/ui/Modal'
 import { useAuth } from '../../state/AuthContext'
 import { isDemoMode, supabase } from '../../lib/supabase'
-import { crearServicioRapido, listarProfesionales, listarServicios } from '../../lib/api/catalogo'
+import { crearServicioRapido, listarProfesionales, listarServicios, obtenerConfiguracionNegocio } from '../../lib/api/catalogo'
 import { buscarClientes, completarYCobrarAtencion, crearClienteRapido, listarClientesRecientes, registrarAtencion } from '../../lib/api/empleada'
 import { crearNotaCliente, obtenerClienteAdmin } from '../../lib/api/clientes'
 import { obtenerReservaPorId } from '../../lib/api/reservas'
@@ -58,6 +58,12 @@ interface LineaProductoBorrador {
   nombre: string
   cantidad: number
   precioUnitario: number | null
+  // Venta de "Tienda" (0075): genera comisión automática (configuracion_negocio.
+  // comision_tienda_porcentaje) para quien lo vendió — nunca se asume que es la profesional
+  // del servicio de esta misma atención, se elige aparte. `esVentaTienda` es el valor interno
+  // estable; "Tienda" es solo cómo se muestra en pantalla.
+  esVentaTienda: boolean
+  vendedoraId: string | null
 }
 
 function idTemporal() {
@@ -73,8 +79,12 @@ function lineaIncompleta(l: LineaServicioBorrador) {
 }
 
 // La marca es opcional: la categoría (tinte, champú…) ya identifica el producto igual.
+// Espejo de la validación del servidor (fn_registrar_atencion, 0075): una venta de Tienda sin
+// vendedora nunca se deja confirmar — nunca se confía solo en esta validación del formulario,
+// pero tampoco se deja llegar al servidor algo que ya sabemos que va a rechazar.
 function productoIncompleto(p: LineaProductoBorrador) {
   return !p.categoria.trim() || p.cantidad <= 0 || p.precioUnitario == null || p.precioUnitario < 0
+    || (p.esVentaTienda && !p.vendedoraId)
 }
 
 // Vuelca un AttentionDraft ya confirmado sobre EXACTAMENTE el mismo estado que llena el
@@ -117,6 +127,10 @@ function draftAFormulario(draft: AttentionDraft): { cliente: Cliente | null; lin
     nombre: '',
     cantidad: p.quantity,
     precioUnitario: p.price ?? null,
+    // El asistente de voz nunca dicta si una venta es de Tienda ni quién la hizo — eso solo se
+    // elige a mano en el formulario, igual que ya pasa con la marca (ver comentario arriba).
+    esVentaTienda: false,
+    vendedoraId: null,
   }))
 
   return { cliente, lineas, productos, notas: draft.notes }
@@ -209,10 +223,14 @@ export function EmpleadaAtender({
   const [configFidelizacion, setConfigFidelizacion] = useState<ConfiguracionFidelizacion | null>(null)
   const [reglaPuntos, setReglaPuntos] = useState<ReglaPuntos | null>(null)
   const [resultadoCobro, setResultadoCobro] = useState<ResultadoCobro | null>(null)
+  // Nunca hardcodeado en la UI (0075): se lee una vez de configuracion_negocio, igual que el
+  // resto de configuración de este mismo useEffect.
+  const [comisionTiendaPorcentaje, setComisionTiendaPorcentaje] = useState(10)
 
   useEffect(() => {
     obtenerConfiguracionFidelizacion().then(setConfigFidelizacion).catch(() => {})
     obtenerReglaPuntosVigente().then(setReglaPuntos).catch(() => {})
+    obtenerConfiguracionNegocio().then((c) => setComisionTiendaPorcentaje(c.comision_tienda_porcentaje)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -459,7 +477,14 @@ export function EmpleadaAtender({
               precioSnapshot: l.precio ?? 0,
               esColaboracion: l.esColaboracion,
             })),
-          productos: productos.map((p) => ({ categoria: p.categoria, nombre: p.nombre, cantidad: p.cantidad, precioUnitario: p.precioUnitario ?? 0 })),
+          productos: productos.map((p) => ({
+            categoria: p.categoria,
+            nombre: p.nombre,
+            cantidad: p.cantidad,
+            precioUnitario: p.precioUnitario ?? 0,
+            esVentaTienda: p.esVentaTienda,
+            vendedoraId: p.vendedoraId,
+          })),
           notas: notas.trim() || null,
           borradorKey,
         })
@@ -596,12 +621,19 @@ export function EmpleadaAtender({
             <p className="text-xs uppercase tracking-wide text-carbon/50">Productos</p>
             {productos.map((p) => (
               <div key={p.tempId} className="flex items-center justify-between text-sm">
-                <span className="text-carbon">{p.nombre} <span className="text-carbon/50">· {p.categoria} · x{p.cantidad}</span></span>
+                <div>
+                  <span className="text-carbon">{p.nombre} <span className="text-carbon/50">· {p.categoria} · x{p.cantidad}</span></span>
+                  {p.esVentaTienda && p.vendedoraId && (
+                    <p className="text-xs text-carbon/50">Vendió: {equipo.find((e) => e.id === p.vendedoraId)?.nombre ?? '—'}</p>
+                  )}
+                </div>
                 <span className="font-medium text-carbon">{formatoMoneda(p.cantidad * (p.precioUnitario ?? 0))}</span>
               </div>
             ))}
           </Card>
         )}
+
+        <ResumenVentasTienda productos={productos} equipo={equipo} comisionTiendaPorcentaje={comisionTiendaPorcentaje} />
 
         {notas.trim() && (
           <Card className="flex flex-col gap-1 bg-champan/10">
@@ -776,13 +808,21 @@ export function EmpleadaAtender({
                   <p className="text-xs text-carbon/50">Incluye los productos vendidos en esta visita.</p>
                 </div>
               </div>
-              <button onClick={() => setProductos((prev) => [...prev, { tempId: idTemporal(), categoria: '', nombre: '', cantidad: 1, precioUnitario: null }])} className="text-sm font-semibold text-oliva hover:underline">
+              <button onClick={() => setProductos((prev) => [...prev, { tempId: idTemporal(), categoria: '', nombre: '', cantidad: 1, precioUnitario: null, esVentaTienda: false, vendedoraId: null }])} className="text-sm font-semibold text-oliva hover:underline">
                 + Añadir producto
               </button>
             </div>
             {productos.map((p) => (
-              <ProductoFila key={p.tempId} producto={p} onCambiar={(c) => actualizarProducto(p.tempId, c)} onQuitar={() => quitarProducto(p.tempId)} />
+              <ProductoFila
+                key={p.tempId}
+                producto={p}
+                equipo={equipo}
+                comisionTiendaPorcentaje={comisionTiendaPorcentaje}
+                onCambiar={(c) => actualizarProducto(p.tempId, c)}
+                onQuitar={() => quitarProducto(p.tempId)}
+              />
             ))}
+            <ResumenVentasTienda productos={productos} equipo={equipo} comisionTiendaPorcentaje={comisionTiendaPorcentaje} />
           </Card>
 
           <Card>
@@ -1495,14 +1535,25 @@ const CATEGORIAS_PRODUCTO_SUGERIDAS = ['Tinte', 'Champú', 'Acondicionador', 'Tr
 
 function ProductoFila({
   producto,
+  equipo,
+  comisionTiendaPorcentaje,
   onCambiar,
   onQuitar,
 }: {
   producto: LineaProductoBorrador
+  equipo: Profesional[]
+  comisionTiendaPorcentaje: number
   onCambiar: (cambios: Partial<LineaProductoBorrador>) => void
   onQuitar: () => void
 }) {
+  const { perfil, profesional: miProfesional } = useAuth()
   const subtotal = producto.cantidad * (producto.precioUnitario ?? 0)
+  const comision = Math.round(subtotal * (comisionTiendaPorcentaje / 100) * 100) / 100
+  const vendedora = equipo.find((p) => p.id === producto.vendedoraId)
+  // Misma regla que VistaPreviaComision para comisiones de servicio: admin ve cualquiera,
+  // una empleada solo ve la suya propia — nunca la de una compañera.
+  const puedeVerComision = perfil?.rol === 'admin' || (!!miProfesional && producto.vendedoraId === miProfesional.id)
+
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-piedra p-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1538,6 +1589,87 @@ function ProductoFila({
         </div>
         <button onClick={onQuitar} aria-label="Quitar producto" className="justify-self-end text-sm text-error hover:underline">Quitar</button>
       </div>
+
+      <label className="flex items-center gap-2 text-sm font-medium text-carbon">
+        <input
+          type="checkbox"
+          checked={producto.esVentaTienda}
+          onChange={(e) => onCambiar({ esVentaTienda: e.target.checked, vendedoraId: e.target.checked ? producto.vendedoraId : null })}
+          className="h-4 w-4 rounded border-piedra text-oliva focus:ring-oliva"
+        />
+        Venta de Tienda
+        <span className="font-normal text-carbon/50">· genera comisión para quien la vendió</span>
+      </label>
+
+      {producto.esVentaTienda && (
+        <div className="flex flex-col gap-1.5 rounded-lg bg-piedra/20 p-3">
+          <Select
+            id={`prod-vendedora-${producto.tempId}`}
+            etiqueta="¿Quién realizó la venta?"
+            value={producto.vendedoraId ?? ''}
+            onChange={(e) => onCambiar({ vendedoraId: e.target.value || null })}
+          >
+            <option value="">Elegir…</option>
+            {equipo.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </Select>
+          {!producto.vendedoraId && (
+            <p className="text-xs font-medium text-error">Selecciona quién realizó esta venta para continuar.</p>
+          )}
+          {vendedora && puedeVerComision && subtotal > 0 && (
+            <p className="text-xs text-carbon/70">
+              Comisión para <span className="font-semibold text-carbon">{vendedora.nombre}</span>:{' '}
+              <span className="font-semibold text-oliva">{comisionTiendaPorcentaje}% · +{formatoMoneda(comision)}</span>
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Visible solo para admin (sección "RESUMEN ANTES DE COBRAR" del pedido: la comisión es
+// información interna del negocio, nunca se le muestra a la clienta ni se detalla por persona
+// a una empleada que no sea la dueña de esa comisión — mismo criterio de VistaPreviaComision).
+function ResumenVentasTienda({
+  productos,
+  equipo,
+  comisionTiendaPorcentaje,
+}: {
+  productos: LineaProductoBorrador[]
+  equipo: Profesional[]
+  comisionTiendaPorcentaje: number
+}) {
+  const { perfil } = useAuth()
+  const deTienda = productos.filter((p) => p.esVentaTienda && p.vendedoraId && p.precioUnitario != null && p.precioUnitario >= 0)
+  if (perfil?.rol !== 'admin' || deTienda.length === 0) return null
+
+  const totalVendido = deTienda.reduce((acc, p) => acc + p.cantidad * (p.precioUnitario ?? 0), 0)
+  const totalComision = Math.round(totalVendido * (comisionTiendaPorcentaje / 100) * 100) / 100
+
+  const porVendedora = new Map<string, number>()
+  for (const p of deTienda) {
+    const subtotal = p.cantidad * (p.precioUnitario ?? 0)
+    const comision = Math.round(subtotal * (comisionTiendaPorcentaje / 100) * 100) / 100
+    porVendedora.set(p.vendedoraId!, (porVendedora.get(p.vendedoraId!) ?? 0) + comision)
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-oliva/30 bg-oliva/5 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-carbon/50">Ventas de tienda</p>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span className="text-carbon/70">{deTienda.length} producto{deTienda.length !== 1 ? 's' : ''} · total vendido {formatoMoneda(totalVendido)}</span>
+        <span className="font-semibold text-oliva">Comisiones: {formatoMoneda(totalComision)}</span>
+      </div>
+      {porVendedora.size > 1 && (
+        <div className="flex flex-col gap-0.5 border-t border-oliva/20 pt-1.5">
+          {Array.from(porVendedora.entries()).map(([vendedoraId, monto]) => (
+            <div key={vendedoraId} className="flex items-center justify-between text-xs text-carbon/70">
+              <span>{equipo.find((p) => p.id === vendedoraId)?.nombre ?? '—'}</span>
+              <span className="font-semibold text-carbon">{formatoMoneda(monto)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
